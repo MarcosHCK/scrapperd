@@ -20,7 +20,7 @@ project \
     'scrapperd', 'c', 'vala',
 
     default_options : [ 'warning_level=3' ],
-    meson_version : '>= 1.2',
+    meson_version : '>= 1.2.3',
 
     version : '@0@.@1@.@2@'.format \
       (

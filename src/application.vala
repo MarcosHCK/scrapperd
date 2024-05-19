@@ -25,18 +25,28 @@ namespace ScrapperD
 
       public static int main (string[] args)
         {
-          var app = new Application ();
-          return app.run (args);
+          var application = new Application ();
+          unowned var extension_point = GLib.IOExtensionPoint.register (Instance.EXTENSION_POINT);
+          unowned var extra_modules_dir = GLib.Environment.get_variable ("SCRAPPERD_EXTRA_MODULES");
+          extension_point.set_required_type (typeof (Instance));
+
+          if (extra_modules_dir != null) foreach (unowned var dir in extra_modules_dir.split (";"))
+            {
+              GLib.IOModule.scan_all_in_directory (dir);
+            }
+
+          return application.run (args);
         }
 
       construct
         {
+          add_main_option ("role", 'r', 0, GLib.OptionArg.STRING, "Node role in the network", "ROLE");
           add_main_option ("version", 'V', 0, GLib.OptionArg.NONE, "Print version", null);
         }
 
       public Application ()
         {
-          Object (application_id : APPID, flags : GLib.ApplicationFlags.NON_UNIQUE);
+          Object (application_id : APPID, flags : GLib.ApplicationFlags.HANDLES_COMMAND_LINE | GLib.ApplicationFlags.NON_UNIQUE);
         }
 
       public override void activate ()
@@ -45,9 +55,70 @@ namespace ScrapperD
           message (@"application $(application_id) activated");
         }
 
+      public override int command_line (GLib.ApplicationCommandLine cmdline)
+        {
+          unowned var opts = cmdline.get_options_dict ();
+          string opt;
+
+          while (true)
+            {
+              if (opts.lookup ("role", "s", out opt))
+                {
+                  unowned var found = false;
+                  unowned var gtype = (GLib.Type) null;
+
+                  foreach (unowned var extension in GLib.IOExtensionPoint.lookup (Instance.EXTENSION_POINT).get_extensions ())
+                    {
+                      if (extension.get_name () == opt)
+                        {
+                          found = true;
+                          gtype = extension.ref_class ().get_type ();
+                          break;
+                        }
+                    }
+
+                  if (unlikely (found == false))
+                    {
+                      cmdline.set_exit_status (1);
+                      cmdline.printerr ("Unknown role '%s'\n", opt);
+                      break;
+                    }
+                  else if (unlikely (gtype.is_a (typeof (Instance)) == false))
+                    {
+                      error ("Instance type doesn't derivates from %s", typeof (Instance).name ());
+                    }
+                  else
+                    {
+                      var instance = (Instance) GLib.Object.new (gtype);
+
+                      if (gtype.is_a (typeof (GLib.Initable))) try
+                        {
+                          ((GLib.Initable) instance).init (null);
+                        }
+                      catch (GLib.Error e)
+                        {
+                          unowned var code = e.code;
+                          unowned var domain = e.domain.to_string ();
+                          unowned var message = e.message.to_string ();
+
+                          cmdline.set_exit_status (1);
+                          cmdline.printerr ("Can not initialize '%s' instance: %s: %u: %s\n", opt, domain, code, message);
+                          break;
+                        }
+
+                      instance.weak_ref (() => release ());
+                      hold ();
+                    }
+                }
+
+              break;
+            }
+          return base.command_line (cmdline);
+        }
+
       public override int handle_local_options (GLib.VariantDict opts)
         {
-          if (opts.contains ("version") || opts.contains ("v"))
+          if (opts.contains ("version"))
             {
               print ("%s\n", Config.PACKAGE_VERSION);
               return 0;
