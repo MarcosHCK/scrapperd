@@ -21,6 +21,8 @@ namespace ScrapperD
 {
   public class InfrastructureInstance : Instance
     {
+      private int sleep_time = 3 * 1000;
+
       [CCode (cname = "g_io_infrastructuremod_query")]
       public static string[] query ()
         {
@@ -39,6 +41,37 @@ namespace ScrapperD
       [CCode (cname = "g_io_infrastructuremod_unload")]
       public static void unload (GLib.IOModule module)
         {
+        }
+
+      class construct
+        {
+          add_option_entry ("sleep-time", 0, 0, GLib.OptionArg.INT, "Time to wait between watches", "MILLISECONDS");
+        }
+
+      public override void activate ()
+        {
+          var source = new GLib.TimeoutSource (sleep_time);
+
+          source.set_callback (() => this.watch ());
+          source.set_priority (GLib.Priority.DEFAULT_IDLE);
+          source.set_static_name ("ScrapperD.InfrastructureInstance.watch");
+          source.set_ready_time (0);
+          source.attach (GLib.MainContext.get_thread_default ());
+        }
+
+      public override bool command_line (GLib.VariantDict dict) throws GLib.Error
+        {
+          if (dict.lookup ("sleep-time", "i", out sleep_time) && sleep_time < 0)
+            {
+              throw new IOError.FAILED ("invalid --sleep-time value");
+            }
+          return true;
+        }
+
+      public bool watch ()
+        {
+          print ("watch\n");
+          return GLib.Source.CONTINUE;
         }
     }
 }

@@ -110,9 +110,13 @@ namespace ScrapperD
                     {
                       var instance = (Instance) GLib.Object.new (gtype);
 
-                      if (gtype.is_a (typeof (GLib.Initable))) try
+                       try
                         {
-                          ((GLib.Initable) instance).init (null);
+                          if (gtype.is_a (typeof (GLib.Initable)))
+                            
+                            ((GLib.Initable) instance).init (null);
+                            instance.command_line (opts);
+                            instance.activate ();
                         }
                       catch (GLib.Error e)
                         {
