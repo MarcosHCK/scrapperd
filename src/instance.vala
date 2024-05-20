@@ -34,6 +34,14 @@ namespace ScrapperD
           LESS = (1 << 2),
         }
 
+      public virtual void activate () { warning ("ScrapperD.Instance.activate should be overriden by implementations"); }
+      public virtual bool command_line (GLib.VariantDict dict) throws GLib.Error { return true; }
+
+      public class unowned List<GLib.OptionEntry?> get_option_entries ()
+        {
+          return option_entries;
+        }
+
       [CCode (simple_generics = false)]
       public static void install<T> (string @as, string? expected_version = null)
         {
@@ -46,11 +54,6 @@ namespace ScrapperD
             {
               warning ("Module '%s' version requirement ('%s') could not be met\n", @as, expected_version);
             }
-        }
-
-      public class unowned List<GLib.OptionEntry?> get_option_entries ()
-        {
-          return option_entries;
         }
 
       protected class void add_option_entry (string long_name, char short_name, GLib.OptionFlags flags, GLib.OptionArg arg, string description, string? arg_description)

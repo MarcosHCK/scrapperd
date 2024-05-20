@@ -37,5 +37,6 @@ infrastructuremod = shared_module \
     sources :
       [
         'instance.vala',
+        'node.vala',
       ],
   )

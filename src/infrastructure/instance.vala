@@ -19,9 +19,22 @@
 
 namespace ScrapperD
 {
+  internal const string ROLE = "infrastructure";
+
   public class InfrastructureInstance : Instance
     {
-      private int sleep_time = 3 * 1000;
+      private int boottime = 300;
+      private string dbus_daemon = "scrapperd-bus";
+      private uint16 dbus_port = 9000;
+
+      private GLib.DBusConnection connection;
+      private GLib.SubprocessLauncher launcher;
+
+      private class NodeImpl : GLib.Object, Node
+        {
+          public string impl { owned get { return "org.hck.ScrapperD.Node.Infrastructure"; } }
+          public string role { owned get { return ROLE; } }
+        }
 
       [CCode (cname = "g_io_infrastructuremod_query")]
       public static string[] query ()
@@ -34,8 +47,8 @@ namespace ScrapperD
       [CCode (cname = "g_io_infrastructuremod_load")]
       public static void load (GLib.IOModule module)
         {
-          module.set_name ("Infrastructure");
-          Instance.install<InfrastructureInstance> ("infrastructure", ">=" + Config.PACKAGE_VERSION);
+          module.set_name (ROLE);
+          Instance.install<InfrastructureInstance> (ROLE, ">=" + Config.PACKAGE_VERSION);
         }
 
       [CCode (cname = "g_io_infrastructuremod_unload")]
@@ -45,33 +58,108 @@ namespace ScrapperD
 
       class construct
         {
-          add_option_entry ("sleep-time", 0, 0, GLib.OptionArg.INT, "Time to wait between watches", "MILLISECONDS");
+          add_option_entry ("boottime", 0, 0, GLib.OptionArg.INT, "Time to wait until dbus boots up", "MILLISECONDS");
+          add_option_entry ("dbus-daemon", 0, 0, GLib.OptionArg.STRING, "D-Bus daemon to use", "COMMAND");
+          add_option_entry ("dbus-port", 'p', 0, GLib.OptionArg.INT, "Port to listen to", "PORT");
         }
 
       public override void activate ()
         {
-          var source = new GLib.TimeoutSource (sleep_time);
-
-          source.set_callback (() => this.watch ());
-          source.set_priority (GLib.Priority.DEFAULT_IDLE);
-          source.set_static_name ("ScrapperD.InfrastructureInstance.watch");
-          source.set_ready_time (0);
-          source.attach (GLib.MainContext.get_thread_default ());
+          try { launch_daemon (); } catch (GLib.Error e)
+            {
+              error (@"Can not launch dbus daemon: $(e.domain): $(e.code): $(e.domain)");
+            }
         }
 
-      public override bool command_line (GLib.VariantDict dict) throws GLib.Error
+      public override bool command_line (GLib.VariantDict opts) throws GLib.Error
         {
-          if (dict.lookup ("sleep-time", "i", out sleep_time) && sleep_time < 0)
+          string value_s;
+          int value_i;
+
+          if (opts.lookup ("boottime", "i", out value_i))
             {
-              throw new IOError.FAILED ("invalid --sleep-time value");
+              if (unlikely ((boottime = value_i) < 0))
+
+                throw new IOError.FAILED ("invalid boottime value");
+            }
+
+          if (opts.lookup ("dbus-daemon", "s", out value_s))
+            {
+              dbus_daemon = value_s;
+            }
+
+          if (opts.lookup ("dbus-port", "i", out value_i))
+            {
+              if (likely (value_i >= uint16.MIN && uint16.MAX >= value_i))
+                dbus_port = (uint16) value_i;
+              else
+                throw new IOError.FAILED ("invalid dbus port value");
             }
           return true;
         }
 
-      public bool watch ()
+      private async void connect_daemon (GLib.Cancellable? cancellable = null) throws GLib.Error
         {
-          print ("watch\n");
-          return GLib.Source.CONTINUE;
+          var family = GLib.SocketFamily.IPV6;
+          var inet_address = new InetAddress.loopback (family);
+          var socket_address = new InetSocketAddress (inet_address, dbus_port);
+          var client = new SocketClient ();
+
+          client.enable_proxy = false;
+          client.family = family;
+          client.protocol = GLib.SocketProtocol.TCP;
+          client.type = GLib.SocketType.STREAM;
+
+          var flags1 = GLib.DBusConnectionFlags.AUTHENTICATION_CLIENT;
+          var flags2 = GLib.DBusConnectionFlags.MESSAGE_BUS_CONNECTION;
+          var flags = flags1 | flags2;
+          var stream = yield client.connect_async (socket_address, cancellable);
+
+          connection = yield new GLib.DBusConnection (stream, null, flags, null, cancellable);
+
+          connection.register_object<Node> (Node.BASE_PATH, new NodeImpl ());
+          connection.register_object<InstanceNode> (Node.BASE_PATH, new InstanceNodeImpl ());
+        }
+
+      private bool connect_daemon_source ()
+        {
+          connect_daemon.begin (null, (_, res) =>
+            {
+              try { connect_daemon.end (res); } catch (GLib.Error e)
+                {
+                  error (@"Can not connect to bus: $(e.domain): $(e.code): $(e.message)");
+                }
+            });
+          return GLib.Source.REMOVE;
+        }
+
+      private void launch_daemon () throws GLib.Error
+        {
+          Subprocess process;
+          Source source;
+
+          launcher = new SubprocessLauncher (0);
+          process = launcher.spawn (dbus_daemon, "--address", @"tcp:port=$(dbus_port)");
+          source = new TimeoutSource (boottime);
+
+          source.set_callback (() => connect_daemon_source ());
+          source.set_priority (GLib.Priority.HIGH_IDLE);
+          source.set_static_name ("ScrapperD.InfrastructureInstance.connect_daemon");
+          source.attach (GLib.MainContext.get_thread_default ());
+
+          process.wait_check_async.begin (null, (source_object, res) =>
+            {
+
+              try { ((GLib.Subprocess) source_object).wait_check_async.end (res); } catch (GLib.Error e)
+                {
+                  warning (@"D-Bus daemon: $(e.domain): $(e.code): $(e.message)");
+                }
+
+              try { launch_daemon (); } catch (GLib.Error e)
+                {
+                  error (@"Can not launch dbus daemon: $(e.domain): $(e.code): $(e.domain)");
+                }
+            });
         }
     }
 }
