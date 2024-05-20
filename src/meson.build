@@ -64,5 +64,6 @@ scrapperd = executable \
     sources :
       [
         'application.vala',
+        'instanceclass.vapi',
       ],
   )

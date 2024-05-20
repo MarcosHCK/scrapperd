@@ -23,11 +23,32 @@ namespace ScrapperD
     {
       public const string EXTENSION_POINT = "org.hck.ScrapperD.Instance";
 
+      private class List<GLib.OptionEntry?> option_entries = new List<GLib.OptionEntry?> ();
+
       [CCode (simple_generics = false)]
       public static void install<T> (string @as)
         {
           var gtype = typeof (T);
           GLib.IOExtensionPoint.implement (EXTENSION_POINT, gtype, @as, 0);
+        }
+
+      public class unowned List<GLib.OptionEntry?> get_option_entries ()
+        {
+          return option_entries;
+        }
+
+      protected class void add_option_entry (string long_name, char short_name, GLib.OptionFlags flags, GLib.OptionArg arg, string description, string? arg_description)
+        {
+          var entry = GLib.OptionEntry ();
+
+          entry.arg = arg;
+          entry.arg_data = null;
+          entry.arg_description = arg_description;
+          entry.description = description;
+          entry.flags = flags;
+          entry.long_name = long_name;
+          entry.short_name = short_name;
+          option_entries.prepend (entry);
         }
     }
 }

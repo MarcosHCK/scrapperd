@@ -25,7 +25,6 @@ namespace ScrapperD
 
       public static int main (string[] args)
         {
-          var application = new Application ();
           unowned var extension_point = GLib.IOExtensionPoint.register (Instance.EXTENSION_POINT);
           unowned var extra_modules_dir = GLib.Environment.get_variable ("SCRAPPERD_EXTRA_MODULES");
           extension_point.set_required_type (typeof (Instance));
@@ -35,11 +34,29 @@ namespace ScrapperD
               GLib.IOModule.scan_all_in_directory (dir);
             }
 
-          return application.run (args);
+          return (new Application ()).run (args);
         }
 
       construct
         {
+          foreach (unowned var extension in GLib.IOExtensionPoint.lookup (Instance.EXTENSION_POINT).get_extensions ())
+            {
+
+              foreach (unowned var entry in ((InstanceClass) extension.ref_class ()).get_option_entries ())
+                {
+                  unowned var arg = entry.arg;
+                  unowned var arg_data = entry.arg_data;
+                  unowned var arg_description = entry.arg_description;
+                  unowned var description = entry.description;
+                  unowned var flags = entry.flags;
+                  unowned var long_name = entry.long_name;
+                  unowned var short_name = entry.short_name;
+
+                  add_main_option (long_name, short_name, flags, arg, description, arg_description);
+                }
+            }
+
+          add_main_option ("modules", 0, 0, GLib.OptionArg.NONE, "List installed modules", null);
           add_main_option ("role", 'r', 0, GLib.OptionArg.STRING, "Node role in the network", "ROLE");
           add_main_option ("version", 'V', 0, GLib.OptionArg.NONE, "Print version", null);
         }
@@ -64,15 +81,17 @@ namespace ScrapperD
             {
               if (opts.lookup ("role", "s", out opt))
                 {
-                  unowned var found = false;
-                  unowned var gtype = (GLib.Type) null;
+                  bool found = false;
+                  GLib.Type gtype = 0;
+                  GLib.TypeClass? klass = null;
 
                   foreach (unowned var extension in GLib.IOExtensionPoint.lookup (Instance.EXTENSION_POINT).get_extensions ())
                     {
                       if (extension.get_name () == opt)
                         {
                           found = true;
-                          gtype = extension.ref_class ().get_type ();
+                          gtype = extension.get_type ();
+                          klass = extension.ref_class ();
                           break;
                         }
                     }
@@ -118,7 +137,21 @@ namespace ScrapperD
 
       public override int handle_local_options (GLib.VariantDict opts)
         {
-          if (opts.contains ("version"))
+          if (opts.contains ("modules"))
+            {
+              var builder = new StringBuilder ();
+              var first = true;
+
+              foreach (unowned var extension in GLib.IOExtensionPoint.lookup (Instance.EXTENSION_POINT).get_extensions ())
+                {
+                  builder.append_printf ("%s%s", first ? "" : ", ", extension.get_name ());
+                  first = true;
+                }
+
+              print ("%s\n", builder.str);
+              return 0;
+            }
+          else if (opts.contains ("version"))
             {
               print ("%s\n", Config.PACKAGE_VERSION);
               return 0;
