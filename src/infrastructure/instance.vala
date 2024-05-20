@@ -21,6 +21,13 @@ namespace ScrapperD
 {
   public class InfrastructureInstance : Instance
     {
+      [CCode (cname = "g_io_infrastructuremod_query")]
+      public static string[] query ()
+        {
+          var extension_points = new string[] { Instance.EXTENSION_POINT };
+          return extension_points;
+        }
+
       [ModuleInit]
       [CCode (cname = "g_io_infrastructuremod_load")]
       public static void load (GLib.IOModule module)
