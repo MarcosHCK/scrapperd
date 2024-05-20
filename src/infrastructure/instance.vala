@@ -23,12 +23,13 @@ namespace ScrapperD
 
   public class InfrastructureInstance : Instance
     {
+      private string? connection_address;
       private int boottime = 300;
       private string dbus_daemon = "scrapperd-bus";
       private uint16 dbus_port = 9000;
 
-      private GLib.DBusConnection connection;
-      private GLib.SubprocessLauncher launcher;
+      private ScrapperD.Connection? client_connection = null;
+      private ScrapperD.Connection? daemon_connection = null;
 
       private class NodeImpl : GLib.Object, Node
         {
@@ -65,10 +66,7 @@ namespace ScrapperD
 
       public override void activate ()
         {
-          try { launch_daemon (); } catch (GLib.Error e)
-            {
-              error (@"Can not launch dbus daemon: $(e.domain): $(e.code): $(e.domain)");
-            }
+          launch_daemon.begin (null);
         }
 
       public override bool command_line (GLib.VariantDict opts) throws GLib.Error
@@ -81,6 +79,11 @@ namespace ScrapperD
               if (unlikely ((boottime = value_i) < 0))
 
                 throw new IOError.FAILED ("invalid boottime value");
+            }
+
+          if (opts.lookup ("connect", "s", out value_s))
+            {
+              connection_address = value_s;
             }
 
           if (opts.lookup ("dbus-daemon", "s", out value_s))
@@ -98,27 +101,38 @@ namespace ScrapperD
           return true;
         }
 
+      private async void connect_client (GLib.Cancellable? cancellable = null) throws GLib.Error
+        {
+          if (connection_address != null)
+            {
+              var bus = yield new ScrapperD.Connection (connection_address, cancellable);
+
+              bus.register_object<Node> (Node.BASE_PATH, new NodeImpl ());
+              bus.register_object<InstanceNode> (Node.BASE_PATH, new InstanceNodeImpl (false));
+              client_connection = bus;
+            }
+        }
+
+      private bool connect_client_source ()
+        {
+          connect_client.begin (null, (_, res) =>
+            {
+              try { connect_client.end (res); } catch (GLib.Error e)
+                {
+                  error (@"Can not connect to bus: $(e.domain): $(e.code): $(e.message)");
+                }
+            });
+          return GLib.Source.REMOVE;
+        }
+
       private async void connect_daemon (GLib.Cancellable? cancellable = null) throws GLib.Error
         {
-          var family = GLib.SocketFamily.IPV6;
-          var inet_address = new InetAddress.loopback (family);
-          var socket_address = new InetSocketAddress (inet_address, dbus_port);
-          var client = new SocketClient ();
+          var address = @"tcp:host=localhost,port=$(dbus_port)";
+          var bus = yield new ScrapperD.Connection (address, cancellable);
 
-          client.enable_proxy = false;
-          client.family = family;
-          client.protocol = GLib.SocketProtocol.TCP;
-          client.type = GLib.SocketType.STREAM;
-
-          var flags1 = GLib.DBusConnectionFlags.AUTHENTICATION_CLIENT;
-          var flags2 = GLib.DBusConnectionFlags.MESSAGE_BUS_CONNECTION;
-          var flags = flags1 | flags2;
-          var stream = yield client.connect_async (socket_address, cancellable);
-
-          connection = yield new GLib.DBusConnection (stream, null, flags, null, cancellable);
-
-          connection.register_object<Node> (Node.BASE_PATH, new NodeImpl ());
-          connection.register_object<InstanceNode> (Node.BASE_PATH, new InstanceNodeImpl ());
+          bus.register_object<Node> (Node.BASE_PATH, new NodeImpl ());
+          bus.register_object<InstanceNode> (Node.BASE_PATH, new InstanceNodeImpl (true));
+          daemon_connection = bus;
         }
 
       private bool connect_daemon_source ()
@@ -129,37 +143,59 @@ namespace ScrapperD
                 {
                   error (@"Can not connect to bus: $(e.domain): $(e.code): $(e.message)");
                 }
+              finally
+                {
+                  var source = new TimeoutSource (boottime);
+
+                  source.set_callback (() => connect_client_source ());
+                  source.set_priority (GLib.Priority.HIGH_IDLE);
+                  source.set_static_name ("ScrapperD.InfrastructureInstance.connect_client");
+                  source.attach (GLib.MainContext.get_thread_default ());
+                }
             });
           return GLib.Source.REMOVE;
         }
 
-      private void launch_daemon () throws GLib.Error
+      private async ScrapperD.Connection? destroy_connection (ScrapperD.Connection? dbus, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
-          Subprocess process;
-          Source source;
-
-          launcher = new SubprocessLauncher (0);
-          process = launcher.spawn (dbus_daemon, "--address", @"tcp:port=$(dbus_port)");
-          source = new TimeoutSource (boottime);
-
-          source.set_callback (() => connect_daemon_source ());
-          source.set_priority (GLib.Priority.HIGH_IDLE);
-          source.set_static_name ("ScrapperD.InfrastructureInstance.connect_daemon");
-          source.attach (GLib.MainContext.get_thread_default ());
-
-          process.wait_check_async.begin (null, (source_object, res) =>
+          if (likely (dbus != null)) try { yield dbus.close (cancellable); } catch (GLib.Error e)
             {
+              if (e.matches (IOError.quark (), IOError.CANCELLED)) throw e;
 
-              try { ((GLib.Subprocess) source_object).wait_check_async.end (res); } catch (GLib.Error e)
-                {
-                  warning (@"D-Bus daemon: $(e.domain): $(e.code): $(e.message)");
-                }
+                warning (@"Error closing connection: $(e.domain): $(e.code): $(e.message)");
+            }
+          return null;
+        }
 
-              try { launch_daemon (); } catch (GLib.Error e)
+      private async void launch_daemon (GLib.Cancellable? cancellable = null) throws GLib.Error
+        {
+          var launcher = new SubprocessLauncher (0);
+          var process = (GLib.Subprocess) null;
+
+          string args[] = { dbus_daemon, "--address", @"tcp:port=$(dbus_port)", null };
+
+          do
+            {
+              try { process = launcher.spawnv (args); } catch (GLib.Error e)
                 {
                   error (@"Can not launch dbus daemon: $(e.domain): $(e.code): $(e.domain)");
                 }
-            });
+
+              var source = new TimeoutSource (boottime);
+
+              source.set_callback (() => connect_daemon_source ());
+              source.set_priority (GLib.Priority.HIGH_IDLE);
+              source.set_static_name ("ScrapperD.InfrastructureInstance.connect_daemon");
+              source.attach (GLib.MainContext.get_thread_default ());
+
+              try { yield process.wait_check_async (cancellable); } catch (GLib.Error e)
+                {
+                  client_connection = yield destroy_connection (client_connection, cancellable);
+                  daemon_connection = yield destroy_connection (daemon_connection, cancellable);
+                  warning (@"D-Bus daemon: $(e.domain): $(e.code): $(e.message)");
+                }
+            }
+          while (cancellable?.is_cancelled () != true);
         }
     }
 }

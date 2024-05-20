@@ -56,6 +56,7 @@ namespace ScrapperD
                 }
             }
 
+          add_main_option ("connect", 'c', 0, GLib.OptionArg.STRING, "Network entry point", "ADDRESS");
           add_main_option ("modules", 0, 0, GLib.OptionArg.NONE, "List installed modules", null);
           add_main_option ("role", 'r', 0, GLib.OptionArg.STRING, "Node role in the network", "ROLE");
           add_main_option ("version", 'V', 0, GLib.OptionArg.NONE, "Print version", null);
@@ -79,7 +80,11 @@ namespace ScrapperD
 
           while (true)
             {
-              if (opts.lookup ("role", "s", out opt))
+              if (opts.lookup ("role", "s", out opt) == false)
+                {
+                  warning ("no role defined for this instance");
+                }
+              else
                 {
                   bool found = false;
                   GLib.Type gtype = 0;
