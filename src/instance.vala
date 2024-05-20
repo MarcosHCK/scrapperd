@@ -25,11 +25,27 @@ namespace ScrapperD
 
       private class List<GLib.OptionEntry?> option_entries = new List<GLib.OptionEntry?> ();
 
-      [CCode (simple_generics = false)]
-      public static void install<T> (string @as)
+      [Flags]
+      private enum VersionOp
         {
-          var gtype = typeof (T);
-          GLib.IOExtensionPoint.implement (EXTENSION_POINT, gtype, @as, 0);
+          NONE = 0,
+          EQUAL = (1 << 0),
+          GREATER = (1 << 1),
+          LESS = (1 << 2),
+        }
+
+      [CCode (simple_generics = false)]
+      public static void install<T> (string @as, string? expected_version = null)
+        {
+          if (expected_version == null || version_check (expected_version))
+            {
+              var gtype = typeof (T);
+              GLib.IOExtensionPoint.implement (EXTENSION_POINT, gtype, @as, 0);
+            }
+          else if (expected_version != null)
+            {
+              warning ("Module '%s' version requirement ('%s') could not be met\n", @as, expected_version);
+            }
         }
 
       public class unowned List<GLib.OptionEntry?> get_option_entries ()
@@ -49,6 +65,78 @@ namespace ScrapperD
           entry.long_name = long_name;
           entry.short_name = short_name;
           option_entries.prepend (entry);
+        }
+
+      private static bool version_ints (string version, uint ints [3]) throws GLib.Error
+        {
+          unowned var from = version;
+          unowned var i = 0;
+
+          for (unichar c = 0; (c = version.get_char ()) > 0 && i < 3; version = version.next_char ())
+            {
+              if (c.isdigit () == true)
+                {
+                  from = version;
+                }
+              else
+                {
+                  unowned var length = (char*) version - (char*) from;
+                  unowned var value = (uint64) 0;
+
+                  uint64.from_string (from.substring (0, (long) length), out value, 10, 0, uint.MAX);
+                  ints [i++] = (uint) value;
+                }
+            }
+
+          return true;
+        }
+
+      private static unowned string version_op (string constraint, out VersionOp op)
+        {
+          op = VersionOp.NONE;
+
+          for (int i = 0; i < 3; ++i) switch (constraint [i])
+            {
+              default: if (unlikely (i > 2)) error ("invalid version constraint '%s'", constraint); else op = i > 0 ? op : VersionOp.EQUAL;
+                return constraint.offset (i);
+              case '=': if (unlikely (i > 1)) error ("invalid version constraint '%s'", constraint); else op |= VersionOp.EQUAL; break;
+              case '>': if (unlikely (i != 0)) error ("invalid version constraint '%s'", constraint); else op |= VersionOp.GREATER; break;
+              case '<': if (unlikely (i != 0)) error ("invalid version constraint '%s'", constraint); else op |= VersionOp.LESS; break;
+            }
+
+          assert_not_reached ();
+        }
+
+      private static bool version_check (string checkstring)
+        {
+          uint local [3] =
+            {
+              Config.PACKAGE_VERSION_MAJOR,
+              Config.PACKAGE_VERSION_MINOR,
+              Config.PACKAGE_VERSION_MICRO,
+            };
+
+          foreach (unowned var constraint in checkstring.split (","))
+            {
+              unowned var op = VersionOp.NONE;
+              unowned var against = version_op (constraint, out op);
+              unowned var good = true;
+              uint ints [3];
+
+              try { good = version_ints (against = against.offset (against [0] != 'v' ? 0 : 1), ints); }
+                catch (GLib.Error e) { good = false; } finally
+                  {
+                    if (unlikely (!good)) error ("invalid version constraint '%s'", constraint);
+                  }
+
+              for (int i = 0; i < ints.length; ++i)
+                {
+                  if (unlikely (local [i] < ints [i] && (VersionOp.LESS in op) == false)) return false;
+                  else if (unlikely (local [i] == ints [i] && (VersionOp.EQUAL in op) == false)) return false;
+                  else if (unlikely (local [i] > ints [i] && (VersionOp.GREATER in op) == false)) return false;
+                }
+            }
+          return true;
         }
     }
 }

@@ -33,7 +33,7 @@ namespace ScrapperD
       public static void load (GLib.IOModule module)
         {
           module.set_name ("Infrastructure");
-          Instance.install<InfrastructureInstance> ("infrastructure");
+          Instance.install<InfrastructureInstance> ("infrastructure", ">=" + Config.PACKAGE_VERSION);
         }
 
       [CCode (cname = "g_io_infrastructuremod_unload")]
