@@ -165,7 +165,7 @@ namespace ScrapperD
               foreach (unowned var extension in GLib.IOExtensionPoint.lookup (Instance.EXTENSION_POINT).get_extensions ())
                 {
                   builder.append_printf ("%s%s", first ? "" : ", ", extension.get_name ());
-                  first = true;
+                  first = false;
                 }
 
               print ("%s\n", builder.str);
