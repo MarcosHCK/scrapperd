@@ -36,7 +36,7 @@ infrastructure = library \
 
     sources :
       [
-        'dbus.vala',
+        'bridge.vala',
       ],
   )
 

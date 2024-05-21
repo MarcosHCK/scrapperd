@@ -27,7 +27,8 @@ namespace ScrapperD
       private string daemon = "scrapperd-bus";
       private uint16 port = 9000;
 
-      public GLib.DBusConnection? daemon_connection { get; private set; }
+      private ScrapperD.DBusBridge? direct = null;
+      private ScrapperD.DBusBridge? reverse = null;
 
       [CCode (cname = "g_io_infrastructuremod_query")]
       public static string[] query ()
@@ -95,8 +96,9 @@ namespace ScrapperD
           var flags1 = GLib.DBusConnectionFlags.AUTHENTICATION_CLIENT;
           var flags2 = GLib.DBusConnectionFlags.MESSAGE_BUS_CONNECTION;
           var flags = flags1 | flags2;
+          var bus = yield new GLib.DBusConnection.for_address (address, flags, null, cancellable);
 
-          daemon_connection = yield new GLib.DBusConnection.for_address (address, flags, null, cancellable);
+          direct = yield new ScrapperD.DBusBridge (connection, bus, bus_name, cancellable);
           return true;
         }
 
@@ -110,17 +112,6 @@ namespace ScrapperD
                 }
             });
           return GLib.Source.REMOVE;
-        }
-
-      private static async GLib.DBusConnection? destroy_connection (GLib.DBusConnection? connection, GLib.Cancellable? cancellable = null) throws GLib.Error
-        {
-          if (likely (connection != null)) try { yield connection.close (cancellable); } catch (GLib.Error e)
-            {
-              if (e.matches (IOError.quark (), IOError.CANCELLED)) throw e;
-
-                warning (@"Error closing connection: $(e.domain): $(e.code): $(e.message)");
-            }
-          return null;
         }
 
       private async void launch_daemon (GLib.Cancellable? cancellable = null) throws GLib.Error
@@ -146,7 +137,7 @@ namespace ScrapperD
 
               try { yield process.wait_check_async (cancellable); } catch (GLib.Error e)
                 {
-                  daemon_connection = yield destroy_connection (daemon_connection);
+                  direct = (reverse = null);
                   warning (@"D-Bus daemon: $(e.domain): $(e.code): $(e.message)");
                 }
             }

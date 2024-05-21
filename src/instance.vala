@@ -24,16 +24,19 @@ namespace ScrapperD
       public const string EXTENSION_POINT = "org.hck.ScrapperD.Instance";
 
       public string address { get; construct; }
+      public string bus_name { get; private set; }
       public GLib.DBusConnection connection { get; private set; }
       public GLib.DBusAuthObserver? observer { get; construct; default = null; }
       public string role { get; construct; }
 
+      private uint name_regid = 0;
       private uint node_regid = 0;
 
       private class List<GLib.OptionEntry?> option_entries = new List<GLib.OptionEntry?> ();
 
       ~Instance ()
         {
+          GLib.Bus.unown_name (name_regid);
           connection?.unregister_object (node_regid);
         }
 
@@ -75,7 +78,15 @@ namespace ScrapperD
               var flags = flags1 | flags2;
 
               connection = yield new GLib.DBusConnection.for_address (address, flags, observer, cancellable);
+            }
+          if (address != null)
+            {
+              var flags = GLib.BusNameOwnerFlags.DO_NOT_QUEUE;
+              var name = @"m.$(connection.unique_name.offset (1))".replace (".", ".c");
+
+              name_regid = GLib.Bus.own_name_on_connection (connection, name, flags, null, null);
               node_regid = connection.register_object<Node> (Node.BASE_PATH, Node.create (role));
+              bus_name = (owned) name;
             }
           return init (cancellable);
         }
