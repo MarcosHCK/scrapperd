@@ -15,9 +15,9 @@
 # along with ScrapperD. If not, see <http://www.gnu.org/licenses/>.
 #
 
-infrastructuremod = shared_module \
+infrastructure = library \
   (
-    'infrastructuremod',
+    'infrastructure',
 
     dependencies :
       [
@@ -36,7 +36,31 @@ infrastructuremod = shared_module \
 
     sources :
       [
+        'dbus.vala',
+      ],
+  )
+
+infrastructuremod = shared_module \
+  (
+    'infrastructuremod',
+
+    dependencies :
+      [
+        vala.find_library ('gio-2.0'),
+        vala.find_library ('glib-2.0'),
+        vala.find_library ('gobject-2.0'),
+
+        libgio_dep,
+        libglib_dep,
+        libgobject_dep,
+      ],
+
+    include_directories : [ configdir, libscrapperdinc ],
+
+    link_with : [ infrastructure, libscrapperd ],
+
+    sources :
+      [
         'instance.vala',
-        'node.vala',
       ],
   )

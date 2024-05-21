@@ -34,7 +34,6 @@ libscrapperd = library \
 
     sources :
       [
-        'connection.vala',
         'instance.vala',
         'node.vala',
       ],

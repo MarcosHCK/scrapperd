@@ -19,11 +19,23 @@
 
 namespace ScrapperD
 {
-  public abstract class Instance : GLib.Object
+  public abstract class Instance : GLib.Object, GLib.Initable, GLib.AsyncInitable
     {
       public const string EXTENSION_POINT = "org.hck.ScrapperD.Instance";
 
+      public string address { get; construct; }
+      public GLib.DBusConnection connection { get; private set; }
+      public GLib.DBusAuthObserver? observer { get; construct; default = null; }
+      public string role { get; construct; }
+
+      private uint node_regid = 0;
+
       private class List<GLib.OptionEntry?> option_entries = new List<GLib.OptionEntry?> ();
+
+      ~Instance ()
+        {
+          connection?.unregister_object (node_regid);
+        }
 
       [Flags]
       private enum VersionOp
@@ -34,12 +46,38 @@ namespace ScrapperD
           LESS = (1 << 2),
         }
 
-      public virtual void activate () { warning ("ScrapperD.Instance.activate should be overriden by implementations"); }
-      public virtual bool command_line (GLib.VariantDict dict) throws GLib.Error { return true; }
+      public virtual void activate ()
+        {
+          warning ("ScrapperD.Instance.activate should be overriden by implementations");
+        }
+
+      public virtual bool command_line (GLib.VariantDict dict) throws GLib.Error
+        {
+          return true;
+        }
 
       public class unowned List<GLib.OptionEntry?> get_option_entries ()
         {
           return option_entries;
+        }
+
+      public bool init (GLib.Cancellable? cancellable = null) throws GLib.Error
+        {
+          return true;
+        }
+
+      public async override bool init_async (int io_priority, GLib.Cancellable? cancellable = null) throws GLib.Error
+        {
+          if (address != null)
+            {
+              var flags1 = GLib.DBusConnectionFlags.AUTHENTICATION_CLIENT;
+              var flags2 = GLib.DBusConnectionFlags.MESSAGE_BUS_CONNECTION;
+              var flags = flags1 | flags2;
+
+              connection = yield new GLib.DBusConnection.for_address (address, flags, observer, cancellable);
+              node_regid = connection.register_object<Node> (Node.BASE_PATH, Node.create (role));
+            }
+          return init (cancellable);
         }
 
       [CCode (simple_generics = false)]

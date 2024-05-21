@@ -23,6 +23,9 @@ namespace ScrapperD
     {
       const string APPID = "org.hck.ScrapperD";
 
+      public string? address = null;
+      public string? role = null;
+
       public static int main (string[] args)
         {
           unowned var extension_point = GLib.IOExtensionPoint.register (Instance.EXTENSION_POINT);
@@ -56,7 +59,7 @@ namespace ScrapperD
                 }
             }
 
-          add_main_option ("connect", 'c', 0, GLib.OptionArg.STRING, "Network entry point", "ADDRESS");
+          add_main_option ("address", 'a', 0, GLib.OptionArg.STRING, "Network entry point", "ADDRESS");
           add_main_option ("modules", 0, 0, GLib.OptionArg.NONE, "List installed modules", null);
           add_main_option ("role", 'r', 0, GLib.OptionArg.STRING, "Node role in the network", "ROLE");
           add_main_option ("version", 'V', 0, GLib.OptionArg.NONE, "Print version", null);
@@ -75,16 +78,21 @@ namespace ScrapperD
 
       public override int command_line (GLib.ApplicationCommandLine cmdline)
         {
-          unowned var opts = cmdline.get_options_dict ();
-          string opt;
+          unowned var dict = cmdline.get_options_dict ();
 
           while (true)
             {
-              if (opts.lookup ("role", "s", out opt) == false)
+              if (dict.lookup ("address", "s", out address))
                 {
-                  warning ("no role defined for this instance");
+                  try { GLib.DBus.is_supported_address (address); } catch (GLib.Error e)
+                    {
+                      cmdline.printerr ("%s: %u: %s\n", e.domain.to_string (), e.code, e.message);
+                      cmdline.set_exit_status (1);
+                      break;
+                    }
                 }
-              else
+
+              if (dict.lookup ("role", "s", out role))
                 {
                   bool found = false;
                   GLib.Type gtype = 0;
@@ -92,7 +100,7 @@ namespace ScrapperD
 
                   foreach (unowned var extension in GLib.IOExtensionPoint.lookup (Instance.EXTENSION_POINT).get_extensions ())
                     {
-                      if (extension.get_name () == opt)
+                      if (extension.get_name () == role)
                         {
                           found = true;
                           gtype = extension.get_type ();
@@ -103,8 +111,8 @@ namespace ScrapperD
 
                   if (unlikely (found == false))
                     {
+                      cmdline.printerr ("Unknown role '%s'\n", role);
                       cmdline.set_exit_status (1);
-                      cmdline.printerr ("Unknown role '%s'\n", opt);
                       break;
                     }
                   else if (unlikely (gtype.is_a (typeof (Instance)) == false))
@@ -113,28 +121,31 @@ namespace ScrapperD
                     }
                   else
                     {
-                      var instance = (Instance) GLib.Object.new (gtype);
+                      var cancellable = (GLib.Cancellable?) null;
+                      var instance = (Instance) GLib.Object.new (gtype, "address", address, "role", role);
+                      var io_priority = (int) GLib.Priority.HIGH;
 
-                       try
+                      instance.init_async.begin (io_priority, cancellable, (o, res) =>
                         {
-                          if (gtype.is_a (typeof (GLib.Initable)))
-                            
-                            ((GLib.Initable) instance).init (null);
-                            instance.command_line (opts);
-                            instance.activate ();
-                        }
-                      catch (GLib.Error e)
-                        {
-                          unowned var code = e.code;
-                          unowned var domain = e.domain.to_string ();
-                          unowned var message = e.message.to_string ();
+                          release ();
 
-                          cmdline.set_exit_status (1);
-                          cmdline.printerr ("Can not initialize '%s' instance: %s: %u: %s\n", opt, domain, code, message);
-                          break;
-                        }
+                          try
+                            {
+                              ((Instance) o).init_async.end (res);
 
-                      instance.weak_ref (() => release ());
+                              ((Instance) o).command_line (cmdline.get_options_dict ());
+                              ((Instance) o).activate ();
+
+                              o.weak_ref (() => release ());
+                              hold ();
+                            }
+                          catch (GLib.Error e)
+                            {
+                              cmdline.printerr ("%s: %u: %s\n", e.domain.to_string (), e.code, e.message);
+                              cmdline.set_exit_status (1);
+                            }
+                        });
+
                       hold ();
                     }
                 }

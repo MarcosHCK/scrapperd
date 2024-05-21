@@ -19,21 +19,13 @@
 
 namespace ScrapperD
 {
-  [DBus (name = "org.hck.ScrapperD.Node.Infrastructure")]
-  public interface InstanceNode : GLib.Object
+  [DBus (name = "org.freedesktop.DBus")]
+  public interface DBus : GLib.Object
     {
-      [DBus (name = "IsMaster")] public abstract bool is_master { get; }
-    }
+      public const string BUS_NAME = "org.freedesktop.DBus";
+      public const string OBJECT_PATH = "/org/freedesktop/DBus";
 
-  internal class InstanceNodeImpl : GLib.Object, InstanceNode
-    {
-      public bool master { get; construct; }
-
-      public bool is_master { get { return master; } }
-
-      public InstanceNodeImpl (bool master = false)
-        {
-          Object (master : master);
-        }
+      public abstract async string[] ListNames () throws GLib.Error;
+      public signal void NameOwnerChanged (string name, string old_owner, string new_owner);
     }
 }

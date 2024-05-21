@@ -24,7 +24,22 @@ namespace ScrapperD
     {
       public const string BASE_PATH = "/org/hck/ScrapperD";
 
-      [DBus (name = "Impl")] public abstract string impl { owned get; }
-      [DBus (name = "Role")] public abstract string role { owned get; }
+      public abstract string Role { owned get; }
+
+      [DBus (visible = false)] public static Node create (string role)
+        {
+          return new NodeImpl (role);
+        }
+    }
+
+  private class NodeImpl : GLib.Object, Node
+    {
+      public string role { get; construct; }
+      public string Role { owned get { return role; } }
+
+      public NodeImpl (string role)
+        {
+          Object (role : role);
+        }
     }
 }
