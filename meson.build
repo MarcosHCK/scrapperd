@@ -19,7 +19,7 @@ project \
   (
     'scrapperd', 'c', 'vala',
 
-    default_options : [ 'warning_level=3' ],
+    default_options : [ 'c_std=gnu99', 'warning_level=3' ],
     meson_version : '>= 1.2.3',
 
     version : '@0@.@1@.@2@'.format \
@@ -72,6 +72,53 @@ default_defines = \
     'G_LOG_DOMAIN' : '"ScrapperD"',
     'G_LOG_USE_STRUCTURED' : '1',
   }
+
+if cc.get_id () == 'gcc' or cc.get_id () == 'clang'
+
+  warning_c_args = \
+    [
+
+      '-Waggregate-return',
+      '-Warray-bounds',
+      '-Wduplicated-branches',
+      '-Werror=format=2',
+      '-Werror=implicit-function-declaration',
+      '-Werror=init-self',
+      '-Werror=missing-include-dirs',
+      '-Werror=missing-prototypes',
+      '-Werror=pointer-arith',
+      '-Werror=pointer-sign',
+      '-Werror=unused-result',
+      '-Wimplicit-fallthrough',
+      '-Wmisleading-indentation',
+      '-Wmissing-field-initializers',
+      # Due to pervasive use of things like GPOINTER_TO_UINT(), we do not support
+      # building with -Wbad-function-cast.
+      '-Wno-bad-function-cast',
+      # Due to pervasive use of things like GPOINTER_TO_UINT(), we do not support
+      # building with -Wbad-function-cast.
+      '-Wno-cast-function-type',
+      # A zero-length format string shouldn't be considered an issue.
+      '-Wno-format-zero-length',
+      # Due to function casts through (void*) we cannot support -Wpedantic:
+      # ./docs/toolchain-requirements.md#Function_pointer_conversions.
+      '-Wno-pedantic',
+      '-Wno-string-plus-int',
+      # Due to maintained deprecated code, we do not want to see unused parameters
+      '-Wno-unused-parameter',
+      # We explicitly require variadic macros
+      '-Wno-variadic-macros',
+      '-Wnonnull',
+      '-Wshadow',
+      '-Wstrict-prototypes',
+      '-Wunused',
+      '-Wunused-function',
+      '-Wunused-label',
+      '-Wunused-value',
+    ]
+
+  add_project_arguments (cc.get_supported_arguments (warning_c_args), language : 'c')
+endif
 
 foreach name, value : default_defines
 

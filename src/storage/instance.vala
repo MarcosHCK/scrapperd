@@ -23,6 +23,14 @@ namespace ScrapperD
 
   public class StorageInstance : Instance
     {
+      private Kademlia.Node? node = null;
+      private uint iface_regid = 0;
+
+      ~StorageInstance ()
+        {
+          connection.unregister_object (iface_regid);
+        }
+
       [CCode (cname = "g_io_storagemod_query")]
       public static string[] query ()
         {
@@ -41,6 +49,21 @@ namespace ScrapperD
       [CCode (cname = "g_io_storagemod_unload")]
       public static void unload (GLib.IOModule module)
         {
+        }
+
+      public override void activate ()
+        {
+          try
+            {
+              node = node != null ? node : new Kademlia.Node ();
+              iface_regid = connection.register_object<Storage> (Node.BASE_PATH, new StorageImpl (node));
+              connection.on_closed.connect (() => unref ());
+              @ref ();
+            }
+          catch (GLib.Error e)
+            {
+              critical (@"$(e.domain): $(e.code): $(e.message)");
+            }
         }
     }
 }

@@ -15,6 +15,41 @@
 # along with ScrapperD. If not, see <http://www.gnu.org/licenses/>.
 #
 
+gnome = import ('gnome')
+
+libkademlia = library \
+  (
+    'kademlia',
+
+    dependencies :
+      [
+        libgio_dep,
+        libglib_dep,
+        libgobject_dep,
+      ],
+
+    include_directories :
+      [
+        configdir,
+        include_directories ('.'),
+      ],
+
+    sources :
+      [
+        'bucket.c',
+        'bucket.h',
+        'kademlia.h',
+        'key.c',
+        'key.h',
+        'node.c',
+        'node.h',
+        'value.c',
+        'value.h',
+
+        gnome.genmarshal ('node.signals', sources : [ 'node.signals' ])
+      ]
+  )
+
 libstorage = library \
   (
     'storage',
@@ -30,12 +65,20 @@ libstorage = library \
         libgobject_dep,
       ],
 
-    include_directories : [ configdir, libscrapperdinc ],
+    include_directories :
+      [
+        configdir,
+        libscrapperdinc,
 
-    link_with : [ libscrapperd ],
+        include_directories ('.'),
+      ],
+
+    link_with : [ libkademlia, libscrapperd ],
 
     sources :
       [
+        'kademlia.vapi',
+        'storage.vala',
       ],
   )
 
@@ -56,10 +99,11 @@ storagemod = shared_module \
 
     include_directories : [ configdir, libscrapperdinc ],
 
-    link_with : [ libstorage, libscrapperd ],
+    link_with : [ libkademlia, libstorage, libscrapperd ],
 
     sources :
       [
+        'kademlia.vapi',
         'instance.vala',
-      ],
+      ]
   )

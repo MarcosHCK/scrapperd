@@ -24,6 +24,7 @@ namespace ScrapperD
     {
       public const string BASE_PATH = "/org/hck/ScrapperD";
 
+      public abstract int Depth { get; }
       public abstract string Role { owned get; }
 
       [DBus (visible = false)] public static Node create (string role)
@@ -35,6 +36,7 @@ namespace ScrapperD
   private class NodeImpl : GLib.Object, Node
     {
       public string role { get; construct; }
+      public int Depth { get { return 1; } }
       public string Role { owned get { return role; } }
 
       public NodeImpl (string role)
