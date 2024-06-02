@@ -23,8 +23,14 @@ namespace ScrapperD
 
   public class StorageInstance : Instance
     {
+      private HashTable<Kademlia.Key, Storage> peers;
       private Kademlia.Node? node = null;
       private uint iface_regid = 0;
+
+      construct
+        {
+          peers = new HashTable<Kademlia.Key, Storage> (Kademlia.Key.hash, Kademlia.Key.equal);
+        }
 
       ~StorageInstance ()
         {
@@ -53,10 +59,103 @@ namespace ScrapperD
 
       public override void activate ()
         {
+          StorageSkeleton skel;
+
           try
             {
               node = node != null ? node : new Kademlia.Node ();
-              iface_regid = connection.register_object<Storage> (Node.BASE_PATH, new StorageImpl (node));
+              iface_regid = connection.register_object<Storage> (Node.BASE_PATH, skel = new StorageSkeleton (node));
+
+              skel.on_find_node.connect ((peer, key) =>
+                {
+                  Kademlia.Value? value = null;
+                  Storage? proxy = peers.lookup (peer);
+                  uint done = 0;
+
+                  if (unlikely (peer == null))
+
+                    return null;
+                  else
+                    {
+                      proxy.find_node.begin (key.get_bytes (), (_, res) =>
+                        {
+                          try { value = Storage.Neighbor.cast (proxy.find_node.end (res)); } catch (GLib.Error e)
+                            {
+                              critical (@"$(e.domain): $(e.code): $(e.message)");
+                              node.demote (peer);
+                              value = null;
+                            }
+                          finally
+                            {
+                              AtomicUint.set (ref done, 1);
+                            }
+                        });
+
+                      while (AtomicUint.get (ref done) == 0) GLib.Thread.yield ();
+                      return (owned) value;
+                    }
+                });
+
+              skel.on_find_value.connect ((peer, key) =>
+                {
+                  Kademlia.Value? value = null;
+                  Storage? proxy = peers.lookup (peer);
+                  uint done = 0;
+
+                  if (unlikely (peer == null))
+
+                    return null;
+                  else
+                    {
+                      proxy.find_value.begin (key.get_bytes (), (_, res) =>
+                        {
+                          try { value = Storage.Value.cast (proxy.find_value.end (res)); } catch (GLib.Error e)
+                            {
+                              critical (@"$(e.domain): $(e.code): $(e.message)");
+                              node.demote (peer);
+                              value = null;
+                            }
+                          finally
+                            {
+                              AtomicUint.set (ref done, 1);
+                            }
+                        });
+
+                      while (AtomicUint.get (ref done) == 0) GLib.Thread.yield ();
+                      return (owned) value;
+                    }
+                });
+
+              skel.on_store.connect ((peer, key, value) =>
+                {
+                  Storage? proxy = peers.lookup (peer);
+                  uint done = 0;
+                  bool result = false;
+
+                  if (unlikely (peer == null))
+
+                    return false;
+                  else
+                    {
+                      proxy.store.begin (key.get_bytes (), value.get_data (), (_, res) =>
+                        {
+                          try { result = proxy.store.end (res); } catch (GLib.Error e)
+                            {
+                              critical (@"$(e.domain): $(e.code): $(e.message)");
+                              node.demote (peer);
+                              result = false;
+                            }
+                          finally
+                            {
+                              AtomicUint.set (ref done, 1);
+                            }
+                        });
+
+                      while (AtomicUint.get (ref done) == 0) GLib.Thread.yield ();
+                      return result;
+                    }
+                });
+
               connection.on_closed.connect (() => unref ());
               @ref ();
             }

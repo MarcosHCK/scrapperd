@@ -180,6 +180,14 @@ static void k_node_class_init (KNodeClass* klass)
   signals [sig_store] = g_signal_new ("store", K_TYPE_NODE, G_SIGNAL_ACTION, G_STRUCT_OFFSET (KNodeClass, store), g_signal_accumulator_first_wins, NULL, g_cclosure_user_marshal_BOOLEAN__BOXED_BOXED_BOXED, G_TYPE_BOOLEAN, 3, K_TYPE_KEY, K_TYPE_KEY, G_TYPE_BYTES);
 }
 
+void k_node_demote (KNode* node, const KKey* peer)
+{
+  g_return_if_fail (K_IS_NODE (node));
+  g_return_if_fail (peer != NULL);
+
+  k_buckets_drop (node->priv->buckets, (KKey*) peer, FALSE);
+}
+
 KKey* k_node_get_id (KNode* node)
 {
   g_return_val_if_fail (K_IS_NODE (node), NULL);

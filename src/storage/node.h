@@ -53,6 +53,7 @@ extern "C" {
 
   GType k_node_get_type (void) G_GNUC_CONST;
 
+  void k_node_demote (KNode* node, const KKey* peer);
   KKey* k_node_get_id (KNode* node);
   void k_node_insert (KNode* node, const KKey* key, GBytes* value, GCancellable* cancellable, GAsyncReadyCallback callback, gpointer user_data);
   gboolean k_node_insert_finish (KNode* node, GAsyncResult* result, GError** error);

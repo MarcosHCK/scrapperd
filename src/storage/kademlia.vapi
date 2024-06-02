@@ -52,6 +52,7 @@ namespace Kademlia
     {
       public Node ();
       public Key id { get; }
+      public void demote ([CCode (type = "const KKey*")] Key peer);
       public async bool insert ([CCode (type = "const KKey*")] Key key, GLib.Bytes value, GLib.Cancellable? cancellable = null) throws GLib.Error;
       public async GLib.Bytes? lookup ([CCode (type = "const KKey*")] Key key, GLib.Cancellable? cancellable = null) throws GLib.Error;
       public GLib.SList<Key> nearest ([CCode (type = "const KKey*")] Key key);
