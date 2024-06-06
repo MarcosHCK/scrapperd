@@ -29,12 +29,8 @@ namespace ScrapperD
 
       construct
         {
+          node = new Kademlia.Node ();
           peers = new HashTable<Kademlia.Key, Storage> (Kademlia.Key.hash, Kademlia.Key.equal);
-        }
-
-      ~StorageInstance ()
-        {
-          connection.unregister_object (iface_regid);
         }
 
       [CCode (cname = "g_io_storagemod_query")]
@@ -57,112 +53,110 @@ namespace ScrapperD
         {
         }
 
-      public override void activate ()
+      public override bool dbus_register (GLib.DBusConnection connection, string bus_name, GLib.Cancellable? cancellable) throws GLib.Error
         {
           StorageSkeleton skel;
 
-          try
+          iface_regid = connection.register_object<Storage> (Node.BASE_PATH, skel = new StorageSkeleton (node));
+
+          skel.on_find_node.connect ((peer, key) =>
             {
-              node = node != null ? node : new Kademlia.Node ();
-              iface_regid = connection.register_object<Storage> (Node.BASE_PATH, skel = new StorageSkeleton (node));
+              Kademlia.Value? value = null;
+              Storage? proxy = peers.lookup (peer);
+              uint done = 0;
 
-              skel.on_find_node.connect ((peer, key) =>
+              if (unlikely (peer == null))
+
+                return null;
+              else
                 {
-                  Kademlia.Value? value = null;
-                  Storage? proxy = peers.lookup (peer);
-                  uint done = 0;
-
-                  if (unlikely (peer == null))
-
-                    return null;
-                  else
+                  proxy.find_node.begin (key.get_bytes (), (_, res) =>
                     {
-                      proxy.find_node.begin (key.get_bytes (), (_, res) =>
+                      try { value = Storage.Neighbor.cast (proxy.find_node.end (res)); } catch (GLib.Error e)
                         {
-                          try { value = Storage.Neighbor.cast (proxy.find_node.end (res)); } catch (GLib.Error e)
-                            {
-                              critical (@"$(e.domain): $(e.code): $(e.message)");
-                              node.demote (peer);
-                              value = null;
-                            }
-                          finally
-                            {
-                              AtomicUint.set (ref done, 1);
-                            }
-                        });
-
-                      while (AtomicUint.get (ref done) == 0) GLib.Thread.yield ();
-                      return (owned) value;
-                    }
-                });
-
-              skel.on_find_value.connect ((peer, key) =>
-                {
-                  Kademlia.Value? value = null;
-                  Storage? proxy = peers.lookup (peer);
-                  uint done = 0;
-
-                  if (unlikely (peer == null))
-
-                    return null;
-                  else
-                    {
-                      proxy.find_value.begin (key.get_bytes (), (_, res) =>
+                          critical (@"$(e.domain): $(e.code): $(e.message)");
+                          node.demote (peer);
+                          value = null;
+                        }
+                      finally
                         {
-                          try { value = Storage.Value.cast (proxy.find_value.end (res)); } catch (GLib.Error e)
-                            {
-                              critical (@"$(e.domain): $(e.code): $(e.message)");
-                              node.demote (peer);
-                              value = null;
-                            }
-                          finally
-                            {
-                              AtomicUint.set (ref done, 1);
-                            }
-                        });
+                          AtomicUint.set (ref done, 1);
+                        }
+                    });
 
-                      while (AtomicUint.get (ref done) == 0) GLib.Thread.yield ();
-                      return (owned) value;
-                    }
-                });
+                  while (AtomicUint.get (ref done) == 0) GLib.Thread.yield ();
+                  return (owned) value;
+                }
+            });
 
-              skel.on_store.connect ((peer, key, value) =>
-                {
-                  Storage? proxy = peers.lookup (peer);
-                  uint done = 0;
-                  bool result = false;
-
-                  if (unlikely (peer == null))
-
-                    return false;
-                  else
-                    {
-                      proxy.store.begin (key.get_bytes (), value.get_data (), (_, res) =>
-                        {
-                          try { result = proxy.store.end (res); } catch (GLib.Error e)
-                            {
-                              critical (@"$(e.domain): $(e.code): $(e.message)");
-                              node.demote (peer);
-                              result = false;
-                            }
-                          finally
-                            {
-                              AtomicUint.set (ref done, 1);
-                            }
-                        });
-
-                      while (AtomicUint.get (ref done) == 0) GLib.Thread.yield ();
-                      return result;
-                    }
-                });
-
-              connection.on_closed.connect (() => unref ());
-              @ref ();
-            }
-          catch (GLib.Error e)
+          skel.on_find_value.connect ((peer, key) =>
             {
-              critical (@"$(e.domain): $(e.code): $(e.message)");
-            }
+              Kademlia.Value? value = null;
+              Storage? proxy = peers.lookup (peer);
+              uint done = 0;
+
+              if (unlikely (peer == null))
+
+                return null;
+              else
+                {
+                  proxy.find_value.begin (key.get_bytes (), (_, res) =>
+                    {
+                      try { value = Storage.Value.cast (proxy.find_value.end (res)); } catch (GLib.Error e)
+                        {
+                          critical (@"$(e.domain): $(e.code): $(e.message)");
+                          node.demote (peer);
+                          value = null;
+                        }
+                      finally
+                        {
+                          AtomicUint.set (ref done, 1);
+                        }
+                    });
+
+                  while (AtomicUint.get (ref done) == 0) GLib.Thread.yield ();
+                  return (owned) value;
+                }
+            });
+
+          skel.on_store.connect ((peer, key, value) =>
+            {
+              Storage? proxy = peers.lookup (peer);
+              uint done = 0;
+              bool result = false;
+
+              if (unlikely (peer == null))
+
+                return false;
+              else
+                {
+                  proxy.store.begin (key.get_bytes (), value.get_data (), (_, res) =>
+                    {
+                      try { result = proxy.store.end (res); } catch (GLib.Error e)
+                        {
+                          critical (@"$(e.domain): $(e.code): $(e.message)");
+                          node.demote (peer);
+                          result = false;
+                        }
+                      finally
+                        {
+                          AtomicUint.set (ref done, 1);
+                        }
+                    });
+
+                  while (AtomicUint.get (ref done) == 0) GLib.Thread.yield ();
+                  return result;
+                }
+            });
+
+          connection.on_closed.connect (() => unref ());
+          @ref ();
+          return base.dbus_register (connection, bus_name, cancellable);
+        }
+
+      public override void dbus_unregister (GLib.DBusConnection connection)
+        {
+          connection.unregister_object (iface_regid);
         }
     }
 }

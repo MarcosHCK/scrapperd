@@ -78,11 +78,28 @@ namespace ScrapperD
 
       public override int command_line (GLib.ApplicationCommandLine cmdline)
         {
-          unowned var dict = cmdline.get_options_dict ();
+          command_line_async.begin (cmdline, null, (app, res) =>
+            {
+              ((Application) app).command_line_async.end (res);
+            });
+          return base.command_line (cmdline);
+        }
+
+      private async void command_line_async (GLib.ApplicationCommandLine cmdline, GLib.Cancellable? cancellable = null)
+        {
+          unowned var options = cmdline.get_options_dict ();
 
           while (true)
             {
-              if (dict.lookup ("address", "s", out address))
+              Instance instance;
+
+              if (options.lookup ("address", "s", out address) == false)
+                {
+                  cmdline.printerr ("---address unspecified\n");
+                  cmdline.set_exit_status (1);
+                  break;
+                }
+              else
                 {
                   try { GLib.DBus.is_supported_address (address); } catch (GLib.Error e)
                     {
@@ -92,7 +109,13 @@ namespace ScrapperD
                     }
                 }
 
-              if (dict.lookup ("role", "s", out role))
+              if (options.lookup ("role", "s", out role) == false)
+                {
+                  cmdline.printerr ("---role unspecified\n");
+                  cmdline.set_exit_status (1);
+                  break;
+                }
+              else
                 {
                   bool found = false;
                   GLib.Type gtype = 0;
@@ -121,38 +144,53 @@ namespace ScrapperD
                     }
                   else
                     {
-                      var cancellable = (GLib.Cancellable?) null;
-                      var instance = (Instance) GLib.Object.new (gtype, "address", address, "role", role);
-                      var io_priority = (int) GLib.Priority.HIGH;
+                      instance = (Instance) GLib.Object.new (gtype, "role", role);
 
-                      instance.init_async.begin (io_priority, cancellable, (o, res) =>
+                      if (gtype.is_a (typeof (GLib.Initable)))
                         {
-                          release ();
-
-                          try
-                            {
-                              ((Instance) o).init_async.end (res);
-
-                              ((Instance) o).command_line (cmdline.get_options_dict ());
-                              ((Instance) o).activate ();
-
-                              o.weak_ref (() => release ());
-                              hold ();
-                            }
-                          catch (GLib.Error e)
+                          try { ((GLib.Initable) instance).init (cancellable); } catch (GLib.Error e)
                             {
                               cmdline.printerr ("%s: %u: %s\n", e.domain.to_string (), e.code, e.message);
                               cmdline.set_exit_status (1);
+                              break;
                             }
-                        });
+                        }
+                      else if (gtype.is_a (typeof (GLib.AsyncInitable)))
+                        {
+                          try { yield ((GLib.AsyncInitable) instance).init_async (GLib.Priority.DEFAULT, cancellable); } catch (GLib.Error e)
+                            {
+                              cmdline.printerr ("%s: %u: %s\n", e.domain.to_string (), e.code, e.message);
+                              cmdline.set_exit_status (1);
+                              break;
+                            }
+                        }
 
+                      instance.weak_ref (() => release ());
                       hold ();
                     }
                 }
 
+              try
+                {
+                  var flags1 = GLib.DBusConnectionFlags.AUTHENTICATION_CLIENT;
+                  var flags2 = GLib.DBusConnectionFlags.MESSAGE_BUS_CONNECTION;
+                  var flags = flags1 | flags2;
+                  var connection = yield new GLib.DBusConnection.for_address (address, flags, null, cancellable);
+                  var bus_name = @"m.$(connection.unique_name.offset (1))".replace (".", ".c");
+
+                  instance.dbus_register (connection, bus_name, cancellable);
+
+                  connection.on_closed.connect ((c, r, e) => instance.dbus_unregister (c));
+                }
+              catch (GLib.Error e)
+                {
+                  cmdline.printerr ("%s: %u: %s\n", e.domain.to_string (), e.code, e.message);
+                  cmdline.set_exit_status (1);
+                  break;
+                }
+
               break;
             }
-          return base.command_line (cmdline);
         }
 
       public override int handle_local_options (GLib.VariantDict opts)

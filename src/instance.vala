@@ -19,14 +19,10 @@
 
 namespace ScrapperD
 {
-  public abstract class Instance : GLib.Object, GLib.Initable, GLib.AsyncInitable
+  public abstract class Instance : GLib.Object
     {
       public const string EXTENSION_POINT = "org.hck.ScrapperD.Instance";
 
-      public string address { get; construct; }
-      public string bus_name { get; private set; }
-      public GLib.DBusConnection connection { get; private set; }
-      public GLib.DBusAuthObserver? observer { get; construct; default = null; }
       public string role { get; construct; }
 
       private uint name_regid = 0;
@@ -34,29 +30,25 @@ namespace ScrapperD
 
       private class List<GLib.OptionEntry?> option_entries = new List<GLib.OptionEntry?> ();
 
-      ~Instance ()
-        {
-          GLib.Bus.unown_name (name_regid);
-          connection?.unregister_object (node_regid);
-        }
-
-      [Flags]
-      private enum VersionOp
-        {
-          NONE = 0,
-          EQUAL = (1 << 0),
-          GREATER = (1 << 1),
-          LESS = (1 << 2),
-        }
-
-      public virtual void activate ()
-        {
-          warning ("ScrapperD.Instance.activate should be overriden by implementations");
-        }
-
       public virtual bool command_line (GLib.VariantDict dict) throws GLib.Error
         {
           return true;
+        }
+
+      public virtual bool dbus_register (GLib.DBusConnection connection, string bus_name, GLib.Cancellable? cancellable = null) throws GLib.Error
+        {
+          unowned var flags = GLib.BusNameOwnerFlags.DO_NOT_QUEUE;
+          unowned var name = bus_name;
+
+          name_regid = GLib.Bus.own_name_on_connection (connection, name, flags, null, null);
+          node_regid = connection.register_object<Node> (Node.BASE_PATH, Node.create (role));
+          return true;
+        }
+
+      public virtual void dbus_unregister (GLib.DBusConnection connection)
+        {
+          GLib.Bus.unown_name (name_regid);
+          connection?.unregister_object (node_regid);
         }
 
       public class unowned List<GLib.OptionEntry?> get_option_entries ()
@@ -64,34 +56,8 @@ namespace ScrapperD
           return option_entries;
         }
 
-      public bool init (GLib.Cancellable? cancellable = null) throws GLib.Error
-        {
-          return true;
-        }
-
-      public async override bool init_async (int io_priority, GLib.Cancellable? cancellable = null) throws GLib.Error
-        {
-          if (address != null)
-            {
-              var flags1 = GLib.DBusConnectionFlags.AUTHENTICATION_CLIENT;
-              var flags2 = GLib.DBusConnectionFlags.MESSAGE_BUS_CONNECTION;
-              var flags = flags1 | flags2;
-
-              connection = yield new GLib.DBusConnection.for_address (address, flags, observer, cancellable);
-            }
-          if (address != null)
-            {
-              var flags = GLib.BusNameOwnerFlags.DO_NOT_QUEUE;
-              var name = @"m.$(connection.unique_name.offset (1))".replace (".", ".c");
-
-              name_regid = GLib.Bus.own_name_on_connection (connection, name, flags, null, null);
-              node_regid = connection.register_object<Node> (Node.BASE_PATH, Node.create (role));
-              bus_name = (owned) name;
-            }
-          return init (cancellable);
-        }
-
       [CCode (simple_generics = false)]
+
       public static void install<T> (string @as, string? expected_version = null)
         {
           if (expected_version == null || version_check (expected_version))
@@ -118,6 +84,17 @@ namespace ScrapperD
           entry.short_name = short_name;
           option_entries.prepend (entry);
         }
+
+      [Flags]
+
+      private enum VersionOp
+        {
+          NONE = 0,
+          EQUAL = (1 << 0),
+          GREATER = (1 << 1),
+          LESS = (1 << 2),
+        }
+
 
       private static bool version_ints (string version, uint ints [3]) throws GLib.Error
         {

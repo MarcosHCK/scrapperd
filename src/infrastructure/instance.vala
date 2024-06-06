@@ -57,9 +57,10 @@ namespace ScrapperD
           add_option_entry ("port", 'p', 0, GLib.OptionArg.INT, "Port to listen to", "PORT");
         }
 
-      public override void activate ()
+      public override bool dbus_register (GLib.DBusConnection connection, string bus_name, GLib.Cancellable? cancellable) throws GLib.Error
         {
-          launch_daemon.begin (null);
+          launch_daemon.begin (connection, bus_name, cancellable);
+          return base.dbus_register (connection, bus_name, cancellable);
         }
 
       public override bool command_line (GLib.VariantDict dict) throws GLib.Error
@@ -90,7 +91,7 @@ namespace ScrapperD
           return base.command_line (dict);
         }
 
-      private async bool connect_to_daemon (GLib.Cancellable? cancellable = null) throws GLib.Error
+      private async bool connect_to_daemon (GLib.DBusConnection connection, string bus_name, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
           var address = @"tcp:host=localhost,port=$(port)";
           var flags1 = GLib.DBusConnectionFlags.AUTHENTICATION_CLIENT;
@@ -102,9 +103,9 @@ namespace ScrapperD
           return true;
         }
 
-      private bool connect_to_daemon_source ()
+      private bool connect_to_daemon_source (GLib.DBusConnection connection, string bus_name)
         {
-          connect_to_daemon.begin (null, (_, res) =>
+          connect_to_daemon.begin (connection, bus_name, null, (_, res) =>
             {
               try { connect_to_daemon.end (res); } catch (GLib.Error e)
                 {
@@ -114,7 +115,7 @@ namespace ScrapperD
           return GLib.Source.REMOVE;
         }
 
-      private async void launch_daemon (GLib.Cancellable? cancellable = null) throws GLib.Error
+      private async void launch_daemon (GLib.DBusConnection connection, string bus_name, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
           var launcher = new SubprocessLauncher (0);
           var process = (GLib.Subprocess) null;
@@ -130,7 +131,7 @@ namespace ScrapperD
 
               var source = new TimeoutSource (boottime);
 
-              source.set_callback (() => connect_to_daemon_source ());
+              source.set_callback (() => connect_to_daemon_source (connection, bus_name));
               source.set_priority (GLib.Priority.HIGH_IDLE);
               source.set_static_name ("ScrapperD.InfrastructureInstance.connect_daemon");
               source.attach (GLib.MainContext.get_thread_default ());
