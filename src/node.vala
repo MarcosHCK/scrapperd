@@ -20,28 +20,27 @@
 namespace ScrapperD
 {
   [DBus (name = "org.hck.ScrapperD.Node")]
+
   public interface Node : GLib.Object
     {
       public const string BASE_PATH = "/org/hck/ScrapperD";
 
-      public abstract int Depth { get; }
-      public abstract string Role { owned get; }
+      public abstract string[] Roles { owned get; }
 
-      [DBus (visible = false)] public static Node create (string role)
+      [DBus (visible = false)] public static Node create (string[] roles)
         {
-          return new NodeImpl (role);
+          return new NodeSkeleton (roles);
         }
     }
 
-  private class NodeImpl : GLib.Object, Node
+  private class NodeSkeleton : GLib.Object, Node
     {
-      public string role { get; construct; }
-      public int Depth { get { return 1; } }
-      public string Role { owned get { return role; } }
+      public string[] roles { get; construct; }
+      public string[] Roles { owned get { return roles; } }
 
-      public NodeImpl (string role)
+      public NodeSkeleton (string[] roles)
         {
-          Object (role : role);
+          Object (roles : roles);
         }
     }
 }

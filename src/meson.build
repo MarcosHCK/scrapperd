@@ -36,13 +36,9 @@ libscrapperd = library \
       [
         'instance.vala',
         'node.vala',
+        'versioncheck.vala',
       ],
   )
-
-libscrapperdinc = include_directories ('.')
-
-subdir ('infrastructure')
-subdir ('storage')
 
 scrapperd = executable \
   (

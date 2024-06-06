@@ -23,8 +23,7 @@ namespace ScrapperD
     {
       const string APPID = "org.hck.ScrapperD";
 
-      public string? address = null;
-      public string? role = null;
+      public HashTable<string, GLib.TypeClass> modules;
 
       public static int main (string[] args)
         {
@@ -42,8 +41,12 @@ namespace ScrapperD
 
       construct
         {
+          modules = new HashTable<string, GLib.TypeClass> (GLib.str_hash, GLib.str_equal);
+
           foreach (unowned var extension in GLib.IOExtensionPoint.lookup (Instance.EXTENSION_POINT).get_extensions ())
             {
+
+              modules.insert (extension.get_name (), extension.ref_class ());
 
               foreach (unowned var entry in ((InstanceClass) extension.ref_class ()).get_option_entries ())
                 {
@@ -59,9 +62,9 @@ namespace ScrapperD
                 }
             }
 
-          add_main_option ("address", 'a', 0, GLib.OptionArg.STRING, "Network entry point", "ADDRESS");
+          add_main_option ("address", 'a', 0, GLib.OptionArg.STRING, "Address of entry node", "ADDRESS");
           add_main_option ("modules", 0, 0, GLib.OptionArg.NONE, "List installed modules", null);
-          add_main_option ("role", 'r', 0, GLib.OptionArg.STRING, "Node role in the network", "ROLE");
+          add_main_option ("role", 'r', 0, GLib.OptionArg.STRING_ARRAY, "Node role in the network (multiple roles allowed)", "ROLE");
           add_main_option ("version", 'V', 0, GLib.OptionArg.NONE, "Print version", null);
         }
 
@@ -88,63 +91,38 @@ namespace ScrapperD
       private async void command_line_async (GLib.ApplicationCommandLine cmdline, GLib.Cancellable? cancellable = null)
         {
           unowned var options = cmdline.get_options_dict ();
+          unowned var good = true;
 
           while (true)
             {
-              Instance instance;
+              GLib.VariantIter iter;
+              string role;
 
-              if (options.lookup ("address", "s", out address) == false)
+              if (options.lookup ("roles", "as", out iter) == false)
                 {
-                  cmdline.printerr ("---address unspecified\n");
+                  cmdline.printerr ("---roles unspecified\n");
                   cmdline.set_exit_status (1);
                   break;
                 }
-              else
+              else while (iter.next ("s", out role))
                 {
-                  try { GLib.DBus.is_supported_address (address); } catch (GLib.Error e)
-                    {
-                      cmdline.printerr ("%s: %u: %s\n", e.domain.to_string (), e.code, e.message);
-                      cmdline.set_exit_status (1);
-                      break;
-                    }
-                }
+                  unowned GLib.TypeClass klass;
 
-              if (options.lookup ("role", "s", out role) == false)
-                {
-                  cmdline.printerr ("---role unspecified\n");
-                  cmdline.set_exit_status (1);
-                  break;
-                }
-              else
-                {
-                  bool found = false;
-                  GLib.Type gtype = 0;
-                  GLib.TypeClass? klass = null;
-
-                  foreach (unowned var extension in GLib.IOExtensionPoint.lookup (Instance.EXTENSION_POINT).get_extensions ())
+                  if (unlikely ((klass = modules.lookup (role)) == null))
                     {
-                      if (extension.get_name () == role)
-                        {
-                          found = true;
-                          gtype = extension.get_type ();
-                          klass = extension.ref_class ();
-                          break;
-                        }
-                    }
-
-                  if (unlikely (found == false))
-                    {
+                      good = false;
                       cmdline.printerr ("Unknown role '%s'\n", role);
                       cmdline.set_exit_status (1);
                       break;
                     }
-                  else if (unlikely (gtype.is_a (typeof (Instance)) == false))
+                  else if (unlikely (klass.get_type ().is_a (typeof (Instance)) == false))
                     {
                       error ("Instance type doesn't derivates from %s", typeof (Instance).name ());
                     }
                   else
                     {
-                      instance = (Instance) GLib.Object.new (gtype, "role", role);
+                      var gtype = klass.get_type ();
+                      var instance = (Instance) GLib.Object.new (gtype, "role", role);
 
                       if (gtype.is_a (typeof (GLib.Initable)))
                         {
@@ -168,25 +146,6 @@ namespace ScrapperD
                       instance.weak_ref (() => release ());
                       hold ();
                     }
-                }
-
-              try
-                {
-                  var flags1 = GLib.DBusConnectionFlags.AUTHENTICATION_CLIENT;
-                  var flags2 = GLib.DBusConnectionFlags.MESSAGE_BUS_CONNECTION;
-                  var flags = flags1 | flags2;
-                  var connection = yield new GLib.DBusConnection.for_address (address, flags, null, cancellable);
-                  var bus_name = @"m.$(connection.unique_name.offset (1))".replace (".", ".c");
-
-                  instance.dbus_register (connection, bus_name, cancellable);
-
-                  connection.on_closed.connect ((c, r, e) => instance.dbus_unregister (c));
-                }
-              catch (GLib.Error e)
-                {
-                  cmdline.printerr ("%s: %u: %s\n", e.domain.to_string (), e.code, e.message);
-                  cmdline.set_exit_status (1);
-                  break;
                 }
 
               break;
