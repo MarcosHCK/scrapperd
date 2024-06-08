@@ -15,19 +15,43 @@
 # along with ScrapperD. If not, see <http://www.gnu.org/licenses/>.
 #
 
+libkademlia = library \
+  (
+    'kademlia',
+
+    dependencies :
+      [
+        vala.find_library ('gio-2.0'), libgio_dep,
+        vala.find_library ('glib-2.0'), libglib_dep,
+        vala.find_library ('gobject-2.0'), libgobject_dep,
+      ],
+
+    include_directories : [ configdir ],
+
+    sources :
+      [
+        'bucket.h',
+        'bucket.vapi',
+        'buckets.vala',
+        'key.vala',
+        'keyval.h',
+        'keyval.vapi',
+        'peer.vala',
+        'rpccall.h',
+        'rpccall.vapi',
+        'value.vala',
+      ],
+  )
+
 libscrapperd = library \
   (
     'scrapperd',
 
     dependencies :
       [
-        vala.find_library ('gio-2.0'),
-        vala.find_library ('glib-2.0'),
-        vala.find_library ('gobject-2.0'),
-
-        libgio_dep,
-        libglib_dep,
-        libgobject_dep,
+        vala.find_library ('gio-2.0'), libgio_dep,
+        vala.find_library ('glib-2.0'), libglib_dep,
+        vala.find_library ('gobject-2.0'), libgobject_dep,
       ],
 
     include_directories : [ configdir ],
@@ -40,24 +64,22 @@ libscrapperd = library \
       ],
   )
 
+subdir ('tests')
+
 scrapperd = executable \
   (
     'scrapperd',
 
     dependencies :
       [
-        vala.find_library ('gio-2.0'),
-        vala.find_library ('glib-2.0'),
-        vala.find_library ('gobject-2.0'),
-
-        libgio_dep,
-        libglib_dep,
-        libgobject_dep,
+        vala.find_library ('gio-2.0'), libgio_dep,
+        vala.find_library ('glib-2.0'), libglib_dep,
+        vala.find_library ('gobject-2.0'), libgobject_dep,
       ],
 
     include_directories : [ configdir ],
 
-    link_with : [ libscrapperd ],
+    link_with : [ libscrapperd, libkademlia ],
 
     sources :
       [
