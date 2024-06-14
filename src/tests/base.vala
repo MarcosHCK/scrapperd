@@ -20,4 +20,80 @@
 namespace Kademlia
 {
   public const string TESTPATHROOT = "/org/hck/ScrapperD/Kademlia";
+
+  public abstract class AsyncTest
+    {
+      protected abstract async void test ();
+
+      public void run ()
+        {
+          var context = (MainContext) GLib.MainContext.default ();
+          var loop = new GLib.MainLoop (context, false);
+
+          test.begin ((o, res) =>
+            {
+              test.end (res);
+              loop.quit ();
+            });
+
+          loop.run ();
+        }
+    }
+
+  [CCode (scope = "notified")]
+  public delegate string ToString<T> (T item);
+
+  public static string serialize_array<T> (T[] ar, owned ToString<T> func)
+    {
+      var builder = new StringBuilder ("[ ");
+      var first = true;
+
+      foreach (unowned var item in ar)
+        {
+          if (first)
+
+            first = false;
+          else
+            builder.append (", ");
+            builder.append (func (item));
+        }
+      builder.append (" ]");
+      return builder.free_and_steal ();
+    }
+
+  public static string serialize_list<T> (GLib.List<T> list, owned ToString<T> func)
+    {
+      var builder = new StringBuilder ("[ ");
+      var first = true;
+
+      foreach (unowned var item in list)
+        {
+          if (first)
+
+            first = false;
+          else
+            builder.append (", ");
+            builder.append (func (item));
+        }
+      builder.append (" ]");
+      return builder.free_and_steal ();
+    }
+
+  public static string serialize_slist<T> (GLib.SList<T> list, owned ToString<T> func)
+    {
+      var builder = new StringBuilder ("[ ");
+      var first = true;
+
+      foreach (unowned var item in list)
+        {
+          if (first)
+
+            first = false;
+          else
+            builder.append (", ");
+            builder.append (func (item));
+        }
+      builder.append (" ]");
+      return builder.free_and_steal ();
+    }
 }

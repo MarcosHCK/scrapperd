@@ -36,7 +36,11 @@ libkademlia = library \
         'key.vala',
         'keyval.h',
         'keyval.vapi',
+        'runner.vala',
         'peer.vala',
+        'value.vala',
+        'valuestore.vala',
+        'valuepeer.vala',
       ],
   )
 
@@ -63,7 +67,7 @@ libscrapperd = library \
 
 subdir ('tests')
 
-scrapperd = executable \
+executable \
   (
     'scrapperd',
 

@@ -19,7 +19,13 @@
 
 namespace Kademlia
 {
-  public class Peer : GLib.Object
+  public errordomain PeerError
+    {
+      FAILED,
+      UNREACHABLE,
+    }
+
+  public abstract class Peer : GLib.Object
     {
       public unowned Key id
         {
@@ -43,12 +49,12 @@ namespace Kademlia
       public signal void added_contact (Key peer);
       public signal void staled_contact (Key peer);
 
-      protected async virtual KeyList find_node (Key peer, Key id, GLib.Cancellable? cancellable = null) throws GLib.Error
+      protected async virtual Key[] find_peer (Key peer, Key id, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
           throw new IOError.FAILED ("unimplemented");
         }
 
-      protected async virtual bool ping_node (Key peer, GLib.Cancellable? cancellable = null) throws GLib.Error
+      protected async virtual bool ping_peer (Key peer, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
           throw new IOError.FAILED ("unimplemented");
         }
@@ -66,7 +72,7 @@ namespace Kademlia
             }
         }
 
-      public Peer (Key? id = null)
+      protected Peer (Key? id = null)
         {
           Object (id : id);
         }
@@ -109,15 +115,7 @@ namespace Kademlia
                 });
             }
 
-          for (unowned uint pending = 1; pending > 0;)
-            {
-              context.iteration (true);
-              pending = 0;
-
-              for (unowned uint i = 0; i < ALPHA; ++i)
-
-                pending |= GLib.AtomicUint.get (ref dones [i]) ^ 1;
-            }
+          runner (context, dones);
 
           if (errors.length_unlocked () > 0)
             {
@@ -137,21 +135,15 @@ namespace Kademlia
 
       async bool check_node (Key peer, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
-          try { return yield ping_node (peer, cancellable); } catch (GLib.IOError e)
+          try { return yield ping_peer (peer, cancellable); } catch (PeerError e)
             {
-              switch (e.code)
+              if (unlikely (e.code != PeerError.UNREACHABLE))
+
+                throw (owned) e;
+              else
                 {
-                  case GLib.IOError.CONNECTION_CLOSED:
-                  case GLib.IOError.CONNECTION_REFUSED:
-                  case GLib.IOError.NETWORK_UNREACHABLE:
-                  case GLib.IOError.TIMED_OUT:
-
-                    buckets.drop (peer);
-                    return false;
-
-                  default:
-
-                    throw (owned) e; 
+                  buckets.drop (peer);
+                  return false;
                 }
             }
         }
@@ -160,7 +152,9 @@ namespace Kademlia
         {
           foreach (unowned var peer in peers)
             {
-              yield check_node (peer, cancellable);
+              if (Key.equal (peer, this.id) == false)
+
+                yield check_node (peer, cancellable);
             }
 
           return true;
@@ -169,8 +163,13 @@ namespace Kademlia
       public async bool connectto (Key to, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
           buckets.insert (to);
-          var peers = yield find_node (to, id, cancellable);
-          return yield check (peers.keys, cancellable);
+          var peers = yield find_peer (to, id, cancellable);
+          return yield check (peers, cancellable);
+        }
+
+      public GLib.SList<Key> nearest (Key to)
+        {
+          return buckets.nearest (to);
         }
     }
 }

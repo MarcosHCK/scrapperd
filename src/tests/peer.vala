@@ -32,16 +32,20 @@ namespace Kademlia
   class TestPeerFindHandle : Peer
     {
 
-      protected async override KeyList find_node (Key peer, Key id, GLib.Cancellable? cancellable) throws GLib.Error
+      protected async override Key[] find_peer (Key peer, Key id, GLib.Cancellable? cancellable) throws GLib.Error
         {
-          return new KeyList (new Key [] { id.copy () });
+          return new Key [] { new Key.random () };
         }
+    }
+
+  class TestPeer : Peer
+    {
     }
 
   class TestPeerPingHandle : Peer
     {
 
-      protected async override bool ping_node (Key peer, GLib.Cancellable? cancellable) throws GLib.Error
+      protected async override bool ping_peer (Key peer, GLib.Cancellable? cancellable) throws GLib.Error
         {
           return true;
         }
@@ -50,22 +54,22 @@ namespace Kademlia
   class TestPeerAllHandle : Peer
     {
 
-      protected async override KeyList find_node (Key peer, Key id, GLib.Cancellable? cancellable) throws GLib.Error
+      protected async override Key[] find_peer (Key peer, Key id, GLib.Cancellable? cancellable) throws GLib.Error
         {
-          GLib.Test.message ("find_node (%s, %s)", peer.to_string (), id.to_string ());
-          return new KeyList (new Key [] { id.copy () });
+          GLib.Test.message ("find_peer (%s, %s)", peer.to_string (), id.to_string ());
+          return new Key [] { new Key.random () };
         }
 
-      protected async override bool ping_node (Key peer, GLib.Cancellable? cancellable) throws GLib.Error
+      protected async override bool ping_peer (Key peer, GLib.Cancellable? cancellable) throws GLib.Error
         {
-          GLib.Test.message ("ping_node (%s)", peer.to_string ());
+          GLib.Test.message ("ping_peer (%s)", peer.to_string ());
           return true;
         }
     }
 
   static void test_connect_to_no_handler (Key to)
     {
-      var peer = new Peer ();
+      var peer = new TestPeer ();
       var tmperr = (GLib.Error?) null;
 
       var context = (GLib.MainContext) GLib.MainContext.default ();
@@ -142,6 +146,6 @@ namespace Kademlia
 
   static void test_new ()
     {
-      GLib.Test.message ("self: %s", (new Peer ()).id.to_string ());
+      GLib.Test.message ("self: %s", (new TestPeer ()).id.to_string ());
     }
 }
