@@ -108,12 +108,11 @@ namespace Kademlia
 
       public static GLib.Type get_type ()
         {
-          return Key.get_type_once ();
+          return Key._get_type ();
         }
 
-      [CCode (cheader_filename = "keytype.h")]
-
-      public static extern GLib.Type get_type_once ();
+      [CCode (cheader_filename = "keytypes.h", cname = "_k_key_get_type")]
+      public static extern GLib.Type _get_type ();
 
       public static uint hash (Key a)
         {
@@ -167,6 +166,69 @@ namespace Kademlia
 
           base.get_digest (key.value.bytes, ref len);
           return key;
+        }
+    }
+
+  [CCode (ref_function = "k_key_list_ref", unref_function = "k_key_list_unref", type_id = "(k_key_list_get_type ())")]
+  [Compact (opaque = true)]
+
+  public class KeyList
+    {
+      private uint refs;
+      private Key[] _keys;
+
+      public struct Iterator
+        {
+          public unowned KeyList self;
+          public unowned int index;
+          public unowned int top;
+
+          public Iterator (KeyList self)
+            {
+              this.index = -1;
+              this.self = self;
+              this.top = self._keys.length;
+            }
+
+          public unowned Key @get () { return self._keys [index]; }
+          public unowned bool has_next () { return index < top; }
+          public unowned bool next () { ++index; return has_next (); }
+        }
+
+      public KeyList (owned Key[] keys)
+        {
+          _keys = (owned) keys;
+        }
+
+      public static GLib.Type get_type ()
+        {
+          return Key._get_type ();
+        }
+
+      public Iterator iterator ()
+        {
+          return Iterator (this);
+        }
+
+      [CCode (cheader_filename = "keytypes.h", cname = "_k_key_list_get_type")]
+      public static extern GLib.Type _get_type ();
+
+      public unowned Key[] keys { get { return _keys; } }
+      public unowned Key @get (uint index) { return _keys [index]; }
+      public void @set (uint index, owned Key key) { _keys [index] = (owned) key; }
+
+      extern void @free ();
+
+      public unowned KeyList @ref ()
+        {
+          AtomicUint.inc (ref refs);
+          return this;
+        }
+
+      public void @unref ()
+        {
+          if (AtomicUint.dec_and_test (ref refs))
+            this.@free ();
         }
     }
 }

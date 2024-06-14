@@ -21,39 +21,42 @@ namespace Kademlia
 {
   public class Peer : GLib.Object
     {
-      public unowned Key id { get { return buckets.self; } }
+      public unowned Key id
+        {
+          get
+            {
+              return buckets.self;
+            }
+          construct
+            {
+              if (value != null)
+
+                buckets = new Buckets (value.copy ());
+              else
+                buckets = new Buckets (new Key.random ());
+            }
+        }
 
       public const uint ALPHA = 3;
 
-      private Buckets buckets;
-      private ThreadPool<RpcCall> pool;
-
+      protected Buckets? buckets = null;
       public signal void added_contact (Key peer);
       public signal void staled_contact (Key peer);
 
-      [Signal (run = "last" /* accumulator = first_wins */)]
-
-      public async signal DelegatedValue? find_node (Key peer, Key key, ref GLib.Error? error)
+      protected async virtual KeyList find_node (Key peer, Key id, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
-          GLib.Error.propagate (out error, new IOError.FAILED ("unimplemented"));
-          return null;
+          throw new IOError.FAILED ("unimplemented");
         }
 
-      [Signal (run = "last" /* accumulator = first_wins */)]
-
-      public async signal bool ping (Key peer, ref GLib.Error? error)
+      protected async virtual bool ping_node (Key peer, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
-          GLib.Error.propagate (out error, new IOError.FAILED ("unimplemented"));
-          return false;
+          throw new IOError.FAILED ("unimplemented");
         }
 
       construct
         {
           try
             {
-              buckets = new Buckets (new Key.random ());
-              pool = new ThreadPool<RpcCall>.with_owned_data (RpcCall.executor, (int) ALPHA, false);
-
               buckets.added_contact.connect ((peer) => this.added_contact (peer));
               buckets.staled_contact.connect ((peer) => this.staled_contact (peer));
             }
@@ -63,35 +66,111 @@ namespace Kademlia
             }
         }
 
-      public async bool connect_to (Key to) throws GLib.Error
+      public Peer (Key? id = null)
         {
-          var sid1 = GLib.Signal.lookup ("find_node", typeof (Peer));
-          var sid2 = GLib.Signal.lookup ("ping", typeof (Peer));
-          var call1 = new RpcCall.failable (sid1, 2);
+          Object (id : id);
+        }
 
-          buckets.insert (to);
+      public async bool check (Key[] peers, GLib.Cancellable? cancellable = null) throws GLib.Error
 
-          call1.nth_value (0).init (typeof (Key));
-          call1.nth_value (0).set_boxed (to);
-          call1.nth_value (1).init (typeof (Key));
-          call1.nth_value (1).set_boxed (id);
+          requires (peers.length > 0)
+        {
+          var context = (GLib.MainContext) MainContext.get_thread_default ();
+          var dones = new uint [ALPHA];
+          var errors = new GLib.AsyncQueue<GLib.Error> ();
+          var lists = new GenericArray<Key> [ALPHA];
 
-          call1.instance.init_from_instance (this);
-          call1.result.init (typeof (Kademlia.DelegatedValue));
-
-          RpcCall.send (call1, pool);
-
-          foreach (unowned var contact in ((DelegatedValue) Kademlia.Value.get_value (call1.result)).neighbors)
+          for (unowned uint i = 0; i < ALPHA; ++i)
             {
-              var call2 = new RpcCall.failable (sid2, 1);
-
-              call2.nth_value (0).init (typeof (Key));
-              call2.nth_value (0).set_boxed (contact);
-              call2.instance.init_from_instance (this);
-              call2.result.init (typeof (bool));
-              RpcCall.send_no_reply (call2, pool);
+              dones [i] = 0;
+              lists [i] = new GenericArray<Key> (1 + peers.length / 3);
             }
+
+          for (unowned uint i = 0, j = 0; j < peers.length; ++j, i = (i + 1) % ALPHA)
+            {
+              lists [i].add (peers [j].copy ());
+            }
+
+          for (unowned uint i = 0; i < ALPHA; ++i) if (lists [i].length == 0)
+
+            GLib.AtomicUint.set (ref dones [i], 1);
+          else
+            {
+              var p = i;
+
+              check_nodes.begin (lists [p].data, cancellable, (o, res) =>
+                {
+                  try { ((Peer) o).check_nodes.end (res); } catch (GLib.Error e)
+                    {
+                      errors.push ((owned) e);
+                    }
+
+                  GLib.AtomicUint.set (ref dones [p], 1);
+                });
+            }
+
+          for (unowned uint pending = 1; pending > 0;)
+            {
+              context.iteration (true);
+              pending = 0;
+
+              for (unowned uint i = 0; i < ALPHA; ++i)
+
+                pending |= GLib.AtomicUint.get (ref dones [i]) ^ 1;
+            }
+
+          if (errors.length_unlocked () > 0)
+            {
+              var f = errors.pop_unlocked ();
+
+              for (unowned var i = 0; i < errors.length_unlocked (); ++i)
+                {
+                  var e = errors.pop_unlocked ();
+                  critical (@"$(e.domain): $(e.code): $(e.message)");
+                }
+
+              throw (owned) f;
+            }
+
           return true;
+        }
+
+      async bool check_node (Key peer, GLib.Cancellable? cancellable = null) throws GLib.Error
+        {
+          try { return yield ping_node (peer, cancellable); } catch (GLib.IOError e)
+            {
+              switch (e.code)
+                {
+                  case GLib.IOError.CONNECTION_CLOSED:
+                  case GLib.IOError.CONNECTION_REFUSED:
+                  case GLib.IOError.NETWORK_UNREACHABLE:
+                  case GLib.IOError.TIMED_OUT:
+
+                    buckets.drop (peer);
+                    return false;
+
+                  default:
+
+                    throw (owned) e; 
+                }
+            }
+        }
+
+      async bool check_nodes (Key[] peers, GLib.Cancellable? cancellable = null) throws GLib.Error
+        {
+          foreach (unowned var peer in peers)
+            {
+              yield check_node (peer, cancellable);
+            }
+
+          return true;
+        }
+
+      public async bool connectto (Key to, GLib.Cancellable? cancellable = null) throws GLib.Error
+        {
+          buckets.insert (to);
+          var peers = yield find_node (to, id, cancellable);
+          return yield check (peers.keys, cancellable);
         }
     }
 }

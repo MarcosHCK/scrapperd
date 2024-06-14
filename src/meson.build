@@ -37,9 +37,6 @@ libkademlia = library \
         'keyval.h',
         'keyval.vapi',
         'peer.vala',
-        'rpccall.h',
-        'rpccall.vapi',
-        'value.vala',
       ],
   )
 

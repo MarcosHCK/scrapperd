@@ -23,10 +23,44 @@ namespace Kademlia
     {
       GLib.Test.init (ref args, null);
       GLib.Test.add_func (TESTPATHROOT + "/Peer/connect_to/no_handler", () => test_connect_to_no_handler (new Key.random ()));
+      GLib.Test.add_func (TESTPATHROOT + "/Peer/connect_to/with_good_find_handler", () => test_connect_to_with_good_find_handler (new Key.random ()));
       GLib.Test.add_func (TESTPATHROOT + "/Peer/connect_to/with_good_handler", () => test_connect_to_with_good_handler (new Key.random ()));
-      GLib.Test.add_func (TESTPATHROOT + "/Peer/connect_to/with_null_handler", () => test_connect_to_with_null_handler (new Key.random ()));
       GLib.Test.add_func (TESTPATHROOT + "/Peer/new", () => test_new ());
       return GLib.Test.run ();
+    }
+
+  class TestPeerFindHandle : Peer
+    {
+
+      protected async override KeyList find_node (Key peer, Key id, GLib.Cancellable? cancellable) throws GLib.Error
+        {
+          return new KeyList (new Key [] { id.copy () });
+        }
+    }
+
+  class TestPeerPingHandle : Peer
+    {
+
+      protected async override bool ping_node (Key peer, GLib.Cancellable? cancellable) throws GLib.Error
+        {
+          return true;
+        }
+    }
+
+  class TestPeerAllHandle : Peer
+    {
+
+      protected async override KeyList find_node (Key peer, Key id, GLib.Cancellable? cancellable) throws GLib.Error
+        {
+          GLib.Test.message ("find_node (%s, %s)", peer.to_string (), id.to_string ());
+          return new KeyList (new Key [] { id.copy () });
+        }
+
+      protected async override bool ping_node (Key peer, GLib.Cancellable? cancellable) throws GLib.Error
+        {
+          GLib.Test.message ("ping_node (%s)", peer.to_string ());
+          return true;
+        }
     }
 
   static void test_connect_to_no_handler (Key to)
@@ -37,9 +71,35 @@ namespace Kademlia
       var context = (GLib.MainContext) GLib.MainContext.default ();
       var loop = new GLib.MainLoop (context, false);
 
-      peer.connect_to.begin (to, (o, res) =>
+      peer.connectto.begin (to, null, (o, res) =>
         {
-          try { ((Peer) o).connect_to.end (res); } catch (GLib.Error e)
+          try { ((Peer) o).connectto.end (res); } catch (GLib.Error e)
+            {
+              tmperr = e.copy ();
+            }
+          finally
+            {
+              loop.quit ();
+            }
+        });
+
+      loop.run ();
+
+      assert_error (tmperr, IOError.quark (), IOError.FAILED);
+      assert_cmpstr (tmperr.message, GLib.CompareOperator.EQ, "unimplemented");
+    }
+
+  static void test_connect_to_with_good_find_handler (Key to)
+    {
+      var context = (GLib.MainContext) GLib.MainContext.default ();
+      var loop = new GLib.MainLoop (context, false);
+      var tmperr = (GLib.Error?) null;
+
+      var peer = new TestPeerFindHandle ();
+
+      peer.connectto.begin (to, null, (o, res) =>
+        {
+          try { ((Peer) o).connectto.end (res); } catch (GLib.Error e)
             {
               tmperr = e.copy ();
             }
@@ -57,25 +117,15 @@ namespace Kademlia
 
   static void test_connect_to_with_good_handler (Key to)
     {
-      var peer = new Peer ();
-      var tmperr = (GLib.Error?) null;
-
       var context = (GLib.MainContext) GLib.MainContext.default ();
       var loop = new GLib.MainLoop (context, false);
+      var tmperr = (GLib.Error?) null;
 
-      peer.find_node.connect ((peer, key, ref error) =>
-        {
-          return new DelegatedValue (new Key [] { key.copy () });
-        });
+      var peer = new TestPeerAllHandle ();
 
-      peer.ping.connect ((peer, ref error) =>
+      peer.connectto.begin (to, null, (o, res) =>
         {
-          return true;
-        });
-
-      peer.connect_to.begin (to, (o, res) =>
-        {
-          try { ((Peer) o).connect_to.end (res); } catch (GLib.Error e)
+          try { ((Peer) o).connectto.end (res); } catch (GLib.Error e)
             {
               tmperr = e.copy ();
             }
@@ -88,38 +138,6 @@ namespace Kademlia
       loop.run ();
 
       assert_no_error (tmperr);
-    }
-
-  static void test_connect_to_with_null_handler (Key to)
-    {
-      var peer = new Peer ();
-      var tmperr = (GLib.Error?) null;
-
-      var context = (GLib.MainContext) GLib.MainContext.default ();
-      var loop = new GLib.MainLoop (context, false);
-
-      peer.find_node.connect ((peer, key, ref error) =>
-        {
-          GLib.Error.propagate (out error, new IOError.FAILED_HANDLED ("unimplemented2"));
-          return null;
-        });
-
-      peer.connect_to.begin (to, (o, res) =>
-        {
-          try { ((Peer) o).connect_to.end (res); } catch (GLib.Error e)
-            {
-              tmperr = e.copy ();
-            }
-          finally
-            {
-              loop.quit ();
-            }
-        });
-
-      loop.run ();
-
-      assert_error (tmperr, IOError.quark (), IOError.FAILED_HANDLED);
-      assert_cmpstr (tmperr.message, GLib.CompareOperator.EQ, "unimplemented2");
     }
 
   static void test_new ()
