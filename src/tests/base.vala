@@ -15,9 +15,7 @@
  * along with ScrapperD. If not, see <http://www.gnu.org/licenses/>.
  */
 
-[CCode (cprefix = "K", lower_case_cprefix = "k_")]
-
-namespace Kademlia
+namespace Testing
 {
   public const string TESTPATHROOT = "/org/hck/ScrapperD/Kademlia";
 

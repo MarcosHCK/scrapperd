@@ -14,10 +14,9 @@
  * You should have received a copy of the GNU General Public License
  * along with ScrapperD. If not, see <http://www.gnu.org/licenses/>.
  */
+using Kademlia;
 
-[CCode (cprefix = "K", lower_case_cprefix = "k_")]
-
-namespace Kademlia
+namespace Testing
 {
   public static int main (string[] args)
     {

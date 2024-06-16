@@ -14,10 +14,9 @@
  * You should have received a copy of the GNU General Public License
  * along with ScrapperD. If not, see <http://www.gnu.org/licenses/>.
  */
+using Kademlia;
 
-[CCode (cprefix = "K", lower_case_cprefix = "k_")]
-
-namespace Kademlia
+namespace Testing
 {
   public static int main (string[] args)
     {
@@ -134,16 +133,16 @@ namespace Kademlia
           return getother (peer) != null;
         }
 
-      protected async override Value find_value (Key peer, Key id, GLib.Cancellable? cancellable = null) throws GLib.Error
+      protected async override Kademlia.Value find_value (Key peer, Key id, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
           unowned var other = getother (peer);
           GLib.Value? value;
 
           if ((value = yield other.lookup (id, cancellable)) != null)
 
-            return new Value.inmediate ((owned) value);
+            return new Kademlia.Value.inmediate ((owned) value);
           else
-            return new Value.delegated (yield find_peer (peer, id, cancellable));
+            return new Kademlia.Value.delegated (yield find_peer (peer, id, cancellable));
         }
 
       protected async override bool store_value (Key peer, Key id, GLib.Value? value = null, GLib.Cancellable? cancellable = null) throws GLib.Error
