@@ -27,5 +27,14 @@ namespace ScrapperD
 
       public abstract string[] PublicAddresses { owned get; }
       public abstract string[] Roles { owned get; }
+
+      public abstract async bool Ping () throws GLib.Error;
+    }
+
+  [DBus (name = "org.hck.ScrapperD.NodeRole")]
+
+  public interface NodeRole : GLib.Object
+    {
+      public abstract uint8[] Id { owned get; }
     }
 }

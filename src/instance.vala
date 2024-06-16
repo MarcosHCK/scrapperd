@@ -23,6 +23,8 @@ namespace ScrapperD
     {
       public const string EXTENSION_POINT = "org.hck.ScrapperD.Instance";
 
+      public Hub hub { get; construct; }
+
       public abstract string role { get; }
 
       private class List<GLib.OptionEntry?> option_entries = new List<GLib.OptionEntry?> ();

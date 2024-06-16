@@ -19,13 +19,11 @@ namespace Testing
 {
   public const string TESTPATHROOT = "/org/hck/ScrapperD/Kademlia";
 
-  public abstract class AsyncTest
+  public abstract class AsyncTest : GLib.Object
     {
-      protected abstract async void test ();
 
-      public void run ()
+      public void run (GLib.MainContext? context = null)
         {
-          var context = (MainContext) GLib.MainContext.default ();
           var loop = new GLib.MainLoop (context, false);
 
           test.begin ((o, res) =>
@@ -34,6 +32,47 @@ namespace Testing
               loop.quit ();
             });
 
+          loop.run ();
+        }
+
+      public void run_in_thread ()
+        {
+          MainContext context;
+
+          (context = new GLib.MainContext ()).push_thread_default ();
+          run (context);
+          context.pop_thread_default ();
+        }
+
+      protected abstract async void test ();
+
+      public static void wait (uint[] dones)
+        {
+          var alpha = dones.length;
+          var context = GLib.MainContext.get_thread_default ();
+          var loop = new GLib.MainLoop (context, true);
+          var source = new GLib.IdleSource ();
+
+          source.set_callback (() =>
+            {
+              uint pending = 0;
+
+              for (unowned var i = 0; i < alpha; ++i)
+                {
+                  pending |= AtomicUint.get (ref dones [i]) ^ 1;
+                }
+
+              if (pending == 0)
+                {
+                  loop.quit ();
+                  return GLib.Source.REMOVE;
+                }
+
+              return GLib.Source.CONTINUE;
+            });
+
+          source.set_priority (GLib.Priority.HIGH_IDLE);
+          source.attach (context);
           loop.run ();
         }
     }

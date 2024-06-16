@@ -19,7 +19,7 @@
 
 namespace ScrapperD
 {
-  internal class NodeSkeleton : GLib.Object, Node
+  internal class NodeSkeleton : GLib.Object, ScrapperD.Node
     {
       public string[] public_addresses { get; construct; }
       public string[] roles { get; construct; }
@@ -30,6 +30,11 @@ namespace ScrapperD
       public NodeSkeleton (string[] public_addresses, string[] roles)
         {
           Object (public_addresses : public_addresses, roles : roles);
+        }
+
+      public async bool Ping () throws GLib.Error
+        {
+          return true;
         }
     }
 }

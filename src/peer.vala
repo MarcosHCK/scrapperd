@@ -22,7 +22,9 @@ namespace Kademlia
   public errordomain PeerError
     {
       FAILED,
-      UNREACHABLE,
+      UNREACHABLE;
+
+      public static extern GLib.Quark quark ();
     }
 
   public abstract class Peer : GLib.Object

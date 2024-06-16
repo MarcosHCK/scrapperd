@@ -27,6 +27,12 @@ namespace Kademlia
   public class Key
     {
       internal KeyVal value;
+      public unowned uint8[] bytes { get
+        {
+          unowned var ar = (uint8[]) (void*) & value.bytes [0];
+                    ar.length = (int) bytelen;
+            return ar;
+        }}
 
       public const uint BITLEN = 160;
       private const string charset = "0123456789abcdef";
@@ -35,7 +41,6 @@ namespace Kademlia
         {
           static_assert (BITLEN == KeyVal.BITLEN);
         }
-
 
       public Key.from_bytes (GLib.Bytes bytes)
         {
@@ -80,6 +85,11 @@ namespace Kademlia
             }
         }
 
+      public Key.verbatim (uint8[] key) requires (key.length == value.bytes.length)
+        {
+          GLib.Memory.copy ((uint8[]) (void*) & value.bytes [0], (uint8[]) (void*) & key [0], bytelen);
+        }
+
       public Key.zero ()
         {
           GLib.Memory.set ((uint8[]) (void*) & value.bytes [0], 0, bytelen);
@@ -87,9 +97,7 @@ namespace Kademlia
 
       public Key copy ()
         {
-          var result = new Key ();
-          result.value = value;
-          return result;
+          return new Key.verbatim (value.bytes);
         }
 
       public static Key distance (Key a, Key b)

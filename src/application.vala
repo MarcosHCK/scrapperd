@@ -22,14 +22,9 @@ namespace ScrapperD
   public class Application : GLib.Application
     {
       const string APPID = "org.hck.ScrapperD";
-      const uint16 APPPORT = 33333;
 
-      private GLib.ThreadPool<SocketConnection> incomming_pool;
-      private GLib.HashTable<string, Instance> instances;
       private GLib.HashTable<string, GLib.TypeClass> modules;
-      private GLib.HashTable<void*, uint> nodes;
-      private GLib.SList<string> public_addresses;
-      private GLib.SocketService service;
+      private ScrapperD.Hub hub;
 
       public static int main (string[] args)
         {
@@ -47,11 +42,7 @@ namespace ScrapperD
 
       construct
         {
-          instances = new HashTable<string, Instance> (GLib.str_hash, GLib.str_equal);
           modules = new HashTable<string, GLib.TypeClass> (GLib.str_hash, GLib.str_equal);
-          nodes = new HashTable<void*, uint> (GLib.direct_hash, GLib.direct_equal);
-          service = new SocketService ();
-          service.stop ();
 
           foreach (unowned var extension in GLib.IOExtensionPoint.lookup (Instance.EXTENSION_POINT).get_extensions ())
             {
@@ -72,25 +63,9 @@ namespace ScrapperD
                 }
             }
 
-          var exclusive = false;
-          var max_threads = (int) GLib.get_num_processors ();
-
-          try { incomming_pool = new GLib.ThreadPool<SocketConnection>.with_owned_data (on_incomming, max_threads, exclusive); } catch (GLib.Error e)
-            {
-              error (@"$(e.domain): $(e.code): $(e.message)");
-            }
-
-          service.incoming.connect ((connection) =>
-            {
-              try { incomming_pool.add (connection); } catch (GLib.Error e)
-                {
-                  critical (@"$(e.domain): $(e.code): $(e.message)");
-                }
-              return true;
-            });
-
           add_main_option ("address", 'a', 0, GLib.OptionArg.STRING, "Address of entry node", "ADDRESS");
           add_main_option ("modules", 0, 0, GLib.OptionArg.NONE, "List installed modules", null);
+          add_main_option ("port", 'p', 0, GLib.OptionArg.INT, "Port where to listen for peer hails", "PORT");
           add_main_option ("public", 0, 0, GLib.OptionArg.STRING_ARRAY, "Public addresses to publish", "ADDRESS");
           add_main_option ("role", 'r', 0, GLib.OptionArg.STRING_ARRAY, "Node role in the network (multiple roles allowed)", "ROLE");
           add_main_option ("version", 'V', 0, GLib.OptionArg.NONE, "Print version", null);
@@ -127,54 +102,34 @@ namespace ScrapperD
           while (true)
             {
               GLib.VariantIter iter;
-              string role, target;
+              int porti;
+              string role;
 
-              var localhost = new InetSocketAddress []
+              if (options.lookup ("port", "i", out porti) == false)
+
+                hub = new Hub ();
+              else
                 {
-                  new InetSocketAddress (new InetAddress.loopback (GLib.SocketFamily.IPV4), APPPORT),
-                  new InetSocketAddress (new InetAddress.loopback (GLib.SocketFamily.IPV6), APPPORT),
-                };
+                  if (porti >= uint16.MIN && porti < uint16.MAX)
 
-              foreach (unowned var address in localhost)
-                {
-                  var protocol = GLib.SocketProtocol.DEFAULT;
-                  var type = GLib.SocketType.STREAM;
-
-                  try { service.add_address (address, type, protocol, null, null); } catch (GLib.Error e)
+                    hub = new Hub ((uint16) porti);
+                  else
                     {
-                      critical (@"$(e.domain): $(e.code): $(e.message)");
-                      continue;
+                      cmdline.printerr ("invalid port %i\n", porti);
+                      cmdline.set_exit_status (1);
+                      break;
                     }
                 }
 
               if (options.lookup ("public", "as", out iter))
                 {
-                  GLib.List<InetAddress> addrs;
-                  GLib.Resolver resolver = GLib.Resolver.get_default ();
-                  string @public;
+                  string address;
 
-                  while (iter.next ("s", out @public))
+                  while (iter.next ("s", out address))
                     {
-
-                      try { addrs = yield resolver.lookup_by_name_async (@public, cancellable); } catch (GLib.Error e)
+                      try { yield hub.add_public_address (address); } catch (GLib.Error e)
                         {
                           critical (@"$(e.domain): $(e.code): $(e.message)");
-                          continue;
-                        }
-
-                      foreach (unowned var addr in addrs)
-                        {
-                          var address = new GLib.InetSocketAddress (addr, APPPORT);
-                          var protocol = GLib.SocketProtocol.DEFAULT;
-                          var type = GLib.SocketType.STREAM;
-
-                          try { service.add_address (address, type, protocol, address, null); } catch (GLib.Error e)
-                            {
-                              critical (@"$(e.domain): $(e.code): $(e.message)");
-                              continue;
-                            }
-
-                          public_addresses.prepend (addr.to_string ());
                         }
                     }
                 }
@@ -203,7 +158,7 @@ namespace ScrapperD
                   else
                     {
                       var gtype = klass.get_type ();
-                      var instance = (Instance) GLib.Object.new (gtype, "role", role);
+                      var instance = (Instance) GLib.Object.new (gtype, "hub", hub);
 
                       if (gtype.is_a (typeof (GLib.Initable)))
                         {
@@ -224,44 +179,12 @@ namespace ScrapperD
                             }
                         }
 
-                      instances.insert (role, (owned) instance);
+                      hub.add_instance (instance);
                     }
                 }
 
-              if (options.lookup ("address", "s", out target))
-                {
-                  try
-                    {
-                      var stream = yield (new SocketClient ()).connect_to_host_async (target, APPPORT, cancellable);
-                      var flags1 = GLib.DBusConnectionFlags.AUTHENTICATION_CLIENT;
-                      var flags2 = GLib.DBusConnectionFlags.DELAY_MESSAGE_PROCESSING;
-                      var flags = flags1 | flags2;
-                      var connection = yield new DBusConnection (stream, null, flags, null, cancellable);
-
-                      on_connected (connection, cancellable);
-
-                      connection.exit_on_close = false;
-                      connection.on_closed.connect ((c, a, b) => on_closed (c));
-                      connection.start_message_processing ();
-
-                      var instance = (Instance) null;
-                      var iterator = HashTableIter<string, Instance> (instances);
-
-                      while (iterator.next (null, out instance))
-                        {
-                          instance.connect_over (connection, cancellable);
-                        }
-                    }
-                  catch (GLib.Error e)
-                    {
-                      cmdline.printerr ("%s: %u: %s\n", e.domain.to_string (), e.code, e.message);
-                      cmdline.set_exit_status (1);
-                      break;
-                    }
-                }
-
-              this.hold ();
-              service.start ();
+              hold ();
+              hub.begin ();
               break;
             }
         }
@@ -288,82 +211,6 @@ namespace ScrapperD
               return 0;
             }
           return -1;
-        }
-
-      private T[] list2ar<T> (GLib.List<T> list)
-        {
-          var ar = new T [list.length ()];
-          var i = 0;
-
-          foreach (unowned var item in list) ar [i] = T.dup (item);
-          return (owned) ar;
-        }
-
-      private T[] slist2ar<T> (GLib.SList<T> list)
-        {
-          var ar = new T [list.length ()];
-          var i = 0;
-
-          foreach (unowned var item in list) ar [i] = T.dup (item);
-          return (owned) ar;
-        }
-
-      private void on_closed (GLib.DBusConnection connection)
-        {
-          var id = (uint) 0;
-          var instance = (Instance) null;
-          var iter = HashTableIter<string, Instance> (instances);
-
-          while (iter.next (null, out instance))
-           
-            instance.dbus_unregister (connection);
-
-          lock (nodes) id = nodes.lookup (connection);
-          connection.unregister_object (id);
-        }
-
-      private void on_connected (GLib.DBusConnection connection, GLib.Cancellable? cancellable = null) throws GLib.Error
-        {
-          var id = (uint) 0;
-          var instance = (Instance) null;
-          var iter = HashTableIter<string, Instance> (instances);
-          var public_addresses = slist2ar (this.public_addresses);
-          var roles = list2ar<unowned string> (instances.get_keys ());
-          var node = new NodeSkeleton (public_addresses, roles);
-
-          while (iter.next (null, out instance))
-           
-            instance.dbus_register (connection, Node.BASE_PATH, cancellable);
-          
-          lock (nodes) id = connection.register_object<Node> (Node.BASE_PATH, node);
-          nodes.insert (connection, id);
-        }
-
-      private void on_incomming (owned GLib.SocketConnection connection)
-        {
-          on_incomming_async.begin ((owned) connection, null, (o, res) =>
-            {
-              try { ((Application) o).on_incomming_async.end (res); } catch (GLib.Error e)
-                {
-                  critical (@"$(e.domain): $(e.code): $(e.message)");
-                }
-            });
-        }
-
-      private async void on_incomming_async (owned GLib.SocketConnection stream, GLib.Cancellable? cancellable = null) throws GLib.Error
-        {
-          var flags1 = GLib.DBusConnectionFlags.AUTHENTICATION_ALLOW_ANONYMOUS;
-          var flags2 = GLib.DBusConnectionFlags.AUTHENTICATION_SERVER;
-          var flags3 = GLib.DBusConnectionFlags.DELAY_MESSAGE_PROCESSING;
-          var flags = flags1 | flags2 | flags3;
-          var guid = (string) DBus.generate_guid ();
-          var connection = yield new DBusConnection (stream, guid, flags, null, null);
-
-          on_connected (connection);
-
-          connection.exit_on_close = false;
-          connection.on_closed.connect ((c, a, b) => on_closed (c));
-          connection.start_message_processing ();
         }
     }
 }

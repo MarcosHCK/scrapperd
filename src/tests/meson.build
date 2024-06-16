@@ -18,6 +18,7 @@
 tests = \
   {
     'buckets.vala' : 'Kademlia buckets tests',
+    'hub.vala' : 'ScrapperD hub tests',
     'integration.vala' : 'Kademlia integration tests',
     'key.vala' : 'Kademlia key tests',
     'peer.vala' : 'Kademlia peer tests',

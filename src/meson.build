@@ -57,10 +57,14 @@ libscrapperd = library \
 
     include_directories : [ configdir ],
 
+    link_with : [ libkademlia ],
+
     sources :
       [
+        'hub.vala',
         'instance.vala',
         'node.vala',
+        'nodeskeleton.vala',
         'versioncheck.vala',
       ],
   )
@@ -86,6 +90,5 @@ executable \
       [
         'application.vala',
         'instanceclass.vapi',
-        'nodeskeleton.vala',
       ],
   )
