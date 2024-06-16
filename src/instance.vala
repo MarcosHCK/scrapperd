@@ -32,6 +32,11 @@ namespace ScrapperD
           return true;
         }
 
+      public virtual bool connect_over (GLib.DBusConnection connection, GLib.Cancellable? cancellable = null) throws GLib.Error
+        {
+          return true;
+        }
+
       public virtual bool dbus_register (GLib.DBusConnection connection, string object_path, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
           return true;

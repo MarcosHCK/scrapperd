@@ -86,5 +86,6 @@ executable \
       [
         'application.vala',
         'instanceclass.vapi',
+        'nodeskeleton.vala',
       ],
   )
