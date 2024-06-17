@@ -65,6 +65,8 @@ libscrapperd = library \
         'instance.vala',
         'node.vala',
         'nodeskeleton.vala',
+        'valuenode.vala',
+        'valuenodeskeleton.vala',
         'versioncheck.vala',
       ],
   )

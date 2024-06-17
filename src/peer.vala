@@ -49,6 +49,7 @@ namespace Kademlia
 
       protected Buckets? buckets = null;
       public signal void added_contact (Key peer);
+      public signal void dropped_contact (Key peer);
       public signal void staled_contact (Key peer);
 
       protected async virtual Key[] find_peer (Key peer, Key id, GLib.Cancellable? cancellable = null) throws GLib.Error
@@ -66,6 +67,7 @@ namespace Kademlia
           try
             {
               buckets.added_contact.connect ((peer) => this.added_contact (peer));
+              buckets.dropped_contact.connect ((peer) => this.dropped_contact (peer));
               buckets.staled_contact.connect ((peer) => this.staled_contact (peer));
             }
           catch (GLib.ThreadError e)
@@ -79,7 +81,32 @@ namespace Kademlia
           Object (id : id);
         }
 
-      public async bool check (Key[] peers, GLib.Cancellable? cancellable = null) throws GLib.Error
+      public void add_contact (Key peer)
+        {
+          lock (buckets) buckets.insert (peer);
+        }
+
+      public void drop_contact (Key peer)
+        {
+          lock (buckets) buckets.drop (peer);
+        }
+
+      public async bool join (Key to, GLib.Cancellable? cancellable = null) throws GLib.Error
+        {
+          lock (buckets) buckets.insert (to);
+          var peers = yield find_peer (to, id, cancellable);
+          return yield notify_join (peers, cancellable);
+        }
+
+      public GLib.SList<Key> nearest (Key to)
+        {
+          GLib.SList<Key> list;
+
+          lock (buckets) list = buckets.nearest (to);
+          return (owned) list;
+        }
+
+      async bool notify_join (Key[] peers, GLib.Cancellable? cancellable = null) throws GLib.Error
 
           requires (peers.length > 0)
         {
@@ -106,9 +133,9 @@ namespace Kademlia
             {
               var p = i;
 
-              check_nodes.begin (lists [p].data, cancellable, (o, res) =>
+              notify_nodes.begin (lists [p].data, cancellable, (o, res) =>
                 {
-                  try { ((Peer) o).check_nodes.end (res); } catch (GLib.Error e)
+                  try { ((Peer) o).notify_nodes.end (res); } catch (GLib.Error e)
                     {
                       errors.push ((owned) e);
                     }
@@ -135,7 +162,7 @@ namespace Kademlia
           return true;
         }
 
-      async bool check_node (Key peer, GLib.Cancellable? cancellable = null) throws GLib.Error
+      async bool notify_node (Key peer, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
           try { return yield ping_peer (peer, cancellable); } catch (PeerError e)
             {
@@ -144,34 +171,22 @@ namespace Kademlia
                 throw (owned) e;
               else
                 {
-                  buckets.drop (peer);
+                  lock (buckets) buckets.drop (peer);
                   return false;
                 }
             }
         }
 
-      async bool check_nodes (Key[] peers, GLib.Cancellable? cancellable = null) throws GLib.Error
+      async bool notify_nodes (Key[] peers, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
           foreach (unowned var peer in peers)
             {
               if (Key.equal (peer, this.id) == false)
 
-                yield check_node (peer, cancellable);
+                yield notify_node (peer, cancellable);
             }
 
           return true;
-        }
-
-      public async bool connectto (Key to, GLib.Cancellable? cancellable = null) throws GLib.Error
-        {
-          buckets.insert (to);
-          var peers = yield find_peer (to, id, cancellable);
-          return yield check (peers, cancellable);
-        }
-
-      public GLib.SList<Key> nearest (Key to)
-        {
-          return buckets.nearest (to);
         }
     }
 }

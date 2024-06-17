@@ -141,14 +141,15 @@ namespace Kademlia
 
       public string to_string ()
         {
-          var builder = new StringBuilder.sized (1 + 6 * bytelen);
+          var builder = new StringBuilder.sized (2 * bytelen);
+
           unowned var bytes = (uint8*) & value.bytes [0];
           unowned var first = true;
 
           for (unowned var i = 0; i < bytelen; ++i)
             {
               uint8 byte = bytes [i];
-              char buffer[6] = { ',', ' ', '0', 'x', charset [byte >> 4], charset [byte & 0xf] };
+              char buffer[2] = { charset [byte >> 4], charset [byte & 0xf] };
               int off = first == false ? 0 : 2;
 
               builder.append_len (((string) buffer).offset (off), buffer.length - off);

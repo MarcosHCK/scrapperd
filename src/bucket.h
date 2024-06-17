@@ -70,6 +70,21 @@ extern "C" {
       g_queue_init (& bucket->stale);
     }
 
+  static __inline gboolean k_queue_bring_front (GQueue* queue, gpointer data, GCompareFunc func)
+    {
+      GList* link;
+
+      if ((link = g_queue_find_custom (queue, data, func)) == NULL)
+
+        return FALSE;
+      else
+        {
+          g_queue_unlink (queue, link);
+          g_queue_push_head_link (queue, link);
+        }
+      return TRUE;
+    }
+
   static __inline void k_stale_contact_copy (KStaleContact* src, KStaleContact* dst)
     {
       k_stale_contact_init (dst, src->key);

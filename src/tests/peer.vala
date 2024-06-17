@@ -74,9 +74,9 @@ namespace Testing
       var context = (GLib.MainContext) GLib.MainContext.default ();
       var loop = new GLib.MainLoop (context, false);
 
-      peer.connectto.begin (to, null, (o, res) =>
+      peer.join.begin (to, null, (o, res) =>
         {
-          try { ((Peer) o).connectto.end (res); } catch (GLib.Error e)
+          try { ((Peer) o).join.end (res); } catch (GLib.Error e)
             {
               tmperr = e.copy ();
             }
@@ -100,9 +100,9 @@ namespace Testing
 
       var peer = new TestPeerFindHandle ();
 
-      peer.connectto.begin (to, null, (o, res) =>
+      peer.join.begin (to, null, (o, res) =>
         {
-          try { ((Peer) o).connectto.end (res); } catch (GLib.Error e)
+          try { ((Peer) o).join.end (res); } catch (GLib.Error e)
             {
               tmperr = e.copy ();
             }
@@ -126,9 +126,9 @@ namespace Testing
 
       var peer = new TestPeerAllHandle ();
 
-      peer.connectto.begin (to, null, (o, res) =>
+      peer.join.begin (to, null, (o, res) =>
         {
-          try { ((Peer) o).connectto.end (res); } catch (GLib.Error e)
+          try { ((Peer) o).join.end (res); } catch (GLib.Error e)
             {
               tmperr = e.copy ();
             }

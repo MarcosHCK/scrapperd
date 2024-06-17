@@ -58,7 +58,7 @@ namespace Kademlia
           var dones = new uint [ALPHA];
           var errors = new GLib.AsyncQueue<GLib.Error> ();
           var lists = new GenericArray<Key> [ALPHA];
-          var peers = buckets.nearest (id);
+          var peers = nearest (id);
 
           if (peers.find_custom (this.id, (a, b) => Key.equal (a, b) ? 0 : 1) != null)
             {
@@ -128,7 +128,7 @@ namespace Kademlia
                 throw (owned) e;
               else
                 {
-                  buckets.drop (peer);
+                  drop_contact (peer);
                   return false;
                 }
             }
@@ -168,7 +168,7 @@ namespace Kademlia
           var peers = new GLib.AsyncQueue<Key> ();
           var values = new GLib.AsyncQueue<Value> ();
 
-          foreach (unowned var key in buckets.nearest (id))
+          foreach (unowned var key in nearest (id))
             {
               peers.push (key.copy ());
             }

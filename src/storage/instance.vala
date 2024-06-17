@@ -24,7 +24,7 @@ namespace ScrapperD
       private HashTable<void*, NodeIds?> nodes;
       private Peer peer;
 
-      public override string role { get { return StorageNode.ROLE; } }
+      public override string role { get { return ROLE; } }
 
       struct NodeIds
         {
@@ -58,8 +58,8 @@ namespace ScrapperD
       [ModuleInit]
       [CCode (cname = "g_io_storagemod_load")] public static void load (GLib.IOModule module)
         {
-          module.set_name (StorageNode.ROLE);
-          Instance.install<StorageInstance> (StorageNode.ROLE, ">=" + Config.PACKAGE_VERSION);
+          module.set_name (ROLE);
+          Instance.install<StorageInstance> (ROLE, ">=" + Config.PACKAGE_VERSION);
         }
 
       [CCode (cname = "g_io_storagemod_query")] public static string[] query ()
@@ -75,7 +75,7 @@ namespace ScrapperD
       public override bool dbus_register (GLib.DBusConnection connection, string object_path, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
           base.dbus_register (connection, object_path, cancellable);
-          unowned var id1 = connection.register_object<StorageNode> (@"$object_path/$role", new StorageNodeSkeleton (peer));
+          unowned var id1 = connection.register_object<ValueNode> (@"$object_path/$role", new ValueNodeSkeleton (hub, peer));
           unowned var id2 = connection.register_object<NodeRole> (@"$object_path/$role", new NodeRoleSkeleton (peer));
 
           lock (nodes) nodes.insert (connection, NodeIds (id1, id2));
@@ -105,7 +105,7 @@ namespace ScrapperD
 
       public async bool join_async (owned Kademlia.Key[] keys, GLib.Cancellable? cancellable = null)
         {
-          foreach (unowned var key in keys) try { yield peer.connectto (key, cancellable); } catch (GLib.Error e)
+          foreach (unowned var key in keys) try { yield peer.join (key, cancellable); } catch (GLib.Error e)
             {
               critical (@"$(e.domain): $(e.code): $(e.message)");
             }

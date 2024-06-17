@@ -24,11 +24,17 @@ namespace Kademlia
   internal struct Bucket
     {
       public uint index;
-      public GLib.Queue<Key> nodes { get; }
-      public GLib.Queue<Key> replacements { get; }
-      public GLib.Queue<StaleContact?> stale { get; }
+      public unowned GLib.Queue<Key> nodes { get; }
+      public unowned GLib.Queue<Key> replacements { get; }
+      public unowned GLib.Queue<StaleContact?> stale { get; }
       public Bucket (uint index);
     }
+
+  [CCode (cheader_filename = "bucket.h", simple_generics = true)]
+
+  internal bool queue_bring_front<T> (GLib.Queue<T>? queue, T item, GLib.CompareFunc<T> func);
+
+  [CCode (cheader_filename = "bucket.h")]
 
   internal struct StaleContact
     {

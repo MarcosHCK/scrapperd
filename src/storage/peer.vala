@@ -20,9 +20,17 @@ using Kademlia;
 
 namespace ScrapperD
 {
+  public const string ROLE = "storage";
+
   public class Peer : ValuePeer
     {
       public Hub hub { get; construct; }
+
+      construct
+        {
+          added_contact.connect ((k) => debug ("added contact '%s'", k.to_string ()));
+          staled_contact.connect ((k) => debug ("staled contact '%s'", k.to_string ()));
+        }
 
       public Peer (Hub hub)
         {
@@ -30,42 +38,57 @@ namespace ScrapperD
           this._hub = hub;
         }
 
-      protected override async Key[] find_peer (Key peer, Key id, GLib.Cancellable? cancellable = null) throws GLib.Error
+      private ValueNode.PeerRef get_self ()
         {
-          var proxy = yield hub.get_proxy<StorageNode> (peer, StorageNode.ROLE, cancellable);
-          var neighbors = yield proxy.find_node (id.bytes, cancellable);
-          var keys = new Key [neighbors.length];
-          for (unowned var i = 0; i < keys.length; ++i) keys [i] = new Key.verbatim (neighbors [i].id);
+          return ValueNode.PeerRef (id.bytes, hub.get_public_addresses ());
+        }
+
+      protected override async Key[] find_peer (Key peer, Key key, GLib.Cancellable? cancellable = null) throws GLib.Error
+        {
+          var proxy = yield hub.get_proxy<ValueNode> (peer, ROLE, cancellable);
+          var peers = yield proxy.find_node (get_self (), id.bytes, cancellable);
+          var keys = new Key [peers.length];
+
+          for (unowned var i = 0; i < keys.length; ++i)
+            {
+              keys [i] = new Key.verbatim (peers [i].id);
+              hub.known_peer (keys [i], peers [i].addresses);
+            }
           return (owned) keys;
         }
 
-      protected override async Kademlia.Value find_value (Key peer, Key id, GLib.Cancellable? cancellable = null) throws GLib.Error
+      protected override async Kademlia.Value find_value (Key peer, Key key, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
-          var proxy = yield hub.get_proxy<StorageNode> (peer, StorageNode.ROLE, cancellable);
-          var value = yield proxy.find_value (id.bytes, cancellable);
+          var proxy = yield hub.get_proxy<ValueNode> (peer, ROLE, cancellable);
+          var value = yield proxy.find_value (get_self (), key.bytes, cancellable);
 
           if (value.found)
 
             return new Kademlia.Value.inmediate (new GLib.Bytes (value.value));
           else
             {
-              var keys = new Key [value.neighbors.length];
-              for (unowned var i = 0; i < keys.length; ++i) keys [i] = new Key.verbatim (value.neighbors [i].id);
+              var keys = new Key [value.peers.length];
+
+              for (unowned var i = 0; i < keys.length; ++i)
+                {
+                  keys [i] = new Key.verbatim (value.peers [i].id);
+                  hub.known_peer (keys [i], value.peers [i].addresses);
+                }
               return new Kademlia.Value.delegated ((owned) keys);
             }
         }
 
-      protected override async bool store_value (Key peer, Key id, GLib.Value? value = null, GLib.Cancellable? cancellable = null) throws GLib.Error
+      protected override async bool store_value (Key peer, Key key, GLib.Value? value = null, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
-          var proxy = yield hub.get_proxy<StorageNode> (peer, StorageNode.ROLE, cancellable);
-          var result = yield proxy.store (id.bytes, StorageNode.Value.inmediate (value).value, cancellable);
+          var proxy = yield hub.get_proxy<ValueNode> (peer, ROLE, cancellable);
+          var result = yield proxy.store (get_self (), key.bytes, ValueNode.ValueRef.inmediate (value).value, cancellable);
           return result;
         }
 
       protected override async bool ping_peer (Key peer, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
-          var proxy = yield hub.get_proxy<StorageNode> (peer, StorageNode.ROLE, cancellable);
-          var result = yield proxy.ping (cancellable);
+          var proxy = yield hub.get_proxy<ValueNode> (peer, ROLE, cancellable);
+          var result = yield proxy.ping (get_self (), cancellable);
           return result;
         }
     }

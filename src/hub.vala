@@ -77,6 +77,8 @@ namespace ScrapperD
               var protocol = GLib.SocketProtocol.DEFAULT;
               var type = GLib.SocketType.STREAM;
 
+              public_addresses.prepend (address.to_string ());
+
               try { socket_service.add_address (address, type, protocol, address, null); } catch (GLib.Error e)
                 {
                   critical (@"$(e.domain): $(e.code): $(e.message)");
@@ -107,6 +109,18 @@ namespace ScrapperD
 
               socket_service.add_address (address, type, protocol, address, null);
               public_addresses.prepend (inet_address.to_string ());
+            }
+        }
+
+      public string[] addresses_for_peer (Key key)
+        {
+          lock (cached)
+            {
+              unowned var addrs = cached_public_addresses.lookup (key);
+              var ar = (string[]) new string [addrs.length ()];
+              int i = 0;
+              foreach (unowned var addr in addrs) ar [i++] = addr;
+              return (owned) ar;
             }
         }
 
@@ -199,10 +213,18 @@ namespace ScrapperD
             }
         }
 
+      public string[] get_public_addresses ()
+        {
+          var ar = new string [public_addresses.length ()];
+          int i = 0;
+          foreach (unowned var item in public_addresses) ar [i++] = item;
+          return (owned) ar;
+        }
+
       public async T? get_proxy<T> (Key key, string role, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
           GLib.DBusConnection connection;
-          debug ("creating proxy for peer '%s':'%s'", role, key.to_string ());
+          debug ("creating proxy for peer %s:%s", role, key.to_string ());
 
           while (true)
             {
@@ -210,7 +232,7 @@ namespace ScrapperD
 
               if (likely (connection != null))
                 {
-                  debug ("using cached connection for peer '%s':'%s'", role, key.to_string ());
+                  debug ("using cached connection for peer %s:%s", role, key.to_string ());
 
                   Key key2;
                   var object_path = @"$(Node.BASE_PATH)/$(role)";
@@ -221,7 +243,7 @@ namespace ScrapperD
                     return yield connection.get_proxy<T> (null, object_path, 0, cancellable);
                   else
                     {
-                      debug ("resetted peer '%s':'%s'", role, key.to_string ());
+                      debug ("resetted peer %s:%s", role, key.to_string ());
 
                       yield forget (key2, cancellable);
                       lock (cached) cached_public_addresses.remove (key2);
@@ -230,7 +252,7 @@ namespace ScrapperD
                 }
               else
                 {
-                  debug ("don't have a cached connection for peer '%s':'%s'", role, key.to_string ());
+                  debug ("don't have a cached connection for peer %s:%s", role, key.to_string ());
 
                   GLib.SList<string> addresses;
                   bool found = false;
@@ -239,7 +261,7 @@ namespace ScrapperD
 
                   foreach (unowned var address in addresses) try
                     {
-                      debug ("connecting to peer '%s':'%s' (%s)", role, key.to_string (), address);
+                      debug ("connecting to peer %s:%s (%s)", role, key.to_string (), address);
                       found = yield connect_to (address, cancellable);
                       break;
                     }
@@ -262,13 +284,33 @@ namespace ScrapperD
 
                   if (found == false)
                     {
+                      debug ("can not connect to peer %s:%s", role, key.to_string ());
                       throw new Kademlia.PeerError.UNREACHABLE ("can not locate node %s", key.to_string ());
                     }
                 }
             }
         }
 
-      private void on_closed (GLib.DBusConnection connection)
+      public void known_peer (Key key, string[] public_addresses)
+        {
+          lock (cached)
+            {
+              var @set = new GenericSet<string> (GLib.str_hash, GLib.str_equal);
+
+              foreach (unowned var addr in cached_public_addresses.lookup (key)) @set.add (addr);
+              foreach (unowned var addr in public_addresses) @set.add (addr);
+
+              var item = (string?) null;
+              var iter = (GenericSetIter<string>) @set.iterator ();
+              var list = new GLib.SList<string> ();
+
+              while ((item = iter.next_value ()) != null) list.prepend ((owned) item);
+
+              cached_public_addresses.insert (key.copy (), (owned) list);
+            }
+        }
+
+      void on_closed (GLib.DBusConnection connection)
         {
           var id = (uint) 0;
           var instance = (Instance) null;
@@ -284,7 +326,7 @@ namespace ScrapperD
           connection.unregister_object (id);
         }
 
-      private void on_incomming (owned GLib.SocketConnection connection)
+      void on_incomming (owned GLib.SocketConnection connection)
         {
           string? remote = null;
           try { remote = connection.get_remote_address ().to_string (); } catch { }
@@ -304,7 +346,7 @@ namespace ScrapperD
             });
         }
 
-      private async bool on_incomming_async (owned GLib.SocketConnection stream, owned string? remote, GLib.Cancellable? cancellable = null) throws GLib.Error
+      async bool on_incomming_async (owned GLib.SocketConnection stream, owned string? remote, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
           var flags1 = GLib.DBusConnectionFlags.AUTHENTICATION_ALLOW_ANONYMOUS;
           var flags2 = GLib.DBusConnectionFlags.AUTHENTICATION_SERVER;
@@ -336,7 +378,7 @@ namespace ScrapperD
           return yield register_connection (connection, true, cancellable);
         }
 
-      private void prepare_connection (GLib.DBusConnection connection, GLib.Cancellable? cancellable = null) throws GLib.Error
+      void prepare_connection (GLib.DBusConnection connection, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
           var instance = (Instance) null;
           var iter = HashTableIter<string, Instance> (instances);
@@ -357,7 +399,7 @@ namespace ScrapperD
           lock (nodes) nodes.insert (connection, connection.register_object<Node> (Node.BASE_PATH, node));
         }
 
-      private async bool register_connection (GLib.DBusConnection connection, bool incomming, GLib.Cancellable? cancellable = null) throws GLib.Error
+      async bool register_connection (GLib.DBusConnection connection, bool incomming, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
           var object_path = Node.BASE_PATH;
           var node_proxy = yield connection.get_proxy<Node> (null, object_path, 0, cancellable);
@@ -384,26 +426,9 @@ namespace ScrapperD
 
           i = 0;
 
-          var remote_address = ((SocketConnection) connection.stream).get_remote_address ();
-          var remote_public = (string?) null;
-
-          if (likely (remote_address is GLib.InetSocketAddress))
-            {
-              var socket_address = (GLib.InetSocketAddress) remote_address;
-              var inet_address = socket_address.get_address ();
-              var inet_port = socket_address.get_port ();
-
-              if (inet_address.family != GLib.SocketFamily.IPV6)
-
-                remote_public = @"$inet_address:$inet_port";
-              else
-                remote_public = @"[$inet_address]:$inet_port";
-            }
-
           lock (cached) foreach (unowned var role in roles)
             {
               var list = pubs.copy_deep ((s) => s);
-              if (remote_public != null) list.prepend ((owned) remote_public);
 
               cached_connections.insert (keys [i].copy (), connection);
               cached_public_addresses.insert ((owned) keys [i], (owned) list);

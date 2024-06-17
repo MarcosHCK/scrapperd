@@ -15,9 +15,9 @@
 # along with ScrapperD. If not, see <http://www.gnu.org/licenses/>.
 #
 
-libstorage = library \
+shared_module \
   (
-    'storage',
+    'storagemod',
 
     dependencies :
       [
@@ -31,29 +31,8 @@ libstorage = library \
 
     sources :
       [
-        'node.vala',
-        'nodeskeleton.vala',
+        'instance.vala',
         'peer.vala',
         'store.vala',
-      ],
-  )
-
-shared_module \
-  (
-    'storagemod',
-
-    dependencies :
-      [
-        vala.find_library ('gio-2.0'), libgio_dep,
-        vala.find_library ('glib-2.0'), libglib_dep,
-        vala.find_library ('gobject-2.0'), libgobject_dep,
-      ],
-
-    include_directories : [ configdir, libsdir ],
-    link_with : [ libkademlia, libscrapperd, libstorage ],
-
-    sources :
-      [
-        'instance.vala',
       ],
   )

@@ -64,7 +64,7 @@ namespace Kademlia
 
                   if (bucket.replacements.length > 0)
                     {
-                      bucket.nodes.push_head (bucket.replacements.pop_head ());
+                      bucket.nodes.push_tail (bucket.replacements.pop_head ());
                       added_contact (bucket.nodes.head.data);
                     }
                 }
@@ -88,18 +88,32 @@ namespace Kademlia
 
       public bool insert (Key key)
         {
-          unowned var bucket = search (key, true).data;
-          unowned var done = false;
+          unowned var bucket = (Bucket?) search (key, true).data;
+          unowned var item = (StaleContact?) (void*) key;
 
-          if ((done = (bucket.nodes.length < MAXSPAN)) == false)
-
-            bucket.replacements.push_head (key.copy ());
-          else
+          if (queue_bring_front<StaleContact?> (bucket.stale, item, compare_stale_contact))
             {
-              bucket.nodes.push_head (key.copy ());
-              added_contact (bucket.nodes.head.data);
+              bucket.stale.pop_head ();
+              return insert (key);
             }
-          return done;
+          else if (queue_bring_front<Key> (bucket.replacements, key, compare_key) == false)
+            {
+              if (queue_bring_front<Key> (bucket.nodes, key, compare_key))
+
+                return false;
+              if (bucket.nodes.length >= MAXSPAN)
+                {
+                  bucket.replacements.push_head (key.copy ());
+                  return false;
+                }
+              else
+                {
+                  bucket.nodes.push_head (key.copy ());
+                  added_contact (bucket.nodes.head.data);
+                  return true;
+                }
+            }
+          return false;
         }
 
       public GLib.SList<Key> nearest (Key key)

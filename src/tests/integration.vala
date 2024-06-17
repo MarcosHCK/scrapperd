@@ -188,7 +188,7 @@ namespace Testing
             {
               unowned var peer = net.lookup (peers [k]);
 
-              try { yield peer.connectto (peers [0]); } catch (GLib.Error e)
+              try { yield peer.join (peers [0]); } catch (GLib.Error e)
                 {
                   assert_no_error (e);
                 }
