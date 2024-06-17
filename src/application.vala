@@ -134,9 +134,9 @@ namespace ScrapperD
                     }
                 }
 
-              if (options.lookup ("roles", "as", out iter) == false)
+              if (options.lookup ("role", "as", out iter) == false)
                 {
-                  cmdline.printerr ("---roles unspecified\n");
+                  cmdline.printerr ("---role unspecified\n");
                   cmdline.set_exit_status (1);
                   break;
                 }
@@ -202,7 +202,12 @@ namespace ScrapperD
                   first = false;
                 }
 
-              print ("%s\n", builder.str);
+              if (first == false)
+                {
+                  builder.append_c ('\n');
+                }
+
+              print ("%s", builder.str);
               return 0;
             }
           else if (opts.contains ("version"))
