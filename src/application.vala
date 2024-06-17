@@ -24,6 +24,7 @@ namespace ScrapperD
       const string APPID = "org.hck.ScrapperD";
 
       private GLib.HashTable<string, GLib.TypeClass> modules;
+      private GLib.HashTable<string, Instance> instances;
       private ScrapperD.Hub hub;
 
       public static int main (string[] args)
@@ -42,6 +43,7 @@ namespace ScrapperD
 
       construct
         {
+          instances = new HashTable<string, Instance> (GLib.str_hash, GLib.str_equal);
           modules = new HashTable<string, GLib.TypeClass> (GLib.str_hash, GLib.str_equal);
 
           foreach (unowned var extension in GLib.IOExtensionPoint.lookup (Instance.EXTENSION_POINT).get_extensions ())
@@ -103,7 +105,7 @@ namespace ScrapperD
             {
               GLib.VariantIter iter;
               int porti;
-              string role;
+              string address, role;
 
               if (options.lookup ("port", "i", out porti) == false)
 
@@ -123,8 +125,6 @@ namespace ScrapperD
 
               if (options.lookup ("public", "as", out iter))
                 {
-                  string address;
-
                   while (iter.next ("s", out address))
                     {
                       try { yield hub.add_public_address (address); } catch (GLib.Error e)
@@ -180,6 +180,32 @@ namespace ScrapperD
                         }
 
                       hub.add_instance (instance);
+                      instances.insert (role, instance);
+                    }
+                }
+
+              if (good == false) break;
+
+              if (options.lookup ("address", "s", out address))
+                {
+                  var instance = (Instance) null;
+                  var iterator = HashTableIter<string, Instance> (instances);
+
+                  try { yield hub.connect_to (address, cancellable); } catch (GLib.Error e)
+                    {
+                      cmdline.printerr ("%s: %u: %s\n", e.domain.to_string (), e.code, e.message);
+                      cmdline.set_exit_status (1);
+                      break;
+                    }
+
+                  while (iterator.next (null, out instance))
+                    {
+                      try { instance.join (); } catch (GLib.Error e)
+                        {
+                          cmdline.printerr ("%s: %u: %s\n", e.domain.to_string (), e.code, e.message);
+                          cmdline.set_exit_status (1);
+                          break;
+                        }
                     }
                 }
 

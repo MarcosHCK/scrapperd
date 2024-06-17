@@ -14,6 +14,7 @@
  * You should have received a copy of the GNU General Public License
  * along with ScrapperD. If not, see <http://www.gnu.org/licenses/>.
  */
+using Kademlia;
 
 [CCode (cprefix = "Scrapperd", lower_case_cprefix = "scrapperd_")]
 
@@ -24,8 +25,8 @@ namespace ScrapperD
       public const uint16 DEFAULT_PORT = 33334;
 
       private bool cached = true;
-      private GLib.HashTable<Kademlia.Key, GLib.DBusConnection> cached_connections;
-      private GLib.HashTable<Kademlia.Key, GLib.SList<string>> cached_public_addresses;
+      private GLib.HashTable<Key, GLib.DBusConnection> cached_connections;
+      private GLib.HashTable<Key, GLib.SList<string>> cached_public_addresses;
       private GLib.ThreadPool<GLib.SocketConnection> incomming_pool;
       private GLib.HashTable<string, Instance> instances;
       private GLib.HashTable<void*, uint> nodes;
@@ -36,11 +37,11 @@ namespace ScrapperD
 
       construct
         {
-          unowned GLib.HashFunc<Kademlia.Key> hash_func = Kademlia.Key.hash;
-          unowned GLib.EqualFunc<Kademlia.Key> equal_func = Kademlia.Key.equal;
+          unowned GLib.HashFunc<Key> hash_func = Key.hash;
+          unowned GLib.EqualFunc<Key> equal_func = Key.equal;
 
-          cached_connections = new HashTable<Kademlia.Key, DBusConnection> (hash_func, equal_func);
-          cached_public_addresses = new HashTable<Kademlia.Key, SList<string>> (hash_func, equal_func);
+          cached_connections = new HashTable<Key, DBusConnection> (hash_func, equal_func);
+          cached_public_addresses = new HashTable<Key, SList<string>> (hash_func, equal_func);
           instances = new HashTable<string, Instance> (GLib.str_hash, GLib.str_equal);
           nodes = new HashTable<void*, uint> (GLib.direct_hash, GLib.direct_equal);
           public_addresses = new SList<string> ();
@@ -120,7 +121,7 @@ namespace ScrapperD
           var flags2 = GLib.DBusConnectionFlags.DELAY_MESSAGE_PROCESSING;
           var flags = flags1 | flags2;
           var remote = (string?) null;
-          var stream = (SocketConnection) yield (new SocketClient ()).connect_to_host_async (address, port, cancellable);
+          var stream = (SocketConnection) yield (new SocketClient ()).connect_to_host_async (address, DEFAULT_PORT, cancellable);
 
           try { remote = stream.get_remote_address ().to_string (); } catch { }
 
@@ -153,7 +154,7 @@ namespace ScrapperD
           return yield forget_all (cancellable);
         }
 
-      public async bool forget (Kademlia.Key key, GLib.Cancellable? cancellable = null) throws GLib.Error
+      public async bool forget (Key key, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
           GLib.DBusConnection connection;
           lock (cached) connection = cached_connections.lookup (key);
@@ -172,7 +173,7 @@ namespace ScrapperD
           lock (cached)
             {
               var connection = (DBusConnection) null;
-              var iterator = HashTableIter<Kademlia.Key, GLib.DBusConnection> (cached_connections);
+              var iterator = HashTableIter<Key, GLib.DBusConnection> (cached_connections);
 
               while (iterator.next (null, out connection))
 
@@ -186,7 +187,19 @@ namespace ScrapperD
           return true;
         }
 
-      public async T? get_proxy<T> (Kademlia.Key key, string role, GLib.Cancellable? cancellable = null) throws GLib.Error
+      public Key[] get_known_peers ()
+        {
+          lock (cached)
+            {
+              var keys = (List<unowned Key>) cached_public_addresses.get_keys ();
+              var ar = (Key[]) new Key [keys.length ()];
+              int i = 0;
+              foreach (unowned var key in keys) ar [i++] = key.copy ();
+              return (owned) ar;
+            }
+        }
+
+      public async T? get_proxy<T> (Key key, string role, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
           GLib.DBusConnection connection;
           debug ("creating proxy for peer '%s':'%s'", role, key.to_string ());
@@ -199,11 +212,11 @@ namespace ScrapperD
                 {
                   debug ("using cached connection for peer '%s':'%s'", role, key.to_string ());
 
-                  Kademlia.Key key2;
+                  Key key2;
                   var object_path = @"$(Node.BASE_PATH)/$(role)";
                   var node_role = yield connection.get_proxy<NodeRole> (null, object_path, 0, cancellable);
 
-                  if (Kademlia.Key.equal (key, (key2 = new Kademlia.Key.verbatim (node_role.Id))))
+                  if (Key.equal (key, (key2 = new Key.verbatim (node_role.Id))))
 
                     return yield connection.get_proxy<T> (null, object_path, 0, cancellable);
                   else
@@ -353,7 +366,7 @@ namespace ScrapperD
 
           int i = 0;
           var roles = node_proxy.Roles;
-          var keys = new Kademlia.Key [roles.length];
+          var keys = new Key [roles.length];
           var pubs = new SList<string> ();
 
           foreach (unowned var address in node_proxy.PublicAddresses)
@@ -364,7 +377,7 @@ namespace ScrapperD
           foreach (unowned var role in roles)
             {
               var node_role = yield connection.get_proxy<NodeRole> (null, @"$object_path/$role", 0, cancellable);
-              var node_key = new Kademlia.Key.verbatim (node_role.Id);
+              var node_key = new Key.verbatim (node_role.Id);
 
               keys [i++] = (owned) node_key;
             }

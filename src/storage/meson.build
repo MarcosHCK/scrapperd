@@ -15,9 +15,9 @@
 # along with ScrapperD. If not, see <http://www.gnu.org/licenses/>.
 #
 
-libkademlia = library \
+libstorage = library \
   (
-    'kademlia',
+    'storage',
 
     dependencies :
       [
@@ -26,57 +26,21 @@ libkademlia = library \
         vala.find_library ('gobject-2.0'), libgobject_dep,
       ],
 
-    include_directories : [ configdir ],
+    include_directories : [ configdir, libsdir ],
+    link_with : [ libkademlia, libscrapperd ],
 
     sources :
       [
-        'bucket.h',
-        'bucket.vapi',
-        'buckets.vala',
-        'key.vala',
-        'keyval.h',
-        'keyval.vapi',
-        'runner.vala',
-        'peer.vala',
-        'value.vala',
-        'valuestore.vala',
-        'valuepeer.vala',
-      ],
-  )
-
-libscrapperd = library \
-  (
-    'scrapperd',
-
-    dependencies :
-      [
-        vala.find_library ('gio-2.0'), libgio_dep,
-        vala.find_library ('glib-2.0'), libglib_dep,
-        vala.find_library ('gobject-2.0'), libgobject_dep,
-      ],
-
-    include_directories : [ configdir ],
-
-    link_with : [ libkademlia ],
-
-    sources :
-      [
-        'hub.vala',
-        'instance.vala',
         'node.vala',
         'nodeskeleton.vala',
-        'versioncheck.vala',
+        'peer.vala',
+        'store.vala',
       ],
   )
 
-libsdir = include_directories ('.')
-
-subdir('storage')
-subdir ('tests')
-
-executable \
+shared_module \
   (
-    'scrapperd',
+    'storagemod',
 
     dependencies :
       [
@@ -85,13 +49,11 @@ executable \
         vala.find_library ('gobject-2.0'), libgobject_dep,
       ],
 
-    include_directories : [ configdir ],
-
-    link_with : [ libscrapperd, libkademlia ],
+    include_directories : [ configdir, libsdir ],
+    link_with : [ libkademlia, libscrapperd, libstorage ],
 
     sources :
       [
-        'application.vala',
-        'instanceclass.vapi',
+        'instance.vala',
       ],
   )
