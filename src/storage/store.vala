@@ -16,9 +16,9 @@
  */
 using Kademlia;
 
-[CCode (cprefix = "Scrapperd", lower_case_cprefix = "scrapperd_")]
+[CCode (cprefix = "ScrapperdStorage", lower_case_cprefix = "scrapperd_storage_")]
 
-namespace ScrapperD
+namespace ScrapperD.Storage
 {
   public class Store : GLib.Object, ValueStore
     {
@@ -26,6 +26,8 @@ namespace ScrapperD
 
       public async override bool insert_value (Kademlia.Key id, GLib.Value? value, GLib.Cancellable? cancellable) throws GLib.Error
         {
+          debug ("insert value %s", id.to_string ());
+
           if (value == null)
 
             values.remove (id);
@@ -41,6 +43,7 @@ namespace ScrapperD
 
       public async override GLib.Value? lookup_value (Kademlia.Key id, GLib.Cancellable? cancellable) throws GLib.Error
         {
+          debug ("lookup value %s", id.to_string ());
           unowned GLib.Value? value;
 
           if ((value = values.lookup (id)) == null)

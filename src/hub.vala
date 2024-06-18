@@ -29,7 +29,7 @@ namespace KademliaDBus
       private GLib.HashTable<Key, GLib.SList<string>> cached_public_addresses;
       private GLib.ThreadPool<GLib.SocketConnection> incomming_pool;
       private GLib.HashTable<void*, uint> nodes;
-      private GLib.HashTable<string, KademliaDBus.Peer> peers;
+      private GLib.HashTable<string, PeerImpl> peers;
       private GLib.SList<string> public_addresses;
       private GLib.SocketService socket_service;
 
@@ -43,7 +43,7 @@ namespace KademliaDBus
           cached_connections = new HashTable<Key, DBusConnection> (hash_func, equal_func);
           cached_public_addresses = new HashTable<Key, SList<string>> (hash_func, equal_func);
           nodes = new HashTable<void*, uint> (GLib.direct_hash, GLib.direct_equal);
-          peers = new HashTable<string, KademliaDBus.Peer> (GLib.str_hash, GLib.str_equal);
+          peers = new HashTable<string, PeerImpl> (GLib.str_hash, GLib.str_equal);
           public_addresses = new SList<string> ();
           socket_service = new SocketService ();
 
@@ -94,13 +94,13 @@ namespace KademliaDBus
 
       ~Hub ()
         {
-          var peer = (KademliaDBus.Peer) null;
-          var iter = HashTableIter<string, Peer> (peers);
+          var peer = (PeerImpl) null;
+          var iter = HashTableIter<string, PeerImpl> (peers);
 
           while (iter.next (null, out peer)) peer.register_on_hub (null);
         }
 
-      public void add_peer (Peer peer)
+      public void add_peer (PeerImpl peer)
         {
           peers.insert (peer.role, peer);
           peer.register_on_hub (this);
@@ -299,11 +299,14 @@ namespace KademliaDBus
             }
         }
 
-      public async bool join (string address, GLib.Cancellable? cancellable = null) throws GLib.Error
+      public async bool join (string? address = null, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
           Key[] keys;
 
-          yield connect_to (address, cancellable);
+          if (address != null)
+            {
+              yield connect_to (address, cancellable);
+            }
 
           lock (cached)
             {
@@ -317,7 +320,11 @@ namespace KademliaDBus
 
           foreach (unowned var peer in peers.get_values ())
             {
-              foreach (unowned var key in keys) yield peer.join (key, cancellable);
+              foreach (unowned var key in keys) try { yield peer.join (key, cancellable); } catch (PeerError e)
+                {
+                  if (e.code == PeerError.UNREACHABLE) continue;
+                  throw (owned) e;
+                }
             }
 
           return true;
@@ -345,8 +352,8 @@ namespace KademliaDBus
       void on_closed (GLib.DBusConnection connection)
         {
           var id = (uint) 0;
-          var peer = (KademliaDBus.Peer) null;
-          var iter = HashTableIter<string, KademliaDBus.Peer> (peers);
+          var peer = (PeerImpl) null;
+          var iter = HashTableIter<string, PeerImpl> (peers);
 
           while (iter.next (null, out peer))
            
@@ -412,8 +419,8 @@ namespace KademliaDBus
 
       void prepare_connection (GLib.DBusConnection connection, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
-          var peer = (KademliaDBus.Peer) null;
-          var iter = HashTableIter<string, KademliaDBus.Peer> (peers);
+          var peer = (PeerImpl) null;
+          var iter = HashTableIter<string, PeerImpl> (peers);
 
           var public_addresses = new (unowned string) [this.public_addresses.length ()];
           var peers = new (unowned string) [this.peers.length];

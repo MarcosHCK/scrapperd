@@ -15,9 +15,9 @@
 # along with ScrapperD. If not, see <http://www.gnu.org/licenses/>.
 #
 
-shared_module \
+executable \
   (
-    'storagemod',
+    'scrapperd-storage',
 
     dependencies :
       [
@@ -32,7 +32,7 @@ shared_module \
 
     sources :
       [
-        'instance.vala',
+        'application.vala',
         'store.vala',
       ],
   )

@@ -16,21 +16,59 @@
  */
 using Kademlia;
 
-[CCode (cprefix = "Scrapperd", lower_case_cprefix = "scrapperd_")]
+[CCode (cprefix = "ScrapperdScrapper", lower_case_cprefix = "scrapperd_scrapper_")]
 
-namespace ScrapperD
+namespace ScrapperD.Scrapper
 {
   public class Store : GLib.Object, ValueStore
     {
+      public Scrapper scrapper { get; construct; }
+      public ValuePeer store_peer { get; construct; }
+
+      public Store (ValuePeer store_peer)
+        {
+          Object (store_peer : store_peer);
+        }
 
       public async override bool insert_value (Kademlia.Key id, GLib.Value? value, GLib.Cancellable? cancellable) throws GLib.Error
         {
-          return true;
+          if (value.holds (GLib.Type.STRING) == false)
+
+            throw new IOError.INVALID_ARGUMENT ("value should be an URI");
+          else
+            {
+              debug ("scrapping uri %s:('%s')", id.to_string (), value.get_string ());
+
+              var val = value.get_string ();
+              var uri = GLib.File.new_for_uri (val);
+              var exists = null != yield store_peer.lookup (id, cancellable);
+
+              if (exists)
+
+                debug ("uri already scrapped %s:('%s')", id.to_string (), val);
+              else
+                {
+                  scrapper.scrap_uri.begin (uri, cancellable, (o, res) =>
+                    {
+                      GLib.Bytes bytes;
+                      debug ("uri scrapped %s:('%s')", id.to_string (), val);
+
+                      try { bytes = ((Scrapper) o).scrap_uri.end (res); } catch (GLib.Error e)
+                        {
+                          warning (@"$(e.domain): $(e.code): $(e.message)");
+                          return;
+                        }
+
+                      store_peer.insert.begin (id, bytes);
+                    });
+                }
+              return true;
+            }
         }
 
       public async override GLib.Value? lookup_value (Kademlia.Key id, GLib.Cancellable? cancellable) throws GLib.Error
         {
-          return null;
+          return yield store_peer.lookup (id, cancellable);
         }
     }
 }

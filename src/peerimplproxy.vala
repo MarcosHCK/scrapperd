@@ -14,38 +14,36 @@
  * You should have received a copy of the GNU General Public License
  * along with ScrapperD. If not, see <http://www.gnu.org/licenses/>.
  */
+using Kademlia;
 
 [CCode (cprefix = "KDBus", lower_case_cprefix = "kdbus_")]
 
 namespace KademliaDBus
 {
-  internal class NodeSkeleton : GLib.Object, KademliaDBus.Node
+  internal class DummyValueStore : GLib.Object, ValueStore
     {
-      public string[] public_addresses { get; construct; }
-      public string[] roles { get; construct; }
-
-      public string[] PublicAddresses { owned get { return public_addresses; } }
-      public string[] Roles { owned get { return roles; } }
-
-      public NodeSkeleton (string[] public_addresses, string[] roles)
+      public override async bool insert_value (Key id, GLib.Value? value = null, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
-          Object (public_addresses : public_addresses, roles : roles);
+          throw new PeerError.UNREACHABLE ("anonymous node");
         }
 
-      public async bool Ping () throws GLib.Error
+      public override async GLib.Value? lookup_value (Key id, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
-          return true;
+          throw new PeerError.UNREACHABLE ("anonymous node");
         }
     }
 
-  internal class NodeRoleSkeleton : GLib.Object, KademliaDBus.NodeRole
+  public sealed class PeerImplProxy : PeerImpl
     {
-      public PeerImpl peer { get; construct; }
-      public override uint8[] Id { owned get { return peer.id.bytes.copy (); } }
 
-      public NodeRoleSkeleton (PeerImpl peer)
+      public PeerImplProxy (string role)
         {
-          Object (peer : peer);
+          base (role, new DummyValueStore ());
+        }
+
+      protected override ValueNode.PeerRef get_self ()
+        {
+          return ValueNode.PeerRef.anonymous (id.bytes);
         }
     }
 }

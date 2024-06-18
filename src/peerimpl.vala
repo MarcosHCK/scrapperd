@@ -20,7 +20,7 @@ using Kademlia;
 
 namespace KademliaDBus
 {
-  public class Peer : ValuePeer
+  public class PeerImpl : ValuePeer
     {
       public string role { get; construct; }
 
@@ -48,13 +48,13 @@ namespace KademliaDBus
           ifaces = new HashTable<void*, NodeIds?> (GLib.direct_hash, GLib.direct_equal);
         }
 
-      public Peer (string role, ValueStore value_store)
+      public PeerImpl (string role, ValueStore value_store)
         {
           base (value_store, new Key.random ());
           this._role = role;
         }
 
-      private ValueNode.PeerRef get_self ()
+      protected virtual ValueNode.PeerRef get_self ()
         {
           return ValueNode.PeerRef (id.bytes, hub.get_public_addresses ());
         }

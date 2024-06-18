@@ -15,14 +15,16 @@
  * along with ScrapperD. If not, see <http://www.gnu.org/licenses/>.
  */
 
-[CCode (cprefix = "Scrapperd", lower_case_cprefix = "scrapperd_")]
+[CCode (cprefix = "ScrapperdScrapper", lower_case_cprefix = "scrapperd_scrapper_")]
 
-namespace ScrapperD
+namespace ScrapperD.Scrapper
 {
-  [CCode (cheader_filename = "scrapperd.h", lower_case_cprefix = "scrapperd_instance_", has_type_id = false)]
-  [Compact (opaque = true)]
-  public class InstanceClass : GLib.TypeClass
+  public class Scrapper : GLib.Object
     {
-      public unowned GLib.List<GLib.OptionEntry?> get_option_entries ();
+
+      public async GLib.Bytes scrap_uri (GLib.File uri, GLib.Cancellable? cancellable = null) throws GLib.Error
+        {
+          return new GLib.Bytes (uri.get_uri ().data);
+        }
     }
 }
