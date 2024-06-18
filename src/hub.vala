@@ -117,7 +117,7 @@ namespace KademliaDBus
               var type = GLib.SocketType.STREAM;
 
               socket_service.add_address (address, type, protocol, address, null);
-              public_addresses.prepend (inet_address.to_string ());
+              public_addresses.prepend (hostname);
             }
         }
 

@@ -103,44 +103,65 @@ namespace ScrapperD
 
           while (true)
             {
+              int option_i;
+              string option_s;
               GLib.VariantIter iter;
-              int porti;
-              string address, role;
 
-              if (options.lookup ("port", "i", out porti) == false)
+              var addresses = new GLib.SList<string> ();
+              var roles = new GLib.SList<string> ();
+              var entry = (string?) null;
+              var port = KademliaDBus.Hub.DEFAULT_PORT;
 
-                hub = new KademliaDBus.Hub ();
-              else
+              if (options.lookup ("address", "s", out option_s))
                 {
-                  if (porti >= uint16.MIN && porti < uint16.MAX)
+                  entry = (owned) option_s;
+                }
 
-                    hub = new KademliaDBus.Hub ((uint16) porti);
+              if (options.lookup ("port", "i", out option_i))
+                {
+                  if (option_i >= uint16.MIN && option_i < uint16.MAX)
+
+                    port = (uint16) option_i;
                   else
                     {
-                      cmdline.printerr ("invalid port %i\n", porti);
+                      cmdline.printerr ("invalid port %i\n", option_i);
                       cmdline.set_exit_status (1);
                       break;
                     }
                 }
 
-              if (options.lookup ("public", "as", out iter))
+              if (options.lookup ("public", "as", out iter)) while (iter.next ("s", out option_s))
                 {
-                  while (iter.next ("s", out address))
-                    {
-                      try { yield hub.add_public_address (address); } catch (GLib.Error e)
-                        {
-                          critical (@"$(e.domain): $(e.code): $(e.message)");
-                        }
-                    }
+                  addresses.prepend ((owned) option_s);
                 }
 
-              if (options.lookup ("role", "as", out iter) == false)
+              if (options.lookup ("role", "as", out iter)) while (iter.next ("s", out option_s))
                 {
-                  cmdline.printerr ("---role unspecified\n");
+                  roles.prepend ((owned) option_s);
+                }
+              else
+                {
+                  cmdline.printerr ("--role unespecified\n");
                   cmdline.set_exit_status (1);
                   break;
                 }
-              else while (iter.next ("s", out role))
+
+              hub = new KademliaDBus.Hub (port);
+
+              foreach (unowned var hostname in addresses)
+                {
+                  try { yield hub.add_public_address (hostname); } catch (GLib.Error e)
+                    {
+                      good = false;
+                      cmdline.printerr ("--role unespecified\n");
+                      cmdline.set_exit_status (1);
+                      break;
+                    }
+                }
+
+              if (unlikely (good == false)) break;
+
+              foreach (unowned var role in roles)
                 {
                   unowned GLib.TypeClass klass;
 
@@ -164,6 +185,7 @@ namespace ScrapperD
                         {
                           try { ((GLib.Initable) instance).init (cancellable); } catch (GLib.Error e)
                             {
+                              good = false;
                               cmdline.printerr ("%s: %u: %s\n", e.domain.to_string (), e.code, e.message);
                               cmdline.set_exit_status (1);
                               break;
@@ -173,6 +195,7 @@ namespace ScrapperD
                         {
                           try { yield ((GLib.AsyncInitable) instance).init_async (GLib.Priority.DEFAULT, cancellable); } catch (GLib.Error e)
                             {
+                              good = false;
                               cmdline.printerr ("%s: %u: %s\n", e.domain.to_string (), e.code, e.message);
                               cmdline.set_exit_status (1);
                               break;
@@ -184,16 +207,13 @@ namespace ScrapperD
                     }
                 }
 
-              if (good == false) break;
+              if (unlikely (good == false)) break;
 
-              if (options.lookup ("address", "s", out address))
+              if (entry != null) try { yield hub.join (entry, cancellable); } catch (GLib.Error e)
                 {
-                  try { yield hub.join (address, cancellable); } catch (GLib.Error e)
-                    {
-                      cmdline.printerr ("%s: %u: %s\n", e.domain.to_string (), e.code, e.message);
-                      cmdline.set_exit_status (1);
-                      break;
-                    }
+                  cmdline.printerr ("%s: %u: %s\n", e.domain.to_string (), e.code, e.message);
+                  cmdline.set_exit_status (1);
+                  break;
                 }
 
               hold ();
