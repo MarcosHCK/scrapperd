@@ -25,11 +25,6 @@ namespace ScrapperD
     {
       public override string role { get { return ROLE; } }
 
-      public override bool command_line (GLib.VariantDict dict) throws GLib.Error
-        {
-          return true;
-        }
-
       public override KademliaDBus.Peer get_peer ()
         {
           return new KademliaDBus.Peer (ROLE, new Store ());

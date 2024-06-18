@@ -101,6 +101,14 @@ namespace ScrapperD
           unowned var options = cmdline.get_options_dict ();
           unowned var good = true;
 
+          var files = new GenericArray<GLib.File> (cmdline.get_arguments ().length);
+          var first = true;
+
+          foreach (unowned var arg in cmdline.get_arguments ()) if (first) first = false; else
+            {
+              files.add (cmdline.create_file_for_arg (arg));
+            }
+
           while (true)
             {
               int option_i;
@@ -200,6 +208,14 @@ namespace ScrapperD
                               cmdline.set_exit_status (1);
                               break;
                             }
+                        }
+
+                      try { instance.command_line (options); if (files.length >0) instance.open (files.data, "open"); } catch (GLib.Error e)
+                        {
+                          good = false;
+                          cmdline.printerr ("%s: %u: %s\n", e.domain.to_string (), e.code, e.message);
+                          cmdline.set_exit_status (1);
+                          break;
                         }
 
                       hub.add_peer (instance.get_peer ());

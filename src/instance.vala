@@ -27,8 +27,9 @@ namespace ScrapperD
 
       private class List<GLib.OptionEntry?> option_entries = new List<GLib.OptionEntry?> ();
 
-      public abstract bool command_line (GLib.VariantDict dict) throws GLib.Error;
+      public virtual bool command_line (GLib.VariantDict dict) throws GLib.Error { return true; }
       public abstract KademliaDBus.Peer get_peer ();
+      public virtual void open (GLib.File[] files, string hint) { }
 
       public class unowned List<GLib.OptionEntry?> get_option_entries ()
         {
