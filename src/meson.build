@@ -94,7 +94,8 @@ libscrapperd = library \
 
 libsdir = include_directories ('.')
 
-subdir('storage')
+subdir ('scrapper')
+subdir ('storage')
 subdir ('tests')
 
 executable \
