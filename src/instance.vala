@@ -23,30 +23,12 @@ namespace ScrapperD
     {
       public const string EXTENSION_POINT = "org.hck.ScrapperD.Instance";
 
-      public Hub hub { get; construct; }
-
       public abstract string role { get; }
 
       private class List<GLib.OptionEntry?> option_entries = new List<GLib.OptionEntry?> ();
 
-      public virtual bool command_line (GLib.VariantDict dict) throws GLib.Error
-        {
-          return true;
-        }
-
-      public virtual bool dbus_register (GLib.DBusConnection connection, string object_path, GLib.Cancellable? cancellable = null) throws GLib.Error
-        {
-          return true;
-        }
-
-      public virtual void dbus_unregister (GLib.DBusConnection connection)
-        {
-        }
-
-      public virtual bool join (GLib.Cancellable? cancellable = null) throws GLib.Error
-        {
-          return true;
-        }
+      public abstract bool command_line (GLib.VariantDict dict) throws GLib.Error;
+      public abstract KademliaDBus.Peer get_peer ();
 
       public class unowned List<GLib.OptionEntry?> get_option_entries ()
         {

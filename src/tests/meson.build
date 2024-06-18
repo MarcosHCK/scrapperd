@@ -18,7 +18,6 @@
 tests = \
   {
     'buckets.vala' : 'Kademlia buckets tests',
-    'hub.vala' : 'ScrapperD hub tests',
     'integration.vala' : 'Kademlia integration tests',
     'key.vala' : 'Kademlia key tests',
     'peer.vala' : 'Kademlia peer tests',
@@ -42,7 +41,8 @@ foreach file, description : tests
             ],
 
           include_directories : [ configdir, include_directories ('..') ],
-          link_with : [ libscrapperd, libkademlia ],
+
+          link_with : [ libscrapperd, libkademlia, libkademlia_dbus ],
 
           sources : [ file, 'base.vala' ],
         ),

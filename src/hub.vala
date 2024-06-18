@@ -16,9 +16,9 @@
  */
 using Kademlia;
 
-[CCode (cprefix = "Scrapperd", lower_case_cprefix = "scrapperd_")]
+[CCode (cprefix = "KDBus", lower_case_cprefix = "kdbus_")]
 
-namespace ScrapperD
+namespace KademliaDBus
 {
   public class Hub : GLib.Object
     {
@@ -28,8 +28,8 @@ namespace ScrapperD
       private GLib.HashTable<Key, GLib.DBusConnection> cached_connections;
       private GLib.HashTable<Key, GLib.SList<string>> cached_public_addresses;
       private GLib.ThreadPool<GLib.SocketConnection> incomming_pool;
-      private GLib.HashTable<string, Instance> instances;
       private GLib.HashTable<void*, uint> nodes;
+      private GLib.HashTable<string, KademliaDBus.Peer> peers;
       private GLib.SList<string> public_addresses;
       private GLib.SocketService socket_service;
 
@@ -42,8 +42,8 @@ namespace ScrapperD
 
           cached_connections = new HashTable<Key, DBusConnection> (hash_func, equal_func);
           cached_public_addresses = new HashTable<Key, SList<string>> (hash_func, equal_func);
-          instances = new HashTable<string, Instance> (GLib.str_hash, GLib.str_equal);
           nodes = new HashTable<void*, uint> (GLib.direct_hash, GLib.direct_equal);
+          peers = new HashTable<string, KademliaDBus.Peer> (GLib.str_hash, GLib.str_equal);
           public_addresses = new SList<string> ();
           socket_service = new SocketService ();
 
@@ -92,9 +92,18 @@ namespace ScrapperD
           Object (port : port);
         }
 
-      public void add_instance (Instance instance)
+      ~Hub ()
         {
-          instances.insert (instance.role, instance);
+          var peer = (KademliaDBus.Peer) null;
+          var iter = HashTableIter<string, Peer> (peers);
+
+          while (iter.next (null, out peer)) peer.register_on_hub (null);
+        }
+
+      public void add_peer (Peer peer)
+        {
+          peers.insert (peer.role, peer);
+          peer.register_on_hub (this);
         }
 
       public async void add_public_address (string hostname) throws GLib.Error
@@ -201,18 +210,6 @@ namespace ScrapperD
           return true;
         }
 
-      public Key[] get_known_peers ()
-        {
-          lock (cached)
-            {
-              var keys = (List<unowned Key>) cached_public_addresses.get_keys ();
-              var ar = (Key[]) new Key [keys.length ()];
-              int i = 0;
-              foreach (unowned var key in keys) ar [i++] = key.copy ();
-              return (owned) ar;
-            }
-        }
-
       public string[] get_public_addresses ()
         {
           var ar = new string [public_addresses.length ()];
@@ -235,7 +232,18 @@ namespace ScrapperD
                   debug ("using cached connection for peer %s:%s", role, key.to_string ());
 
                   Key key2;
-                  var object_path = @"$(Node.BASE_PATH)/$(role)";
+                  string object_path;
+
+                  object_path = Node.BASE_PATH;
+                  var node = yield connection.get_proxy<Node> (null, object_path, 0, cancellable);
+
+                  if ((role in node.Roles) == false)
+                    {
+                      debug ("no role on peer %s:%s", role, key.to_string ());
+                      throw new Kademlia.PeerError.UNREACHABLE ("no role %s in node %s", role, key.to_string ());
+                    }
+
+                  object_path = @"$object_path/$role";
                   var node_role = yield connection.get_proxy<NodeRole> (null, object_path, 0, cancellable);
 
                   if (Key.equal (key, (key2 = new Key.verbatim (node_role.Id))))
@@ -291,6 +299,30 @@ namespace ScrapperD
             }
         }
 
+      public async bool join (string address, GLib.Cancellable? cancellable = null) throws GLib.Error
+        {
+          Key[] keys;
+
+          yield connect_to (address, cancellable);
+
+          lock (cached)
+            {
+              var items = (List<unowned Key>) cached_public_addresses.get_keys ();
+              var ar = new Key [items.length ()];
+              int i = 0;
+
+              foreach (unowned var item in items) ar [i++] = item.copy ();
+              keys = (owned) ar;
+            }
+
+          foreach (unowned var peer in peers.get_values ())
+            {
+              foreach (unowned var key in keys) yield peer.join (key, cancellable);
+            }
+
+          return true;
+        }
+
       public void known_peer (Key key, string[] public_addresses)
         {
           lock (cached)
@@ -313,12 +345,12 @@ namespace ScrapperD
       void on_closed (GLib.DBusConnection connection)
         {
           var id = (uint) 0;
-          var instance = (Instance) null;
-          var iter = HashTableIter<string, Instance> (instances);
+          var peer = (KademliaDBus.Peer) null;
+          var iter = HashTableIter<string, KademliaDBus.Peer> (peers);
 
-          while (iter.next (null, out instance))
+          while (iter.next (null, out peer))
            
-            instance.dbus_unregister (connection);
+            peer.unregister_on_connection (connection);
 
           lock (cached) cached_connections.foreach_remove ((k, c) => c == connection);
           lock (nodes) id = nodes.lookup (connection);
@@ -380,21 +412,21 @@ namespace ScrapperD
 
       void prepare_connection (GLib.DBusConnection connection, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
-          var instance = (Instance) null;
-          var iter = HashTableIter<string, Instance> (instances);
+          var peer = (KademliaDBus.Peer) null;
+          var iter = HashTableIter<string, KademliaDBus.Peer> (peers);
 
           var public_addresses = new (unowned string) [this.public_addresses.length ()];
-          var roles = new (unowned string) [this.instances.length];
+          var peers = new (unowned string) [this.peers.length];
 
           int i;
           i = 0; foreach (unowned var item in this.public_addresses) public_addresses [i++] = item;
-          i = 0; foreach (unowned var item in this.instances.get_keys ()) roles [i++] = item;
+          i = 0; foreach (unowned var item in this.peers.get_keys ()) peers [i++] = item;
 
-          var node = new NodeSkeleton (public_addresses, roles);
+          var node = new NodeSkeleton (public_addresses, peers);
 
-          while (iter.next (null, out instance))
+          while (iter.next (null, out peer))
            
-            instance.dbus_register (connection, Node.BASE_PATH, cancellable);
+            peer.register_on_connection (connection, Node.BASE_PATH);
 
           lock (nodes) nodes.insert (connection, connection.register_object<Node> (Node.BASE_PATH, node));
         }

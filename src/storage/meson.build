@@ -27,12 +27,12 @@ shared_module \
       ],
 
     include_directories : [ configdir, libsdir ],
-    link_with : [ libkademlia, libscrapperd ],
+
+    link_with : [ libkademlia, libkademlia_dbus, libscrapperd ],
 
     sources :
       [
         'instance.vala',
-        'peer.vala',
         'store.vala',
       ],
   )

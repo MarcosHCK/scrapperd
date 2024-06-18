@@ -19,40 +19,20 @@
 
 namespace ScrapperD
 {
+  internal const string ROLE = "storage";
+
   public class StorageInstance : Instance
     {
-      private HashTable<void*, NodeIds?> nodes;
-      private Peer peer;
-
       public override string role { get { return ROLE; } }
 
-      struct NodeIds
+      public override bool command_line (GLib.VariantDict dict) throws GLib.Error
         {
-          public uint iface_id;
-          public uint nrole_id;
-
-          public NodeIds (uint iface_id, uint nrole_id)
-            {
-              this.iface_id = iface_id;
-              this.nrole_id = nrole_id;
-            }
+          return true;
         }
 
-      class NodeRoleSkeleton : GLib.Object, NodeRole
+      public override KademliaDBus.Peer get_peer ()
         {
-          public NodeRoleSkeleton (Peer peer)
-            {
-              Object (peer : peer);
-            }
-
-          public Peer peer { get; construct; }
-          public override uint8[] Id { owned get { return peer.id.bytes.copy (); } }
-        }
-
-      construct
-        {
-          nodes = new HashTable<void*, NodeIds?> (GLib.direct_hash, GLib.direct_equal);
-          peer = new Peer (hub);
+          return new KademliaDBus.Peer (ROLE, new Store ());
         }
 
       [ModuleInit]
@@ -70,46 +50,6 @@ namespace ScrapperD
 
       [CCode (cname = "g_io_storagemod_unload")] public static void unload (GLib.IOModule module)
         {
-        }
-
-      public override bool dbus_register (GLib.DBusConnection connection, string object_path, GLib.Cancellable? cancellable = null) throws GLib.Error
-        {
-          base.dbus_register (connection, object_path, cancellable);
-          unowned var id1 = connection.register_object<ValueNode> (@"$object_path/$role", new ValueNodeSkeleton (hub, peer));
-          unowned var id2 = connection.register_object<NodeRole> (@"$object_path/$role", new NodeRoleSkeleton (peer));
-
-          lock (nodes) nodes.insert (connection, NodeIds (id1, id2));
-          return true;
-        }
-
-      public override void dbus_unregister (GLib.DBusConnection connection)
-        {
-          base.dbus_unregister (connection);
-          unowned var id = (NodeIds?) null;
-
-          lock (nodes) id = nodes.lookup (connection);
-          connection.unregister_object (id.iface_id);
-          connection.unregister_object (id.nrole_id);
-        }
-
-      public override bool join (GLib.Cancellable? cancellable = null) throws GLib.Error
-        {
-          var known = hub.get_known_peers ();
-
-          join_async.begin ((owned) known, cancellable, (o, res) =>
-            {
-              ((StorageInstance) o).join_async.end (res);
-            });
-          return true;
-        }
-
-      public async bool join_async (owned Kademlia.Key[] keys, GLib.Cancellable? cancellable = null)
-        {
-          foreach (unowned var key in keys) try { yield peer.join (key, cancellable); } catch (GLib.Error e)
-            {
-              critical (@"$(e.domain): $(e.code): $(e.message)");
-            }
-          return true;
         }
     }
 }

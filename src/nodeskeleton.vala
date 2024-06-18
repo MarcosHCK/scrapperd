@@ -15,11 +15,11 @@
  * along with ScrapperD. If not, see <http://www.gnu.org/licenses/>.
  */
 
-[CCode (cprefix = "Scrapperd", lower_case_cprefix = "scrapperd_")]
+[CCode (cprefix = "KDBus", lower_case_cprefix = "kdbus_")]
 
-namespace ScrapperD
+namespace KademliaDBus
 {
-  internal class NodeSkeleton : GLib.Object, ScrapperD.Node
+  internal class NodeSkeleton : GLib.Object, KademliaDBus.Node
     {
       public string[] public_addresses { get; construct; }
       public string[] roles { get; construct; }
@@ -35,6 +35,17 @@ namespace ScrapperD
       public async bool Ping () throws GLib.Error
         {
           return true;
+        }
+    }
+
+  internal class NodeRoleSkeleton : GLib.Object, KademliaDBus.NodeRole
+    {
+      public Peer peer { get; construct; }
+      public override uint8[] Id { owned get { return peer.id.bytes.copy (); } }
+
+      public NodeRoleSkeleton (Peer peer)
+        {
+          Object (peer : peer);
         }
     }
 }

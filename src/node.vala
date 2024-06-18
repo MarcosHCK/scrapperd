@@ -15,15 +15,15 @@
  * along with ScrapperD. If not, see <http://www.gnu.org/licenses/>.
  */
 
-[CCode (cprefix = "Scrapperd", lower_case_cprefix = "scrapperd_")]
+[CCode (cprefix = "KDBus", lower_case_cprefix = "kdbus_")]
 
-namespace ScrapperD
+namespace KademliaDBus
 {
-  [DBus (name = "org.hck.ScrapperD.Node")]
+  [DBus (name = "org.hck.kademlia.Node")]
 
   public interface Node : GLib.Object
     {
-      public const string BASE_PATH = "/org/hck/ScrapperD";
+      public const string BASE_PATH = "/org/hck/Kademlia";
 
       public abstract string[] PublicAddresses { owned get; }
       public abstract string[] Roles { owned get; }
@@ -31,7 +31,7 @@ namespace ScrapperD
       public abstract async bool Ping () throws GLib.Error;
     }
 
-  [DBus (name = "org.hck.ScrapperD.NodeRole")]
+  [DBus (name = "org.hck.kademlia.NodeRole")]
 
   public interface NodeRole : GLib.Object
     {

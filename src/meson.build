@@ -44,9 +44,9 @@ libkademlia = library \
       ],
   )
 
-libscrapperd = library \
+libkademlia_dbus = library \
   (
-    'scrapperd',
+    'kademlia_dbus',
 
     dependencies :
       [
@@ -61,12 +61,33 @@ libscrapperd = library \
 
     sources :
       [
+        'dbuspeer.vala',
         'hub.vala',
-        'instance.vala',
         'node.vala',
         'nodeskeleton.vala',
         'valuenode.vala',
         'valuenodeskeleton.vala',
+      ],
+  )
+
+libscrapperd = library \
+  (
+    'scrapperd',
+
+    dependencies :
+      [
+        vala.find_library ('gio-2.0'), libgio_dep,
+        vala.find_library ('glib-2.0'), libglib_dep,
+        vala.find_library ('gobject-2.0'), libgobject_dep,
+      ],
+
+    include_directories : [ configdir ],
+
+    link_with : [ libkademlia, libkademlia_dbus ],
+
+    sources :
+      [
+        'instance.vala',
         'versioncheck.vala',
       ],
   )
@@ -89,7 +110,7 @@ executable \
 
     include_directories : [ configdir ],
 
-    link_with : [ libscrapperd, libkademlia ],
+    link_with : [ libscrapperd, libkademlia, libkademlia_dbus ],
 
     sources :
       [

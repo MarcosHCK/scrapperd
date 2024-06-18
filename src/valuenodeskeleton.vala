@@ -16,9 +16,9 @@
  */
 using Kademlia;
 
-[CCode (cprefix = "Scrapperd", lower_case_cprefix = "scrapperd_")]
+[CCode (cprefix = "KDBus", lower_case_cprefix = "kdbus_")]
 
-namespace ScrapperD
+namespace KademliaDBus
 {
   public class ValueNodeSkeleton : GLib.Object, ValueNode
     {
@@ -30,12 +30,15 @@ namespace ScrapperD
           Object (hub : hub, peer : peer);
         }
 
-      void know_peer (PeerRef? @ref)
+      void know_peer (PeerRef? other)
         {
-          var id = new Key.verbatim (@ref.id);
+          if (other.knowable)
+            {
+              var id = new Key.verbatim (other.id);
 
-          hub.known_peer (id, @ref.addresses);
-          peer.add_contact (id);
+              hub.known_peer (id, other.addresses);
+              peer.add_contact (id);
+            }
         }
 
       public async PeerRef[] find_node (PeerRef from, uint8[] key, GLib.Cancellable? cancellable = null) throws GLib.Error

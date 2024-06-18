@@ -16,24 +16,32 @@
  */
 using Kademlia;
 
-[CCode (cprefix = "Scrapperd", lower_case_cprefix = "scrapperd_")]
+[CCode (cprefix = "KDBus", lower_case_cprefix = "kdbus_")]
 
-namespace ScrapperD
+namespace KademliaDBus
 {
-  [DBus (name = "org.hck.ScrapperD.ValueNode")]
+  [DBus (name = "org.hck.kademlia.ValueNode")]
 
   public interface ValueNode : GLib.Object
     {
 
       public struct PeerRef
         {
-          string[] addresses;
-          uint8[] id;
+          string[]? addresses;
+          uint8[]? id;
+          bool knowable;
 
           public PeerRef (owned uint8[] id, owned string[] addresses)
             {
               this.addresses = (owned) addresses;
               this.id = (owned) id;
+              this.knowable = true;
+            }
+
+          public PeerRef.anonymous (owned uint8[] id)
+            {
+              this.id = (owned) id;
+              this.knowable = false;
             }
         }
 
