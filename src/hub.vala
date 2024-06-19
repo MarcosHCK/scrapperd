@@ -218,8 +218,20 @@ namespace KademliaDBus
           return (owned) ar;
         }
 
-      public async T? get_proxy<T> (Key key, string role, GLib.Cancellable? cancellable = null) throws GLib.Error
+      public async T? get_proxy<T> (Key key_, string role, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
+          /*
+           * There is a major bug (but very silent) with vala code generation
+           * the argument key_ here is a compact class without ref-unref semantics
+           * which makes it uncopyable, so when you call connection.get_proxy,
+           * which is a GIO function with *REAL* GTask driven asynchronous method,
+           * key_ is freed (by this function's caller), but upon completion the value
+           * get reused (pointing to a freed memory), so to mend this I need to create
+           * an owned local variable (which is only freed when local variable block is
+           * freed too).
+           */
+          var key = key_.copy ();
+
           GLib.DBusConnection connection;
           debug ("creating proxy for peer %s:%s", role, key.to_string ());
 

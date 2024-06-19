@@ -30,7 +30,7 @@ namespace KademliaDBus
           Object (hub : hub, peer : peer);
         }
 
-      void know_peer (PeerRef? other)
+      private void know_peer (PeerRef? other)
         {
           if (other.knowable)
             {
@@ -54,17 +54,23 @@ namespace KademliaDBus
 
       public async ValueRef find_value (PeerRef from, uint8[] key, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
+          know_peer (from);
           var id = new Key.verbatim (key);
           var val = (GLib.Value?) null;
 
-          if ((val = yield peer.lookup (id, cancellable)) != null)
-            {
-              know_peer (from);
-              return ValueRef.inmediate (val);
-            }
+          if ((val = yield peer.value_store.lookup_value (id, cancellable)) != null)
+            
+            return ValueRef.inmediate ((owned) val);
           else
             {
-              var ar = (PeerRef[]) yield find_node (from, key, cancellable);
+              var ni = (SList<Key>) peer.nearest (id);
+
+              ni.foreach (e => { if (Key.equal (e, peer.id)) ni.remove (e); });
+
+              var ar = (PeerRef[]) new PeerRef [ni.length ()];
+              int i = 0;
+
+              foreach (unowned var n in ni) ar [i++] = PeerRef (n.bytes, hub.addresses_for_peer (n));
               return ValueRef.delegated ((owned) ar);
             }
         }

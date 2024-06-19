@@ -25,9 +25,17 @@ namespace ScrapperD.Scrapper
       public Scrapper scrapper { get; construct; }
       public ValuePeer store_peer { get; construct; }
 
-      public Store (ValuePeer store_peer)
+      public Store (Scrapper scrapper, ValuePeer store_peer)
         {
-          Object (store_peer : store_peer);
+          Object (scrapper : scrapper, store_peer : store_peer);
+        }
+
+      private async bool scrap_and_save (owned Key id, GLib.File uri) throws GLib.Error
+        {
+          var bytes = yield scrapper.scrap_uri (uri);
+
+          debug ("uri scrapped %s:('%s')", id.to_string (), uri.get_uri ());
+          return yield store_peer.insert (id, bytes);
         }
 
       public async override bool insert_value (Kademlia.Key id, GLib.Value? value, GLib.Cancellable? cancellable) throws GLib.Error
@@ -39,27 +47,20 @@ namespace ScrapperD.Scrapper
             {
               debug ("scrapping uri %s:('%s')", id.to_string (), value.get_string ());
 
-              var val = value.get_string ();
-              var uri = GLib.File.new_for_uri (val);
+              var uri = GLib.File.new_for_uri (value.get_string ());
               var exists = null != yield store_peer.lookup (id, cancellable);
 
               if (exists)
 
-                debug ("uri already scrapped %s:('%s')", id.to_string (), val);
+                debug ("uri already scrapped %s:('%s')", id.to_string (), value.get_string ());
               else
                 {
-                  scrapper.scrap_uri.begin (uri, cancellable, (o, res) =>
+                  scrap_and_save.begin (id.copy (), uri, (o, res) =>
                     {
-                      GLib.Bytes bytes;
-                      debug ("uri scrapped %s:('%s')", id.to_string (), val);
-
-                      try { bytes = ((Scrapper) o).scrap_uri.end (res); } catch (GLib.Error e)
+                      try { ((Store) o).scrap_and_save.end (res); } catch (GLib.Error e)
                         {
                           warning (@"$(e.domain): $(e.code): $(e.message)");
-                          return;
                         }
-
-                      store_peer.insert.begin (id, bytes);
                     });
                 }
               return true;

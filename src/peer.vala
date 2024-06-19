@@ -22,6 +22,7 @@ namespace Kademlia
   public errordomain PeerError
     {
       FAILED,
+      NOT_FOUND,
       UNREACHABLE;
 
       public static extern GLib.Quark quark ();

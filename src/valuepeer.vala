@@ -60,12 +60,6 @@ namespace Kademlia
           var lists = new GenericArray<Key> [ALPHA];
           var peers = nearest (id);
 
-          if (peers.find_custom (this.id, (a, b) => Key.equal (a, b) ? 0 : 1) != null)
-            {
-              bool good = yield insert_on_nodes (new Key [] { this.id.copy () }, id, value, cancellable);
-              return good;
-            }
-
           lock (inserting) inserting.add (id);
 
           unowned var list = peers;
@@ -89,7 +83,7 @@ namespace Kademlia
             {
               var p = i;
 
-              insert_on_nodes.begin (lists [i].data, id, value, cancellable, (o, res) =>
+              insert_on_nodes.begin (lists [i], id, value, cancellable, (o, res) =>
                 {
                   try { ((ValuePeer) o).insert_on_nodes.end (res); } catch (GLib.Error e)
                     {
@@ -121,7 +115,15 @@ namespace Kademlia
 
       async bool insert_on_node (Key peer, Key id, GLib.Value? value = null, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
-          try { return yield store_value (peer, id, value, cancellable); } catch (PeerError e)
+          try
+            {
+              if (Key.equal (peer, this.id) == false)
+
+                return yield store_value (peer, id, value, cancellable);
+              else
+                return yield value_store.insert_value (id, value, cancellable);
+            }
+          catch (PeerError e)
             {
               if (unlikely (e.code != PeerError.UNREACHABLE))
 
@@ -134,46 +136,33 @@ namespace Kademlia
             }
         }
 
-      async bool insert_on_nodes (Key[] peers, Key id, GLib.Value? value = null, GLib.Cancellable? cancellable = null) throws GLib.Error
+      async bool insert_on_nodes (GenericArray<Key> peers, Key id, GLib.Value? value = null, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
-
-          foreach (unowned var peer in peers)
-            {
-              if (Key.equal (peer, this.id))
-
-                yield value_store.insert_value (id, value, cancellable);
-              else
-                yield insert_on_node (peer, id, value, cancellable);
-            }
+          foreach (unowned var peer in peers) yield insert_on_node (peer, id, value, cancellable);
           return true;
         }
 
       public async GLib.Value? lookup (Key id, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
-          GLib.Value? value;
-
-          if ((value = yield value_store.lookup_value (id, cancellable)) != null)
-
-            return (owned) value;
-          else
-            return yield lookup_a (id, cancellable);
-        }
-
-      async GLib.Value? lookup_a (Key id, GLib.Cancellable? cancellable = null) throws GLib.Error
-        {
           var context = (MainContext) GLib.MainContext.get_thread_default ();
           var dones = new uint [ALPHA];
           var errors = new GLib.AsyncQueue<GLib.Error> ();
           var left = (uint) 0;
-          var peers = new GLib.AsyncQueue<Key> ();
+          var peers = new GLib.AsyncQueue<unowned Key> ();
+          var seed = (SList<Key>) nearest (id);
           var values = new GLib.AsyncQueue<Value> ();
+          var visited = new GenericSet<Key> (Key.hash, Key.equal);
+          var lvisited = GLib.Mutex ();
 
-          foreach (unowned var key in nearest (id))
+          foreach (unowned var key in seed)
             {
-              peers.push (key.copy ());
+              Key id_ = key.copy ();
+
+              peers.push (id_);
+              visited.add ((owned) id_);
             }
 
-          while (values.length_unlocked () == 0 && (left = peers.length ()) > 0)
+          while (values.length_unlocked () == 0 && (left = peers.length_unlocked ()) > 0)
             {
               for (unowned var i = 0; i < ALPHA; ++i)
                 {
@@ -182,9 +171,11 @@ namespace Kademlia
 
               for (unowned var i = 0; i < uint.min (left, ALPHA); ++i)
                 {
-                  var p = peers.pop ();
-                  var k = i;
+                  lvisited.lock ();
+                  unowned var p = peers.pop_unlocked ();
+                  unowned var k = i;
 
+                  lvisited.unlock ();
                   AtomicUint.set (ref dones [i], 0);
 
                   lookup_in_node.begin (p, id, cancellable, (o, res) =>
@@ -204,9 +195,17 @@ namespace Kademlia
                         }
                       else if (value != null)
                         {
-                          foreach (unowned var peer in value.keys)
+                          lvisited.lock ();
 
-                            peers.push (peer.copy ());
+                          foreach (unowned var peer in value.keys) if (visited.contains (peer) == false)
+                            {
+                              Key id_ = peer.copy ();
+
+                              peers.push (id_);
+                              visited.add ((owned) id_);
+                            }
+
+                          lvisited.unlock ();
                         }
 
                       AtomicUint.set (ref dones [k], 1);
@@ -240,18 +239,30 @@ namespace Kademlia
 
       async Value? lookup_in_node (Key peer, Key id, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
-          if (Key.equal (peer, this.id) == false)
-
-            return yield find_value (peer, id, cancellable);
-          else
+          try
             {
-              GLib.Value? value;
+              if (Key.equal (peer, this.id) == false)
 
-              if ((value = yield value_store.lookup_value (id, cancellable)) == null)
-
-                return null;
+                return yield find_value (peer, id, cancellable);
               else
-                return new Value.inmediate ((owned) value);
+                {
+                  GLib.Value? value;
+
+                  if ((value = yield value_store.lookup_value (id, cancellable)) == null)
+
+                    return null;
+                  else
+                    return new Value.inmediate ((owned) value);
+                }
+            }
+          catch (PeerError e)
+            {
+              switch (e.code)
+                {
+                  case PeerError.NOT_FOUND: return null;
+                  case PeerError.UNREACHABLE: drop_contact (peer); return null;
+                  default: throw (owned) e;
+                }
             }
         }
     }

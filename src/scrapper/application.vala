@@ -24,7 +24,13 @@ namespace ScrapperD.Scrapper
 
   public sealed class Application : ScrapperD.Application
     {
+      private Scrapper? scrapper = null;
       private Store? store = null;
+
+      construct
+        {
+          scrapper = new Scrapper ();
+        }
 
       public Application ()
         {
@@ -66,7 +72,7 @@ namespace ScrapperD.Scrapper
           var store_peer = new PeerImplProxy ("storage");
 
           hub.add_peer (store_peer);
-          hub.add_peer (new PeerImpl ("scrapper", store = new Store (store_peer)));
+          hub.add_peer (new PeerImpl ("scrapper", store = new Store (scrapper, store_peer)));
           return true;
         }
     } 

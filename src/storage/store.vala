@@ -22,7 +22,12 @@ namespace ScrapperD.Storage
 {
   public class Store : GLib.Object, ValueStore
     {
-      private HashTable<Key, GLib.Value?> values;
+      private GLib.HashTable<Key, GLib.Value?> values;
+
+      construct
+        {
+          values = new HashTable<Key, GLib.Value?> (Key.hash, Key.equal);
+        }
 
       public async override bool insert_value (Kademlia.Key id, GLib.Value? value, GLib.Cancellable? cancellable) throws GLib.Error
         {

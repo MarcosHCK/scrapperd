@@ -111,7 +111,7 @@ namespace Kademlia
         {
           unowned var a_bytes = (uint8*) & a.value.bytes [0];
           unowned var b_bytes = (uint8*) & b.value.bytes [0];
-          return 0 == GLib.Memory.cmp (a_bytes, b_bytes, bytelen);
+          return (void*) a == (void*) b || 0 == GLib.Memory.cmp (a_bytes, b_bytes, bytelen);
         }
 
       public static GLib.Type get_type ()
