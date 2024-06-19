@@ -29,7 +29,8 @@ namespace Kademlia
       [CCode (array_length_cexpr = "(G_SIZEOF_MEMBER (KKeyVal, shorts) / G_SIZEOF_MEMBER (KKeyVal, shorts [0]))")] public uint16[] shorts;
       [CCode (array_length_cexpr = "(G_SIZEOF_MEMBER (KKeyVal, longs) / G_SIZEOF_MEMBER (KKeyVal, longs [0]))")] public uint32[] longs;
       [CCode (array_length_cexpr = "(G_SIZEOF_MEMBER (KKeyVal, quads) / G_SIZEOF_MEMBER (KKeyVal, quads [0]))")] public uint64[] quads;
-      public static void distance (out KeyVal dst, [CCode (type = "const KKeyVal*")] KeyVal? a, [CCode (type = "const KKeyVal*")] KeyVal? b);
+      public static int log ([CCode (type = "const KKeyVal*")] KeyVal? a, [CCode (type = "const KKeyVal*")] KeyVal? b);
       public int nth_bit (uint nth);
+      public static void xor (out KeyVal dst, [CCode (type = "const KKeyVal*")] KeyVal? a, [CCode (type = "const KKeyVal*")] KeyVal? b);
     }
 }

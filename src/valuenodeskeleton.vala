@@ -30,6 +30,11 @@ namespace KademliaDBus
           Object (hub : hub, peer : peer);
         }
 
+      static int compare_key (Key a, Key b)
+        {
+          return Key.equal (a, b) ? 0 : 1;
+        }
+
       private void know_peer (PeerRef? other)
         {
           if (other.knowable)
@@ -78,8 +83,14 @@ namespace KademliaDBus
       public async bool store (PeerRef from, uint8[] key, uint8[] value, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
           know_peer (from);
-          yield peer.insert (new Key.verbatim (key), new GLib.Bytes (value));
-          return false;
+          var id = (Key) new Key.verbatim (key);
+          var ni = (SList<Key>) peer.nearest (id);
+
+          if (ni.find_custom (id, compare_key) != null)
+
+            return yield peer.value_store.insert_value (id, new GLib.Bytes (value), cancellable);
+          else
+            return yield peer.insert (new Key.verbatim (key), new GLib.Bytes (value));
         }
 
       public async bool ping (PeerRef from, GLib.Cancellable? cancellable = null) throws GLib.Error

@@ -100,11 +100,11 @@ namespace Kademlia
           return new Key.verbatim (value.bytes);
         }
 
-      public static Key distance (Key a, Key b)
+      public static int distance (Key a, Key b)
+
+          ensures (result == -1 || result >= 0)
         {
-          var result = new Key ();
-          KeyVal.distance (out result.value, a.value, b.value);
-          return result;
+          return KeyVal.log (a.value, b.value);
         }
 
       public static bool equal (Key a, Key b)

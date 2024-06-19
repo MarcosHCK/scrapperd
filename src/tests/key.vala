@@ -47,15 +47,15 @@ namespace Testing
     {
       var key1 = new Key.random ();
       var key2 = new Key.random ();
-      var zero = new Key.zero ();
+      var key3 = new Key.random ();
 
       GLib.Test.message ("key1: %s", key1.to_string ());
       GLib.Test.message ("key2: %s", key2.to_string ());
       GLib.Test.message ("distance: %s", Key.distance (key1, key2).to_string ());
 
-      assert_true (Key.equal (Key.distance (key1, key2), Key.distance (key2, key1)));
-      assert_true (Key.equal (Key.distance (key1, key1), zero));
-      assert_true (Key.equal (Key.distance (key1, zero), key1));
+      assert_cmpint (Key.distance (key1, key2), CompareOperator.EQ, Key.distance (key2, key1));
+      assert_cmpint (Key.distance (key1, key1), CompareOperator.EQ, -1);
+      assert_cmpint (Key.distance (key1, key2) + Key.distance (key2, key3), CompareOperator.GE,Key.distance (key1, key3));
     }
 
   static void test_equal ()

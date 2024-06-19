@@ -172,7 +172,7 @@ namespace Kademlia
                 throw (owned) e;
               else
                 {
-                  lock (buckets) buckets.drop (peer);
+                  drop_contact (peer);
                   return false;
                 }
             }

@@ -115,9 +115,11 @@ namespace Kademlia
 
       async bool insert_on_node (Key peer, Key id, GLib.Value? value = null, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
+          bool same;
+
           try
             {
-              if (Key.equal (peer, this.id) == false)
+              if ((same = Key.equal (peer, this.id)) == false)
 
                 return yield store_value (peer, id, value, cancellable);
               else
@@ -130,7 +132,7 @@ namespace Kademlia
                 throw (owned) e;
               else
                 {
-                  drop_contact (peer);
+                  if (! same) drop_contact (peer);
                   return false;
                 }
             }
@@ -228,20 +230,16 @@ namespace Kademlia
                 }
             }
 
-          if (values.length_unlocked () > 0)
-            {
-              var f = values.pop_unlocked ();
-              return f.steal_value ();
-            }
-
-          return null;
+          return values.length_unlocked () == 0 ? null : values.pop_unlocked ().steal_value ();
         }
 
       async Value? lookup_in_node (Key peer, Key id, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
+          bool same;
+
           try
             {
-              if (Key.equal (peer, this.id) == false)
+              if ((same = Key.equal (peer, this.id)) == false)
 
                 return yield find_value (peer, id, cancellable);
               else
@@ -260,7 +258,7 @@ namespace Kademlia
               switch (e.code)
                 {
                   case PeerError.NOT_FOUND: return null;
-                  case PeerError.UNREACHABLE: drop_contact (peer); return null;
+                  case PeerError.UNREACHABLE: if (!same) drop_contact (peer); return null;
                   default: throw (owned) e;
                 }
             }

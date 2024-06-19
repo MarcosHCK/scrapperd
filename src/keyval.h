@@ -53,7 +53,7 @@ extern "C" {
       (memcpy (__dst, __src, sizeof (*__dst)), FALSE); \
     }))
 
-  static __inline void k_key_val_distance (KKeyVal* d, const KKeyVal* a, const KKeyVal* b)
+  static __inline void k_key_val_xor (KKeyVal* d, const KKeyVal* a, const KKeyVal* b)
     {
       guint i;
   #if GLIB_SIZEOF_VOID_P >= 8
@@ -70,6 +70,48 @@ extern "C" {
 
       for (i = first; i < G_N_ELEMENTS (a->bytes); ++i)
         d->bytes[i] = a->bytes[i] ^ b->bytes[i];
+    }
+
+  static const gchar k_key_val_logtable [] =
+    {
+      -1, 0, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3,
+       4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
+       5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
+       5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
+       6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
+       6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
+       6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
+       6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
+       7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+       7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+       7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+       7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+       7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+       7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+       7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+       7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+    };
+
+  #define _2exp(n) (2<<(((n))-1))
+
+  G_STATIC_ASSERT (_2exp (sizeof (gchar) << 3) == G_N_ELEMENTS (k_key_val_logtable));
+  #undef _2exp
+
+  static __inline gint k_key_val_log (const KKeyVal* a, const KKeyVal* b)
+    {
+      KKeyVal xor;
+      guint8 c;
+      guint i, l;
+
+      k_key_val_xor (&xor, a, b);
+
+      for (i = 0; i < (l = K_KEY_VAL_BITLEN >> 3); ++i)
+        {
+          if ((c = xor.bytes [i]) > 0)
+
+            return ((l - (i + 1)) << 3) + k_key_val_logtable [c];
+        }
+      return -1; /* equals */
     }
 
 #if __cplusplus

@@ -47,7 +47,7 @@ namespace Kademlia
           return compare_key (a.key, (Key) (void*) b);
         }
 
-      public void drop (Key key)
+      public void drop (Key key) requires (Key.equal (key, self) == false)
         {
           unowned Kademlia.Bucket? bucket;
           unowned GLib.List<Key> link = null;
@@ -86,7 +86,7 @@ namespace Kademlia
             }
         }
 
-      public bool insert (Key key)
+      public bool insert (Key key) requires (Key.equal (key, self) == false)
         {
           unowned var bucket = (Bucket?) search (key, true).data;
           unowned var item = (StaleContact?) (void*) key;
@@ -119,39 +119,42 @@ namespace Kademlia
       public GLib.SList<Key> nearest (Key key)
         {
           var got = 0;
-          var distance = Key.distance (self, key);
           var result = new GLib.SList<Key> ();
 
           unowned GLib.List<Key>? head = null;
           unowned GLib.List<Bucket?>? pivt = null;
-          unowned GLib.List<Bucket?>? link = null;
-          unowned int i;
+          unowned int i, j, d;
 
-          for (i = 0; i < KeyVal.BITLEN; ++i) if (distance.nth_bit (i) == 1)
-            {
-              if ((pivt = search_index (KeyVal.BITLEN - (i + 1), false)) != null)
-                {
-                  for (link = pivt; link != null && got < MAXSPAN; link = link.prev)
-                  for (head = link.data.nodes.head; head != null && got < MAXSPAN; head = head.next)
-                    {
-                      result.prepend (head.data.copy ());
-                      ++got;
-                    }
-
-                  break;
-                }
-            }
-
-          if (got < MAXSPAN)
+          if ((d = Key.distance (self, key)) < 0)
             {
               result.prepend (self.copy ());
               ++got;
             }
 
-          for (link = pivt == null ? buckets : pivt.next; link != null && got < MAXSPAN; link = link.next)
-          for (head = link.data.nodes.head; head != null && got < MAXSPAN; head = head.next)
+          for (j = 1 + (i = d < 0 ? 0 : d); got < MAXSPAN && (i >= 0 || j < Key.BITLEN); --i, ++j)
             {
-              result.prepend (head.data.copy ());
+              if (i >= 0)
+              if ((pivt = search_index (i, false)) != null)
+              for (head = pivt.data.nodes.head; head != null && got < MAXSPAN; head = head.next)
+                {
+                  result.prepend (head.data.copy ());
+                  ++got;
+                }
+
+              if (got >= MAXSPAN) break;
+
+              if (j < Key.BITLEN)
+              if ((pivt = search_index (j, false)) != null)
+              for (head = pivt.data.nodes.head; head != null && got < MAXSPAN; head = head.next)
+                {
+                  result.prepend (head.data.copy ());
+                  ++got;
+                }
+            }
+
+          if (got < MAXSPAN && d >= 0)
+            {
+              result.prepend (self.copy ());
               ++got;
             }
 
@@ -162,16 +165,10 @@ namespace Kademlia
 
       private unowned GLib.List<Bucket?>? search (Key key, bool create = false)
         {
-          var distance = Key.distance (self, key);
-
-          for (unowned var i = 0; i < KeyVal.BITLEN; ++i) if (distance.nth_bit (i) == 1)
-            {
-              return search_index (KeyVal.BITLEN - (i + 1), create);
-            }
-          return null;
+          return search_index (Key.distance (self, key), create);
         }
 
-      private unowned GLib.List<Bucket?>? search_index (uint index, bool create = false)
+      private unowned GLib.List<Bucket?>? search_index (int index, bool create = false) requires (index >= 0)
         {
           unowned GLib.List<Bucket?> link;
           unowned GLib.CompareFunc<Bucket?> cmp1 = (a, b) => int.from_pointer ((void*) b) - (int) a.index;
