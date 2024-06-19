@@ -47,20 +47,6 @@ extern "C" {
       return (GType) g_type_id;
     }
 
-  static __inline GType _k_key_list_get_type (void)
-    {
-      static gsize g_type_id = 0;
-
-      if (g_once_init_enter (&g_type_id))
-        {
-          GType g_type;
-
-          g_type = g_boxed_type_register_static (g_intern_static_string ("KKeyList"), (GBoxedCopyFunc) k_key_list_copy, (GBoxedFreeFunc) k_key_list_free);
-          g_once_init_leave (&g_type_id, (gsize) g_type);
-        }
-      return (GType) g_type_id;
-    }
-
 #if __cplusplus
 }
 #endif // __cplusplus

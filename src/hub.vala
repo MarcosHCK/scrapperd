@@ -287,7 +287,7 @@ namespace KademliaDBus
                     }
                   catch (GLib.Error e)
                     {
-                      warning (@"$(e.domain): $(e.code): $(e.message)");
+                      debug (@"$(e.domain): $(e.code): $(e.message)");
 
                       addresses.remove (address);
 
