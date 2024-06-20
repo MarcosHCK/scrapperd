@@ -33,9 +33,12 @@ namespace ScrapperD.Scrapper
       private async bool scrap_and_save (owned Key id, GLib.File uri) throws GLib.Error
         {
           var bytes = yield scrapper.scrap_uri (uri);
-
           debug ("uri scrapped %s:('%s')", id.to_string (), uri.get_uri ());
-          return yield store_peer.insert (id, bytes);
+
+          var done = yield store_peer.insert (id, bytes);
+
+          if (!done) debug ("uri data was not saved %s:('%s')", id.to_string (), uri.get_uri ());
+          return done;
         }
 
       public async override bool insert_value (Kademlia.Key id, GLib.Value? value, GLib.Cancellable? cancellable) throws GLib.Error

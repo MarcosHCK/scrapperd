@@ -52,11 +52,16 @@ namespace Kademlia
           return doing ? true : yield insert_a (id, value, cancellable);
         }
 
+      [CCode (cheader_filename = "glib.h", cname = "g_atomic_int_or")]
+
+      static extern uint _g_atomic_int_or ([CCode (type = "volatile guint *")] ref uint atomic, uint val);
+
       async bool insert_a (Key id, GLib.Value? value = null, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
           var context = (GLib.MainContext) MainContext.get_thread_default ();
           var dones = new uint [ALPHA];
           var errors = new GLib.AsyncQueue<GLib.Error> ();
+          var good = new uint [1];
           var lists = new GenericArray<Key> [ALPHA];
           var peers = nearest (id);
 
@@ -85,11 +90,14 @@ namespace Kademlia
 
               insert_on_nodes.begin (lists [i], id, value, cancellable, (o, res) =>
                 {
-                  try { ((ValuePeer) o).insert_on_nodes.end (res); } catch (GLib.Error e)
+                  var result = false;
+
+                  try { result = ((ValuePeer) o).insert_on_nodes.end (res); } catch (GLib.Error e)
                     {
                       errors.push ((owned) e);
                     }
 
+                  _g_atomic_int_or (ref good [0], result ? 1 : 0);
                   GLib.AtomicUint.set (ref dones [p], 1);
                 });
             }
@@ -110,7 +118,7 @@ namespace Kademlia
               throw (owned) f;
             }
 
-          return true;
+          return good [0] > 0;
         }
 
       async bool insert_on_node (Key peer, Key id, GLib.Value? value = null, GLib.Cancellable? cancellable = null) throws GLib.Error
@@ -140,8 +148,9 @@ namespace Kademlia
 
       async bool insert_on_nodes (GenericArray<Key> peers, Key id, GLib.Value? value = null, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
-          foreach (unowned var peer in peers) yield insert_on_node (peer, id, value, cancellable);
-          return true;
+          bool good = false;
+          foreach (unowned var peer in peers) if (yield insert_on_node (peer, id, value, cancellable)) good = true;
+          return good;
         }
 
       public async GLib.Value? lookup (Key id, GLib.Cancellable? cancellable = null) throws GLib.Error
