@@ -67,6 +67,10 @@ namespace ScrapperD.Scrapper
           return new Bytes.take ((owned) buffer);
         }
 
+      [CCode (cheader_filename = "validuri.h", cname = "_g_uri_is_valid")]
+
+      internal static extern bool uri_is_valid (GLib.Uri uri);
+
       public static GLib.Uri normal_uri (string uri_string) throws GLib.UriError
         {
           var flags1 = GLib.UriFlags.ENCODED;

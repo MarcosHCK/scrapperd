@@ -19,30 +19,6 @@
 
 namespace ScrapperD.Scrapper
 {
-  public class RateConstraintConverter : GLib.Object, GLib.Converter
-    {
-      public size_t max_bytes { get; construct; }
-
-      public RateConstraintConverter (size_t max_bytes)
-        {
-          Object (max_bytes : max_bytes);
-        }
-
-      public GLib.ConverterResult convert (uint8[] inbuf, uint8[] outbuf, GLib.ConverterFlags flags, out size_t bytes_read, out size_t bytes_written) throws GLib.Error
-        {
-          size_t copied;
-
-          Memory.copy (& outbuf [0], & inbuf [0], copied = size_t.min (max_bytes, size_t.min (inbuf.length, outbuf.length)));
-          bytes_read = bytes_written = copied;
-
-          return (flags & (ConverterFlags.FLUSH | ConverterFlags.INPUT_AT_END)) == 0 ? ConverterResult.CONVERTED : ((flags & (ConverterFlags.INPUT_AT_END)) == 0 ? ConverterResult.FLUSHED : ConverterResult.FINISHED);
-        }
-
-      public void reset ()
-        {
-        }
-    }
-
   public class LinkSearcherConverter : GLib.Object, GLib.Converter
     {
       private GLib.SList<string> hrefs;

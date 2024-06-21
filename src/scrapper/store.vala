@@ -70,6 +70,12 @@ namespace ScrapperD.Scrapper
             {
               var uri = Scrapper.normal_uri (value.get_string ());
 
+              if (Scrapper.uri_is_valid (uri) == false)
+                {
+                  debug ("invalid HTTP uri %s:('%s')", id.to_string (), uri.to_string ());
+                  return false;
+                }
+
               debug ("scrapping uri %s:('%s')", id.to_string (), uri.to_string ());
 
               if (null != yield store_peer.lookup (id, cancellable))
@@ -81,7 +87,7 @@ namespace ScrapperD.Scrapper
                   {
                     try { ((Store) o).scrap_and_save.end (res); } catch (GLib.Error e)
                       {
-                          warning (@"$(e.domain): $(e.code): $(e.message)");
+                        warning (@"$(e.domain): $(e.code): $(e.message)");
                       }
                   });
               return true;
