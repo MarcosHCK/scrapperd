@@ -21,6 +21,14 @@ namespace Kademlia
 {
   private const uint bytelen = KeyVal.BITLEN >> 3;
 
+  public errordomain KeyError
+    {
+      FAILED,
+      INVALID_KEY;
+
+      public static extern GLib.Quark quark ();
+    }
+
   [CCode (has_type_id = true, type_id = "(k_key_get_type ())")]
   [Compact (opaque = true)]
 
@@ -85,6 +93,38 @@ namespace Kademlia
             }
         }
 
+      public Key.parse (string key, int length = -1) throws GLib.Error
+        {
+          if ((length = (length >= 0 ? length : key.length)) != (bytelen << 1))
+            {
+              throw new KeyError.INVALID_KEY ("invalid serialized key length");
+            }
+
+          unowned var bytes = (uint8[]) (void*) & value.bytes [0];
+
+          for (unowned var i = 0; i < bytelen; ++i)
+            {
+              uint8 b = 0;
+              char c;
+
+              if ((c = key [(i << 1) + 0].tolower ()).isalnum () == false || c > 'f')
+
+                throw new KeyError.INVALID_KEY ("invalid serialized key length");
+              else
+                b |= c.isdigit () ? c - '0' : 10 + (c - 'a');
+
+              b <<= 4;
+
+              if ((c = key [(i << 1) + 1].tolower ()).isalnum () == false || c > 'f')
+
+                throw new KeyError.INVALID_KEY ("invalid serialized key length");
+              else
+                b |= c.isdigit () ? c - '0' : 10 + (c - 'a');
+
+              bytes [i] = b;
+            }
+        }
+
       public Key.verbatim (uint8[] key) requires (key.length == value.bytes.length)
         {
           GLib.Memory.copy ((uint8[]) (void*) & value.bytes [0], (uint8[]) (void*) & key [0], bytelen);
@@ -144,17 +184,14 @@ namespace Kademlia
           var builder = new StringBuilder.sized (2 * bytelen);
 
           unowned var bytes = (uint8*) & value.bytes [0];
-          unowned var first = true;
 
           for (unowned var i = 0; i < bytelen; ++i)
             {
-              uint8 byte = bytes [i];
-              char buffer[2] = { charset [byte >> 4], charset [byte & 0xf] };
-              int off = first == false ? 0 : 2;
-
-              builder.append_len (((string) buffer).offset (off), buffer.length - off);
-              first = false;
+              uint8 b = bytes [i];
+              builder.append_c (charset [b >> 4]);
+              builder.append_c (charset [b & 0xf]);
             }
+
           return builder.free_and_steal ();
         }
     }

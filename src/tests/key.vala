@@ -29,6 +29,7 @@ namespace Testing
       GLib.Test.add_func (TESTPATHROOT + "/Key/new_from_data", () => test_new_from_data ("test data".data));
       GLib.Test.add_func (TESTPATHROOT + "/Key/new_random/with_seed", () => test_new_random (new uint32 [] { 13, 33 }));
       GLib.Test.add_func (TESTPATHROOT + "/Key/new_random/without_seed", () => test_new_random ());
+      GLib.Test.add_func (TESTPATHROOT + "/Key/parser", () => test_parse (new Key.random ()));
       return GLib.Test.run ();
     }
 
@@ -126,5 +127,20 @@ namespace Testing
 
       assert_false (Key.equal (key1, zero));
       assert_false (Key.equal (key2, zero));
+    }
+
+  static void test_parse (Key key)
+    {
+      var as_string = key.to_string ();
+
+      try { assert_true (Key.equal (key, new Key.parse (as_string))); } catch (GLib.Error e)
+        {
+          assert_no_error (e);
+        }
+
+      try { assert_true (Key.equal (key, new Key.parse (@"$as_string,twoone21", as_string.length))); } catch (GLib.Error e)
+        {
+          assert_no_error (e);
+        }
     }
 }
