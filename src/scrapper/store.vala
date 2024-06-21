@@ -30,15 +30,35 @@ namespace ScrapperD.Scrapper
           Object (scrapper : scrapper, store_peer : store_peer);
         }
 
-      private async bool scrap_and_save (owned Key id, GLib.File uri) throws GLib.Error
+      private async void scrap_and_save (owned Key id, GLib.Uri uri) throws GLib.Error
         {
-          var bytes = yield scrapper.scrap_uri (uri);
-          debug ("uri scrapped %s:('%s')", id.to_string (), uri.get_uri ());
+          Scrapper.Result? result = null;
 
-          var done = yield store_peer.insert (id, bytes);
+          try { result = yield scrapper.scrap_uri (uri); } catch (GLib.Error e)
+            {
+              unowned var domain = e.domain.to_string ();
+              unowned var code = e.code;
+              unowned var message = e.message;
 
-          if (!done) debug ("uri data was not saved %s:('%s')", id.to_string (), uri.get_uri ());
-          return done;
+              debug ("could not scrap uri (%s: %i: %s) %s:('%s')", domain, code, message, id.to_string (), uri.to_string ());
+              return;
+            }
+
+          debug ("uri scrapped %s:('%s')", id.to_string (), uri.to_string ());
+
+          if (unlikely (false == yield store_peer.insert (id, result.contents)))
+
+            debug ("uri data was not saved %s:('%s')", id.to_string (), uri.to_string ());
+
+          foreach (unowned var link in result.links)
+            {
+              var value = (string?) null;
+              var child = Scrapper.normalize_uri (link);
+              var child_id = new Key.from_data ((value = child.to_string ()).data);
+
+              debug ("found link in uri '%s' <= %s:('%s')", child.to_string (), id.to_string (), uri.to_string ());
+              yield insert_value (child_id, value);
+            }
         }
 
       public async override bool insert_value (Kademlia.Key id, GLib.Value? value, GLib.Cancellable? cancellable) throws GLib.Error
@@ -48,24 +68,22 @@ namespace ScrapperD.Scrapper
             throw new IOError.INVALID_ARGUMENT ("value should be an URI");
           else
             {
-              debug ("scrapping uri %s:('%s')", id.to_string (), value.get_string ());
+              var uri = Scrapper.normal_uri (value.get_string ());
 
-              var uri = GLib.File.new_for_uri (value.get_string ());
-              var exists = null != yield store_peer.lookup (id, cancellable);
+              debug ("scrapping uri %s:('%s')", id.to_string (), uri.to_string ());
 
-              if (exists)
+              if (null != yield store_peer.lookup (id, cancellable))
 
-                debug ("uri already scrapped %s:('%s')", id.to_string (), value.get_string ());
+                debug ("uri already scrapped %s:('%s')", id.to_string (), uri.to_string ());
               else
-                {
-                  scrap_and_save.begin (id.copy (), uri, (o, res) =>
-                    {
-                      try { ((Store) o).scrap_and_save.end (res); } catch (GLib.Error e)
-                        {
+
+                scrap_and_save.begin (id.copy (), uri, (o, res) =>
+                  {
+                    try { ((Store) o).scrap_and_save.end (res); } catch (GLib.Error e)
+                      {
                           warning (@"$(e.domain): $(e.code): $(e.message)");
-                        }
-                    });
-                }
+                      }
+                  });
               return true;
             }
         }

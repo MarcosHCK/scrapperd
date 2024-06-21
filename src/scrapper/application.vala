@@ -51,16 +51,34 @@ namespace ScrapperD.Scrapper
               assert (store != null);
               bool first = true;
 
-              foreach (unowned var arg in cmdline.get_arguments ()) if (first) first = false; else
+              foreach (unowned var uri_string in cmdline.get_arguments ()) if (first) first = false; else try
                 {
                   var value = (string?) null;
-                  var file = cmdline.create_file_for_arg (arg);
-                  var id = new Kademlia.Key.from_data ((value = file.get_uri ()).data);
+                  var uri = (Uri) Scrapper.normal_uri (uri_string);
+                  var id = new Kademlia.Key.from_data ((value = uri.to_string ()).data);
 
                   try { yield store.insert_value (id, value, cancellable); } catch (GLib.Error e)
                     {
-                      warning (@"$(e.domain): $(e.code): $(e.message)");
+                      unowned var code = e.code;
+                      unowned var domain = e.domain.to_string ();
+                      unowned var message = e.message.to_string ();
+
+                      good = false;
+                      cmdline.printerr ("can not scrap uri: %s: %u: %s", domain, code, message);
+                      cmdline.set_exit_status (1);
+                      break;
                     }
+                }
+              catch (GLib.UriError e)
+                {
+                  unowned var code = e.code;
+                  unowned var domain = e.domain.to_string ();
+                  unowned var message = e.message.to_string ();
+
+                  good = false;
+                  cmdline.printerr ("can not parse uri '%s': %s: %u: %s", uri_string, domain, code, message);
+                  cmdline.set_exit_status (1);
+                  break;
                 }
             }
 
