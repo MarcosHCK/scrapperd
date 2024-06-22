@@ -88,7 +88,7 @@ namespace KademliaDBus
           for (unowned var i = 0; i < keys.length; ++i)
             {
               keys [i] = new Key.verbatim (peers [i].id);
-              hub.known_peer (keys [i], peers [i].addresses);
+              peers [i].know (hub, this);
             }
           return (owned) keys;
         }
@@ -108,7 +108,7 @@ namespace KademliaDBus
               for (unowned var i = 0; i < keys.length; ++i)
                 {
                   keys [i] = new Key.verbatim (value.peers [i].id);
-                  hub.known_peer (keys [i], value.peers [i].addresses);
+                  value.peers [i].know (hub, this);
                 }
               return new Kademlia.Value.delegated ((owned) keys);
             }

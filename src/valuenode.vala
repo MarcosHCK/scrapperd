@@ -43,6 +43,19 @@ namespace KademliaDBus
               this.id = (owned) id;
               this.knowable = false;
             }
+
+          internal void know (Hub hub, Peer peer)
+            {
+              if (knowable)
+                {
+                  var key = new Key.verbatim (id);
+
+                  if (Key.equal (key, peer.id)) return;
+
+                  hub.known_peer (key, addresses);
+                  peer.add_contact (key);
+                }
+            }
         }
 
       public struct ValueRef

@@ -104,6 +104,8 @@ namespace KademliaDBus
         {
           peers.insert (peer.role, peer);
           peer.register_on_hub (this);
+
+          debug ("exposing peer %s:%s", peer.role, peer.id.to_string ());
         }
 
       public async void add_public_address (string hostname) throws GLib.Error

@@ -57,7 +57,7 @@ namespace ScrapperD.Scrapper
                   var uri = (Uri) Scrapper.normal_uri (uri_string);
                   var id = new Kademlia.Key.from_data ((value = uri.to_string ()).data);
 
-                  try { yield store.insert_value (id, value, cancellable); } catch (GLib.Error e)
+                  try { yield store.insert_value (id, new Bytes (value.data), cancellable); } catch (GLib.Error e)
                     {
                       unowned var code = e.code;
                       unowned var domain = e.domain.to_string ();
@@ -88,9 +88,11 @@ namespace ScrapperD.Scrapper
       protected override async bool register_on_hub_async () throws GLib.Error
         {
           var store_peer = new PeerImplProxy ("storage");
+          var scrapper_peer = new PeerImpl ("scrapper", store = new Store (scrapper, store_peer));
 
           hub.add_peer (store_peer);
-          hub.add_peer (new PeerImpl ("scrapper", store = new Store (scrapper, store_peer)));
+          hub.add_peer (scrapper_peer);
+          store.scrapper_peer = scrapper_peer;
           return true;
         }
     } 

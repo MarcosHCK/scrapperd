@@ -25,7 +25,7 @@ namespace ScrapperD
 
       construct
         {
-          add_main_option ("address", 'a', 0, GLib.OptionArg.STRING, "Address of entry node", "ADDRESS");
+          add_main_option ("address", 'a', 0, GLib.OptionArg.STRING_ARRAY, "Address of entry node", "ADDRESS");
           add_main_option ("port", 'p', 0, GLib.OptionArg.INT, "Port where to listen for peer hails", "PORT");
           add_main_option ("public", 0, 0, GLib.OptionArg.STRING_ARRAY, "Public addresses to publish", "ADDRESS");
           add_main_option ("version", 'V', 0, GLib.OptionArg.NONE, "Print version", null);
@@ -61,12 +61,12 @@ namespace ScrapperD
               GLib.VariantIter iter;
 
               var addresses = new GLib.SList<string> ();
-              var entry = (string?) null;
+              var entries = new GLib.SList<string> ();
               var port = (uint16) KademliaDBus.Hub.DEFAULT_PORT;
 
-              if (options.lookup ("address", "s", out option_s))
+              if (options.lookup ("address", "as", out iter)) while (iter.next ("s", out option_s))
                 {
-                  entry = (owned) option_s;
+                  entries.prepend ((owned) option_s);
                 }
 
               if (options.lookup ("port", "i", out option_i))
@@ -111,13 +111,15 @@ namespace ScrapperD
                   break;
                 }
 
-              if (entry != null) try { yield hub.join (entry, cancellable); } catch (GLib.Error e)
+              foreach (unowned var entry in entries) try { yield hub.join (entry, cancellable); } catch (GLib.Error e)
                 {
                   good = false;
                   cmdline.printerr ("%s: %u: %s\n", e.domain.to_string (), e.code, e.message);
                   cmdline.set_exit_status (1);
                   break;
                 }
+
+              if (unlikely (good == false)) break;
 
               hold ();
               hub.begin ();

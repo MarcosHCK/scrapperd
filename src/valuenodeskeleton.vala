@@ -35,20 +35,9 @@ namespace KademliaDBus
           return Key.equal (a, b) ? 0 : 1;
         }
 
-      private void know_peer (PeerRef? other)
-        {
-          if (other.knowable)
-            {
-              var id = new Key.verbatim (other.id);
-
-              hub.known_peer (id, other.addresses);
-              peer.add_contact (id);
-            }
-        }
-
       public async PeerRef[] find_node (PeerRef from, uint8[] key, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
-          know_peer (from);
+          from.know (hub, peer);
           var ni = (SList<Key>) peer.nearest (new Key.verbatim (key));
           var ar = (PeerRef[]) new PeerRef [ni.length ()];
           int i = 0;
@@ -59,7 +48,7 @@ namespace KademliaDBus
 
       public async ValueRef find_value (PeerRef from, uint8[] key, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
-          know_peer (from);
+          from.know (hub, peer);
           var id = new Key.verbatim (key);
           var val = (GLib.Value?) null;
 
@@ -82,7 +71,7 @@ namespace KademliaDBus
 
       public async bool store (PeerRef from, uint8[] key, uint8[] value, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
-          know_peer (from);
+          from.know (hub, peer);
           var id = (Key) new Key.verbatim (key);
           var ni = (SList<Key>) peer.nearest (id);
 
@@ -95,7 +84,7 @@ namespace KademliaDBus
 
       public async bool ping (PeerRef from, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
-          know_peer (from);
+          from.know (hub, peer);
           return true;
         }
     }

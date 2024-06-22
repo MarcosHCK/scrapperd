@@ -25,12 +25,15 @@ namespace ScrapperD.Scrapper
       public Scrapper scrapper { get; construct; }
       public ValuePeer store_peer { get; construct; }
 
+      private WeakRef _scrapper_peer;
+      public ValuePeer scrapper_peer { owned get { return (ValuePeer) _scrapper_peer.get (); } set { _scrapper_peer.set (value); } }
+
       public Store (Scrapper scrapper, ValuePeer store_peer)
         {
           Object (scrapper : scrapper, store_peer : store_peer);
         }
 
-      private async void scrap_and_save (owned Key id, GLib.Uri uri) throws GLib.Error
+      private async void scrap_and_save (owned Key id, GLib.Uri uri, GLib.Bytes? other) throws GLib.Error
         {
           Scrapper.Result? result = null;
 
@@ -46,29 +49,71 @@ namespace ScrapperD.Scrapper
 
           debug ("uri scrapped %s:('%s')", id.to_string (), uri.to_string ());
 
-          if (unlikely (false == yield store_peer.insert (id, result.contents)))
+          GLib.Bytes contents;
+
+          if (other == null)
+
+            contents = result.contents;
+          else
+            {
+              var otherv = new GLib.Variant.from_bytes (Scrapper.scrap_variant_type, other, false);
+              var arv = (GLib.Variant) null;
+
+              if (otherv.is_of_type (GLib.VariantType.ARRAY) == false)
+                {
+                  GLib.Variant newv;
+
+                  newv = new GLib.Variant.from_bytes (Scrapper.scrap_variant_type, result.contents, false);
+                  arv = new GLib.Variant.array (Scrapper.scrap_variant_type, { otherv, newv });
+                }
+              else
+                {
+                  var othern = arv.n_children ();
+                  var othervs = new GLib.Variant [1 + othern];
+                  var i = 0;
+
+                  foreach (var child in otherv)
+                    {
+                      othervs [++i] = (owned) child;
+                    }
+
+                  othervs [0] = new GLib.Variant.from_bytes (Scrapper.scrap_variant_type, result.contents, false);
+                  arv = new GLib.Variant.array (Scrapper.scrap_variant_type, othervs);
+                }
+
+              var data = new uint8 [arv.get_size ()];
+
+              arv.store (& data [0]);
+              contents = new GLib.Bytes.take (data);
+            }
+
+          if (unlikely (false == yield store_peer.insert (id, contents)))
 
             debug ("uri data was not saved %s:('%s')", id.to_string (), uri.to_string ());
 
           foreach (unowned var link in result.links)
             {
-              var value = (string?) null;
+              var uri_string = (string?) null;
               var child = Scrapper.normalize_uri (link);
-              var child_id = new Key.from_data ((value = child.to_string ()).data);
+              var child_id = new Key.from_data ((uri_string = child.to_string ()).data);
 
               debug ("found link in uri '%s' <= %s:('%s')", child.to_string (), id.to_string (), uri.to_string ());
-              yield insert_value (child_id, value);
+              yield scrapper_peer.insert (child_id, new GLib.Bytes (uri_string.data));
             }
         }
 
       public async override bool insert_value (Kademlia.Key id, GLib.Value? value, GLib.Cancellable? cancellable) throws GLib.Error
         {
-          if (value.holds (GLib.Type.STRING) == false)
+          if (value.holds (typeof (GLib.Bytes)) == false)
 
             throw new IOError.INVALID_ARGUMENT ("value should be an URI");
           else
             {
-              var uri = Scrapper.normal_uri (value.get_string ());
+              unowned var uri_bytes = (Bytes) value.get_boxed ();
+              unowned var uri_string = (string) uri_bytes.get_data ();
+
+              var uri = (Uri) Scrapper.normal_uri (uri_string.substring (0, (long) uri_bytes.get_size ()));
+              var other = (GLib.Value?) null;
 
               if (Scrapper.uri_is_valid (uri) == false)
                 {
@@ -78,12 +123,12 @@ namespace ScrapperD.Scrapper
 
               debug ("scrapping uri %s:('%s')", id.to_string (), uri.to_string ());
 
-              if (null != yield store_peer.lookup (id, cancellable))
+              if (null != (other = yield store_peer.lookup (id, cancellable)))
 
                 debug ("uri already scrapped %s:('%s')", id.to_string (), uri.to_string ());
               else
 
-                scrap_and_save.begin (id.copy (), uri, (o, res) =>
+                scrap_and_save.begin (id.copy (), uri, (Bytes?) other?.get_boxed (), (o, res) =>
                   {
                     try { ((Store) o).scrap_and_save.end (res); } catch (GLib.Error e)
                       {
