@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-model href="/usr/share/gtk-4.0/gtk4builder.rng" type="application/xml"?>
+<!--
+  Copyright (C) Copyright 2024-2029
+  This file is part of ScrapperD.
+  
+  ScrapperD is free software: you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation, either version 3 of the License, or
+  (at your option) any later version.
+  
+  ScrapperD is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+  
+  You should have received a copy of the GNU General Public License
+  along with ScrapperD.  If not, see <http://www.gnu.org/licenses/>.
+-->
+<interface domain="en_US">
+
+  <template class="ScrapperdViewerInfoBarMessage" parent="GtkGrid">
+
+    <child>
+
+      <object class="GtkLabel" id="label1">
+
+        <layout>
+          <property name="column">0</property>
+          <property name="row">0</property>
+        </layout>
+
+        <property name="hexpand">True</property>
+        <property name="vexpand">False</property>
+        <property name="valign">fill</property>
+      </object>
+
+    </child>
+
+    <child>
+
+      <object class="GtkButton" id="button1">
+
+        <child>
+
+          <object class="GtkImage">
+
+            <property name="icon-name">window-close-symbolic</property>
+          </object>
+        </child>
+
+        <style>
+
+          <class name="close" />
+        </style>
+
+        <layout>
+          <property name="column">1</property>
+          <property name="row">0</property>
+        </layout>
+
+        <property name="halign">center</property>
+        <property name="has-frame">False</property>
+        <property name="hexpand">False</property>
+        <property name="valign">center</property>
+        <property name="vexpand">False</property>
+
+        <signal name="clicked" handler="on_button1_clicked" />
+      </object>
+    </child>
+
+    <property name="halign">fill</property>
+    <property name="valign">fill</property>
+  </template>
+</interface>

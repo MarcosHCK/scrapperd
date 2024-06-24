@@ -90,15 +90,12 @@ namespace ScrapperD
 
               hub = new KademliaDBus.Hub (port);
 
-              foreach (unowned var hostname in addresses)
+              foreach (unowned var hostname in addresses) try { yield hub.add_public_address (hostname); } catch (GLib.Error e)
                 {
-                  try { yield hub.add_public_address (hostname); } catch (GLib.Error e)
-                    {
-                      good = false;
-                      cmdline.printerr ("--role unespecified\n");
-                      cmdline.set_exit_status (1);
-                      break;
-                    }
+                  good = false;
+                  cmdline.printerr ("%s: %u: %s\n", e.domain.to_string (), e.code, e.message);
+                  cmdline.set_exit_status (1);
+                  break;
                 }
 
               if (unlikely (good == false)) break;

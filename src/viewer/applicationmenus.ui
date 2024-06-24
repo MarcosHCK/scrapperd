@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-model href="/usr/share/gtk-4.0/gtk4builder.rng" type="application/xml"?>
+<!--
+  Copyright (C) Copyright 2024-2029
+  This file is part of ScrapperD.
+  
+  ScrapperD is free software: you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation, either version 3 of the License, or
+  (at your option) any later version.
+  
+  ScrapperD is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+  
+  You should have received a copy of the GNU General Public License
+  along with ScrapperD.  If not, see <http://www.gnu.org/licenses/>.
+-->
+<interface domain="en_US">
+
+  <menu id="menubar">
+
+    <section>
+
+      <item>
+        <attribute name="action">app.jointo</attribute>
+        <attribute name="label">Join</attribute>
+      </item>
+
+      <item>
+        <attribute name="action">app.joinrole</attribute>
+        <attribute name="label">Join role</attribute>
+      </item>
+    </section>
+
+    <section>
+
+      <item>
+        <attribute name="action">app.about</attribute>
+        <attribute name="label">About</attribute>
+      </item>
+      <item>
+        <attribute name="action">app.quit</attribute>
+        <attribute name="label">Quit</attribute>
+      </item>
+    </section>
+  </menu>
+</interface>

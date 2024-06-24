@@ -33,6 +33,7 @@ namespace KademliaDBus
       private GLib.SList<string> public_addresses;
       private GLib.SocketService socket_service;
 
+      public bool is_offline { get; construct; default = false; }
       public uint16 port { get; construct; default = DEFAULT_PORT; }
 
       construct
@@ -45,9 +46,10 @@ namespace KademliaDBus
           nodes = new HashTable<void*, uint> (GLib.direct_hash, GLib.direct_equal);
           peers = new HashTable<string, PeerImpl> (GLib.str_hash, GLib.str_equal);
           public_addresses = new SList<string> ();
-          socket_service = new SocketService ();
 
-          socket_service.stop ();
+          if (is_offline) return;
+
+          (socket_service = new SocketService ()).stop ();
 
           var exclusive = false;
           var max_threads = (int) GLib.get_num_processors ();
@@ -90,6 +92,11 @@ namespace KademliaDBus
       public Hub (uint16 port = DEFAULT_PORT)
         {
           Object (port : port);
+        }
+
+      public Hub.offline ()
+        {
+          Object (is_offline : true);
         }
 
       ~Hub ()
