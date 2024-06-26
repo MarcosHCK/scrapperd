@@ -23,5 +23,8 @@ namespace ScrapperD.Viewer
     {
       public string id { get; set; }
       public string role { get; set; }
+
+      public signal void on_get (RoleSource key, RoleTarget target);
+      public signal void on_set (RoleSource key, RoleSource value);
     }
 }

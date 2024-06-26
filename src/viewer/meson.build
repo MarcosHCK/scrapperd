@@ -18,6 +18,30 @@
 gnome = import ('gnome')
 libgtk_dep = dependency ('gtk4')
 
+scrapperd_viewer_support = library \
+  (
+    'scrapperd-viewer',
+
+    dependencies :
+      [
+        vala.find_library ('gio-2.0'), libgio_dep,
+        vala.find_library ('glib-2.0'), libglib_dep,
+        vala.find_library ('gobject-2.0'), libgobject_dep,
+      ],
+
+    include_directories : [ configdir, libsdir ],
+
+    link_with : [ libkademlia, libkademlia_dbus, libscrapperd ],
+
+    sources :
+      [
+        'role.vala',
+        'rolesource.vala',
+        'roletarget.vala',
+        'roletransport.vala',
+      ],
+  )
+
 executable \
   (
     'scrapperd-viewer',
@@ -34,7 +58,7 @@ executable \
 
     include_directories : [ configdir, libsdir ],
 
-    link_with : [ libkademlia, libkademlia_dbus, libscrapperd ],
+    link_with : [ libkademlia, libkademlia_dbus, libscrapperd, scrapperd_viewer_support ],
 
     sources :
       [
@@ -43,7 +67,6 @@ executable \
         'infobar.vala',
         'infobarmessage.vala',
         'joindialog.vala',
-        'role.vala',
         'rolerow.vala',
 
         gnome.compile_resources ('resources', 'resources.xml'),

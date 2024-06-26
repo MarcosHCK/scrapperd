@@ -90,11 +90,34 @@ namespace ScrapperD.Viewer
           var role_dto = (Role) new Role ();
           var role_row = (RoleRow) new RoleRow (role_dto); 
           var role_proxy = (PeerImpl) roles.lookup (role);
-          var weak_ = WeakRef (window);
+          var weak1 = WeakRef (role_proxy);
+          var weak2 = WeakRef (window);
+
+          role_dto.on_get.connect ((key, target) =>
+            {
+              on_role_dto_get.begin ((PeerImplProxy) weak1.get (), key, target, null, (o, res) =>
+                {
+                  try { on_role_dto_get.end (res); } catch (GLib.Error e)
+                    {
+                      ((Application) GLib.Application.get_default ()).notify_recoverable_error (e);
+                    }
+                });
+            });
+
+          role_dto.on_set.connect ((key, value) =>
+            {
+              on_role_dto_set.begin ((PeerImplProxy) weak1.get (), key, value, null, (o, res) =>
+                {
+                  try { on_role_dto_set.end (res); } catch (GLib.Error e)
+                    {
+                      ((Application) GLib.Application.get_default ()).notify_recoverable_error (e);
+                    }
+                });
+            });
 
           role_row.close.connect ((row) =>
             {
-              ((ApplicationWindow?) weak_.get ())?.remove_row (row);
+              ((ApplicationWindow?) weak2.get ())?.remove_row (row);
             });
 
           role_row.externalize.connect ((row) =>
@@ -258,8 +281,7 @@ namespace ScrapperD.Viewer
             {
               try { jointo_async.end (res); } catch (GLib.Error e)
                 {
-                  var window = active_window as ApplicationWindow;
-                  window?.infobar?.push_recoverable_error (e);
+                  notify_recoverable_error (e);
                 }
 
               release ();
@@ -318,8 +340,7 @@ namespace ScrapperD.Viewer
             {
               try { joinrole_async.end (res); added_role (role); } catch (GLib.Error e)
                 {
-                  var window = active_window as ApplicationWindow;
-                  window?.infobar?.push_recoverable_error (e);
+                  notify_recoverable_error (e);
                 }
 
               release ();
@@ -332,6 +353,57 @@ namespace ScrapperD.Viewer
           hub.add_peer (proxy = new PeerImplProxy (role));
           roles.insert (role, (owned) proxy);
           yield hub.join (null, cancellable);
+        }
+
+      public void notify_desktop_error (GLib.Error error)
+        {
+          unowned var id1 = GLib.int_hash (error.code);
+          unowned var id2 = GLib.str_hash (error.domain.to_string ());
+          unowned var id3 = GLib.str_hash (error.message);
+          unowned var id = id1 ^ id2 ^ id3;
+          var notification = new GLib.Notification (@"$(error.domain) error");
+
+          notification.set_body (@"Recoverable error: $(error.domain): $(error.code): $(error.message)");
+          notification.set_icon (new GLib.ThemedIcon ("dialog-warning"));
+          notification.set_priority (GLib.NotificationPriority.NORMAL);
+
+          send_notification (@"$APPID-notification-$id", notification);
+        }
+
+      public void notify_recoverable_error (GLib.Error error)
+        {
+          ApplicationWindow window;
+
+          if ((window = active_window as ApplicationWindow) == null)
+
+            notify_desktop_error (error);
+          else
+            window.infobar.push_recoverable_error (error);
+        }
+
+      public void notify_unrecoverable_error (GLib.Error error)
+        {
+          ApplicationWindow window;
+
+          if ((window = active_window as ApplicationWindow) == null)
+
+            notify_desktop_error (error);
+          else
+            window.infobar.push_unrecoverable_error (error);
+        }
+
+      static async void on_role_dto_get (PeerImplProxy peer, owned RoleSource key_source, owned RoleTarget target_source, GLib.Cancellable? cancellable = null) throws GLib.Error
+        {
+          var key = yield key_source.get_key ();
+          var value = yield peer.lookup (key, cancellable);
+          yield target_source.set_output (value, cancellable);
+        }
+
+      static async void on_role_dto_set (PeerImplProxy peer, owned RoleSource key_source, owned RoleSource value_source, GLib.Cancellable? cancellable = null) throws GLib.Error
+        {
+          var key = yield key_source.get_key (cancellable);
+          var value = yield value_source.get_input (cancellable);
+          yield peer.insert (key, value, cancellable);
         }
 
       [CCode (cname = "gtk_style_context_add_provider_for_display")]

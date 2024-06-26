@@ -23,6 +23,10 @@ namespace ScrapperD.Viewer
 
   public class RoleRow : Gtk.Grid
     {
+      [GtkChild] private unowned Gtk.EntryBuffer? entrybuffer1 = null;
+      [GtkChild] private unowned Gtk.EntryBuffer? entrybuffer2 = null;
+      [GtkChild] private unowned Gtk.EntryBuffer? entrybuffer3 = null;
+      [GtkChild] private unowned Gtk.EntryBuffer? entrybuffer4 = null;
       [GtkChild] private unowned Gtk.Expander? expander1 = null;
       [GtkChild] private unowned Gtk.Label? label1 = null;
 
@@ -51,6 +55,45 @@ namespace ScrapperD.Viewer
       [GtkCallback] public void on_button2_clicked (Gtk.Button button2)
         {
           externalize ();
+        }
+
+      [GtkCallback] public void on_button3_clicked (Gtk.Button button3)
+        {
+          RoleSource key_source;
+          RoleTarget target_source;
+
+          try { key_source = new RoleSource.parse (entrybuffer1.text); } catch (GLib.Error e)
+            {
+              ((Application) GLib.Application.get_default ()).notify_recoverable_error (e);
+              return;
+            }
+
+          try { target_source = new RoleTarget.parse (entrybuffer2.text); } catch (GLib.Error e)
+            {
+              ((Application) GLib.Application.get_default ()).notify_recoverable_error (e);
+              return;
+            }
+
+          role.on_get (key_source, target_source);
+        }
+
+      [GtkCallback] public void on_button4_clicked (Gtk.Button button4)
+        {
+          RoleSource key_source, value_source;
+
+          try { key_source = new RoleSource.parse (entrybuffer3.text); } catch (GLib.Error e)
+            {
+              ((Application) GLib.Application.get_default ()).notify_recoverable_error (e);
+              return;
+            }
+
+          try { value_source = new RoleSource.parse (entrybuffer4.text); } catch (GLib.Error e)
+            {
+              ((Application) GLib.Application.get_default ()).notify_recoverable_error (e);
+              return;
+            }
+
+          role.on_set (key_source, value_source);
         }
     }
 }
