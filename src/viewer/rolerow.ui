@@ -19,31 +19,80 @@
 -->
 <interface domain="en_US">
 
-  <menu id="menu1">
+  <menu id="datasourcemenu">
 
     <section>
 
       <item>
+        <attribute name="action">row.with-type</attribute>
+        <attribute name="target">('entrybuffer4','')</attribute>
+        <attribute name="label" translatable="yes">From data</attribute>
+      </item>
+      <item>
+        <attribute name="action">row.pick-file</attribute>
+        <attribute name="target">('entrybuffer4',false)</attribute>
+        <attribute name="label" translatable="yes">From file</attribute>
+      </item>
+    </section>
+  </menu>
+
+  <menu id="keysourcemenu1">
+
+    <section>
+
+      <item>
+        <attribute name="action">row.with-type</attribute>
+        <attribute name="target">('entrybuffer1','data')</attribute>
+        <attribute name="label" translatable="yes">From data</attribute>
+      </item>
+      <item>
+        <attribute name="action">row.pick-file</attribute>
+        <attribute name="target">('entrybuffer1',false)</attribute>
         <attribute name="label" translatable="yes">From file</attribute>
       </item>
       <item>
-        <attribute name="label" translatable="yes">From console</attribute>
-      </item>
-      <item>
+        <attribute name="action">row.with-type</attribute>
+        <attribute name="target">('entrybuffer1','verbatim')</attribute>
         <attribute name="label" translatable="yes">Verbatim</attribute>
       </item>
     </section>
   </menu>
 
-  <menu id="menu2">
+  <menu id="keysourcemenu2">
 
     <section>
 
       <item>
-        <attribute name="label" translatable="yes">To file</attribute>
+        <attribute name="action">row.with-type</attribute>
+        <attribute name="target">('entrybuffer3','data')</attribute>
+        <attribute name="label" translatable="yes">From data</attribute>
       </item>
       <item>
+        <attribute name="action">row.pick-file</attribute>
+        <attribute name="target">('entrybuffer3',false)</attribute>
+        <attribute name="label" translatable="yes">From file</attribute>
+      </item>
+      <item>
+        <attribute name="action">row.with-type</attribute>
+        <attribute name="target">('entrybuffer3','verbatim')</attribute>
+        <attribute name="label" translatable="yes">Verbatim</attribute>
+      </item>
+    </section>
+  </menu>
+
+  <menu id="targetmenu">
+
+    <section>
+
+      <item>
+        <attribute name="action">row.with-type</attribute>
+        <attribute name="target">('entrybuffer2','console')</attribute>
         <attribute name="label" translatable="yes">To console</attribute>
+      </item>
+      <item>
+        <attribute name="action">row.pick-file</attribute>
+        <attribute name="target">('entrybuffer2',true)</attribute>
+        <attribute name="label" translatable="yes">To file</attribute>
       </item>
     </section>
   </menu>
@@ -127,7 +176,7 @@
                               <object class="GtkEntryBuffer" id="entrybuffer1" />
                             </property>
 
-                            <property name="extra-menu">menu1</property>
+                            <property name="extra-menu">keysourcemenu1</property>
                             <property name="placeholder-text">Key</property>
                             <property name="hexpand">true</property>
                           </object>
@@ -141,7 +190,7 @@
                               <object class="GtkEntryBuffer" id="entrybuffer2" />
                             </property>
 
-                            <property name="extra-menu">menu2</property>
+                            <property name="extra-menu">targetmenu</property>
                             <property name="placeholder-text">Target</property>
                             <property name="hexpand">true</property>
                           </object>
@@ -229,7 +278,7 @@
                               <object class="GtkEntryBuffer" id="entrybuffer3" />
                             </property>
 
-                            <property name="extra-menu">menu1</property>
+                            <property name="extra-menu">keysourcemenu2</property>
                             <property name="placeholder-text">Key</property>
                             <property name="hexpand">true</property>
                           </object>
@@ -243,7 +292,7 @@
                               <object class="GtkEntryBuffer" id="entrybuffer4" />
                             </property>
 
-                            <property name="extra-menu">menu1</property>
+                            <property name="extra-menu">datasourcemenu</property>
                             <property name="placeholder-text">Value</property>
                             <property name="hexpand">true</property>
                           </object>
