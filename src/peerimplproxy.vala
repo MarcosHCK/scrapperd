@@ -45,5 +45,12 @@ namespace KademliaDBus
         {
           return ValueNode.PeerRef.anonymous (id.bytes);
         }
+
+      public override GLib.SList<Key> nearest (Key id)
+        {
+          var list = base.nearest (id);
+          list.foreach (a => { if (Key.equal (a, this.id)) list.remove (a); });
+          return (owned) list;
+        }
     }
 }

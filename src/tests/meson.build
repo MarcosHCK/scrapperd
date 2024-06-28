@@ -21,7 +21,6 @@ tests = \
     'integration.vala' : 'Kademlia integration tests',
     'key.vala' : 'Kademlia key tests',
     'peer.vala' : 'Kademlia peer tests',
-    'valuepeer.vala' : 'Kademlia valuepeer tests',
   }
 
 foreach file, description : tests

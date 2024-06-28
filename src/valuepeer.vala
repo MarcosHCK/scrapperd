@@ -23,16 +23,14 @@ namespace Kademlia
     {
       public ValueStore value_store { get; construct; }
 
-      private GenericSet<unowned Key> inserting;
-
-      construct
-        {
-          inserting = new GenericSet<unowned Key> (GLib.str_hash, GLib.str_equal);
-        }
-
       protected ValuePeer (ValueStore value_store, Key? id = null)
         {
           Object (id : id, value_store : value_store);
+        }
+
+      static int compare_key (Key? a, Key? b)
+        {
+          return Key.equal (a, b) ? 0 : 1;
         }
 
       protected virtual async Value find_value (Key peer, Key id, GLib.Cancellable? cancellable = null) throws GLib.Error
@@ -40,48 +38,60 @@ namespace Kademlia
           throw new IOError.FAILED ("unimplemented");
         }
 
+      public async Value find_value_complete (Key id, GLib.Cancellable? cancellable = null) throws GLib.Error
+        {
+          GLib.Value? value;
+
+          if ((value = yield value_store.lookup_value (id, cancellable)) != null)
+
+            return new Value.inmediate ((owned) value);
+          else
+            {
+              var ni = (SList<Key>) nearest (id);
+              var ar = (Key[]) new Key [ni.length () - (ni.find_custom (this.id, compare_key) == null ? 0 : 1)];
+              int i = 0;
+
+              foreach (unowned var n in ni) if (Key.equal (n, this.id) == false) ar [i++] = n.copy ();
+              return new Value.delegated ((owned) ar);
+            }
+        }
+
       protected virtual async bool store_value (Key peer, Key id, GLib.Value? value = null, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
           throw new IOError.FAILED ("unimplemented");
         }
 
-      public async bool insert (Key id, GLib.Value? value = null, GLib.Cancellable? cancellable = null) throws GLib.Error
+      public async bool store_value_complete (Key id, GLib.Value? value = null, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
-          bool doing;
-          lock (inserting) doing = inserting.contains (id);
-          return doing ? true : yield insert_a (id, value, cancellable);
+          yield value_store.insert_value (id, value, cancellable);
+          return true;
         }
 
       [CCode (cheader_filename = "glib.h", cname = "g_atomic_int_or")]
 
       static extern uint _g_atomic_int_or ([CCode (type = "volatile guint *")] ref uint atomic, uint val);
 
-      async bool insert_a (Key id, GLib.Value? value = null, GLib.Cancellable? cancellable = null) throws GLib.Error
+      public async bool insert (Key id, GLib.Value? value = null, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
           var context = (GLib.MainContext) MainContext.get_thread_default ();
           var dones = new uint [ALPHA];
           var errors = new GLib.AsyncQueue<GLib.Error> ();
           var good = new uint [1];
           var lists = new GenericArray<Key> [ALPHA];
-          var peers = nearest (id);
+          Key[] peers = yield lookup_node (id, cancellable);
 
-          lock (inserting) inserting.add (id);
-
-          unowned var list = peers;
-          unowned uint i, n_peers = peers.length ();
-
-          for (i = 0; i < ALPHA; ++i)
+          for (unowned uint i = 0; i < ALPHA; ++i)
             {
               dones [i] = 0;
-              lists [i] = new GenericArray<Key> (1 + n_peers / 3);
+              lists [i] = new GenericArray<Key> (1 + peers.length / 3);
             }
 
-          for (i = 0, list = peers; list != null; list = list.next, i = (i + 1) % ALPHA)
+          for (unowned uint i = 0, j = 0; j < peers.length; ++j, i = (i + 1) % ALPHA)
             {
-              lists [i].add (list.data.copy ());
+              lists [i].add (peers [j].copy ());
             }
 
-          for (i = 0; i < ALPHA; ++i) if (lists [i].length == 0)
+          for (unowned uint i = 0; i < ALPHA; ++i) if (lists [i].length == 0)
 
             GLib.AtomicUint.set (ref dones [i], 1);
           else
@@ -103,13 +113,12 @@ namespace Kademlia
             }
 
           runner (context, dones);
-          lock (inserting) inserting.remove (id);
 
           if (errors.length_unlocked () > 0)
             {
               var f = errors.pop_unlocked ();
 
-              for (i = 0; i < errors.length_unlocked (); ++i)
+              for (unowned uint i = 0; i < errors.length_unlocked (); ++i)
                 {
                   var e = errors.pop_unlocked ();
                   critical (@"$(e.domain): $(e.code): $(e.message)");

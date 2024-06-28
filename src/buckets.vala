@@ -37,15 +37,10 @@ namespace Kademlia
           this.self = (owned) self;
         }
 
-      static int compare_key (Key a, Key b)
-        {
-          return Key.equal (a, b) ? 0 : 1;
-        }
-
-      static int compare_stale_contact (StaleContact? a, StaleContact? b)
-        {
-          return compare_key (a.key, (Key) (void*) b);
-        }
+      static int compare_index (Bucket? a, Bucket? b) { return (int) b.index - (int) a.index; }
+      static int compare_index2 (Kademlia.Bucket? a, Kademlia.Bucket? b) { return int.from_pointer ((void*) b) - (int) a.index; }
+      static int compare_key (Key a, Key b) { return Key.equal (a, b) ? 0 : 1; }
+      static int compare_stale_contact (StaleContact? a, StaleContact? b) { return compare_key (a.key, (Key) (void*) b); }
 
       public void drop (Key key) requires (Key.equal (key, self) == false)
         {
@@ -171,18 +166,16 @@ namespace Kademlia
       private unowned GLib.List<Bucket?>? search_index (int index, bool create = false) requires (index >= 0)
         {
           unowned GLib.List<Bucket?> link;
-          unowned GLib.CompareFunc<Bucket?> cmp1 = (a, b) => int.from_pointer ((void*) b) - (int) a.index;
-          unowned GLib.CompareFunc<Bucket?> cmp2 = (a, b) => (int) b.index - (int) a.index;
           unowned var data = index.to_pointer ();
 
           do
             {
-              if ((link = buckets.find_custom ((Kademlia.Bucket?) data, cmp1)) != null)
+              if ((link = buckets.find_custom ((Kademlia.Bucket?) data, compare_index2)) != null)
 
                 return link;
               else if (create == false) return null; else
                 {
-                  buckets.insert_sorted (Bucket (index), cmp2);
+                  buckets.insert_sorted (Bucket (index), compare_index);
                   continue;
                 }
             }

@@ -24,6 +24,7 @@ namespace Testing
       GLib.Test.add_func (TESTPATHROOT + "/Integration/network/connect", () => (new TestNetworkConnect ()).run ());
       GLib.Test.add_func (TESTPATHROOT + "/Integration/network/insert", () => (new TestNetworkInsert ()).run ());
       GLib.Test.add_func (TESTPATHROOT + "/Integration/network/lookup", () => (new TestNetworkLookup ()).run ());
+      GLib.Test.add_func (TESTPATHROOT + "/Integration/network/lookup_node", () => (new TestNetworkLookupNode ()).run ());
       return GLib.Test.run ();
     }
 
@@ -97,7 +98,7 @@ namespace Testing
           this.net = net;
         }
 
-      unowned ValuePeer getother (Key peer) throws GLib.Error
+      unowned ValuePeer getother (Key peer, bool find = false) throws GLib.Error
         {
           unowned ValuePeer other;
 
@@ -106,48 +107,33 @@ namespace Testing
             throw new PeerError.UNREACHABLE ("no node in net with id (%s)", peer.to_string ());
           else
             {
-              other.buckets.insert (this.id);
+              if (find == false) other.buckets.insert (this.id);
               return other;
             }
         }
 
       protected async override Key[] find_peer (Key peer, Key id, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
-          unowned var other = getother (peer);
-
-          var near = other.nearest (id);
-          var ar = new Key [near.length ()];
-
-          unowned var link = near;
-          unowned int i;
-
-          for (i = 0; link != null; ++i, link = link.next)
-
-            ar [i] = link.data.copy ();
-
-          return (owned) ar;
-        }
-
-      protected async override bool ping_peer (Key peer, GLib.Cancellable? cancellable = null) throws GLib.Error
-        {
-          return getother (peer) != null;
+          unowned var other = getother (peer, true);
+          return yield other.find_peer_complete (id, cancellable);
         }
 
       protected async override Kademlia.Value find_value (Key peer, Key id, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
           unowned var other = getother (peer);
-          GLib.Value? value;
-
-          if ((value = yield other.lookup (id, cancellable)) != null)
-
-            return new Kademlia.Value.inmediate ((owned) value);
-          else
-            return new Kademlia.Value.delegated (yield find_peer (peer, id, cancellable));
+          return yield other.find_value_complete (id, cancellable);
         }
 
       protected async override bool store_value (Key peer, Key id, GLib.Value? value = null, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
-          return yield getother (peer).insert (id, value, cancellable);
+          unowned var other = getother (peer);
+          return yield other.store_value_complete (id, value, cancellable);
+        }
+
+      protected async override bool ping_peer (Key peer, GLib.Cancellable? cancellable = null) throws GLib.Error
+        {
+          unowned var other = getother (peer);
+          return yield other.ping_peer_complete (cancellable);
         }
     }
 
@@ -256,8 +242,64 @@ namespace Testing
                   break;
                 }
 
+              assert_true (value != null && value.holds (typeof (uint)));
               assert_cmpuint (values.data [i], GLib.CompareOperator.EQ, value.get_uint ());
             }
+        }
+    }
+
+  class TestNetworkLookupNode : TestNetworkConnect
+    {
+
+      protected override async void test ()
+        {
+          yield base.test ();
+          var keys = net.get_keys ();
+          var peer = net.lookup (keys.nth_data (GLib.Random.int_range (0, (int32) keys.length ())));
+
+          var closest_expected = new GenericArray<Key> ();
+          Key[] closest_got;
+          Key key = new Key.random ();
+
+          CompareDataFunc<Key> sorter = (a, b) =>
+            {
+              return Key.distance (a, key) - Key.distance (b, key);
+            };
+
+          foreach (unowned var other in net.get_values ())
+            {
+              closest_expected.add (other.id.copy ());
+              closest_expected.sort_with_data (sorter);
+              closest_expected.length = int.min (closest_expected.length, (int) Buckets.MAXSPAN);
+            }
+
+          try { closest_got = yield peer.lookup_node (new Key.random ()); } catch (GLib.Error e)
+            {
+              assert_no_error (e);
+              return;
+            }
+
+          GLib.Test.message ("expected closest:");
+
+          foreach (unowned var k in closest_expected)
+
+            GLib.Test.message ("  key: %s", k.to_string ());
+
+          GLib.Test.message ("got closest:");
+
+          foreach (unowned var k in closest_got)
+
+            GLib.Test.message ("  key: %s", k.to_string ());
+
+          uint join = 0;
+
+          foreach (unowned var a in closest_got)
+          foreach (unowned var b in closest_expected)
+            {
+              join = Key.equal (a, b) == false ? join : 1 + join;
+            }
+
+          assert_cmpuint (0, GLib.CompareOperator.LT, join);
         }
     }
 }

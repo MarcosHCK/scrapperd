@@ -42,9 +42,9 @@ namespace KademliaDBus
 
       construct
         {
-          added_contact.connect ((k) => debug ("added contact '%s'", k.to_string ()));
-          dropped_contact.connect ((k) => debug ("dropped contact '%s'", k.to_string ()));
-          staled_contact.connect ((k) => debug ("staled contact '%s'", k.to_string ()));
+          added_contact.connect ((k) => debug ("added contact %s:(%s)", k.to_string (), id.to_string ()));
+          dropped_contact.connect ((k) => debug ("dropped contact %s:(%s)", k.to_string (), id.to_string ()));
+          staled_contact.connect ((k) => debug ("staled contact %s:(%s)", k.to_string (), id.to_string ()));
           ifaces = new HashTable<void*, NodeIds?> (GLib.direct_hash, GLib.direct_equal);
         }
 

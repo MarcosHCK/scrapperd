@@ -30,19 +30,14 @@ namespace KademliaDBus
           Object (hub : hub, peer : peer);
         }
 
-      static int compare_key (Key a, Key b)
-        {
-          return Key.equal (a, b) ? 0 : 1;
-        }
-
       public async PeerRef[] find_node (PeerRef from, uint8[] key, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
           from.know (hub, peer);
-          var ni = (SList<Key>) peer.nearest (new Key.verbatim (key));
-          var ar = (PeerRef[]) new PeerRef [ni.length ()];
-          int i = 0;
+          var id = new Key.verbatim (key);
+          var re = yield peer.find_peer_complete (id, cancellable);
+          var ar = new PeerRef [re.length];
 
-          foreach (unowned var n in ni) ar [i++] = PeerRef (n.bytes, hub.addresses_for_peer (n));
+          for (int i = 0; i < re.length; ++i) ar [i] = PeerRef (re [i].bytes, hub.addresses_for_peer (re [i]));
           return (owned) ar;
         }
 
@@ -50,21 +45,16 @@ namespace KademliaDBus
         {
           from.know (hub, peer);
           var id = new Key.verbatim (key);
-          var val = (GLib.Value?) null;
+          var value = yield peer.find_value_complete (id, cancellable);
 
-          if ((val = yield peer.value_store.lookup_value (id, cancellable)) != null)
-            
-            return ValueRef.inmediate ((owned) val);
+          if (value.is_inmediate)
+
+            return ValueRef.inmediate (value.steal_value ());
           else
             {
-              var ni = (SList<Key>) peer.nearest (id);
-
-              ni.foreach (e => { if (Key.equal (e, peer.id)) ni.remove (e); });
-
-              var ar = (PeerRef[]) new PeerRef [ni.length ()];
-              int i = 0;
-
-              foreach (unowned var n in ni) ar [i++] = PeerRef (n.bytes, hub.addresses_for_peer (n));
+              var ks = value.steal_keys ();
+              var ar = new PeerRef [ks.length];
+              for (int i = 0; i < ks.length; ++i) ar [i] = PeerRef (ks [i].bytes, hub.addresses_for_peer (ks [i]));
               return ValueRef.delegated ((owned) ar);
             }
         }
@@ -73,19 +63,14 @@ namespace KademliaDBus
         {
           from.know (hub, peer);
           var id = (Key) new Key.verbatim (key);
-          var ni = (SList<Key>) peer.nearest (id);
-
-          if (ni.find_custom (id, compare_key) != null)
-
-            return yield peer.value_store.insert_value (id, new GLib.Bytes (value), cancellable);
-          else
-            return yield peer.insert (new Key.verbatim (key), new GLib.Bytes (value));
+          var go = (bool) yield peer.store_value_complete (id, new GLib.Bytes (value), cancellable);
+          return go;
         }
 
       public async bool ping (PeerRef from, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
           from.know (hub, peer);
-          return true;
+          return yield peer.ping_peer_complete (cancellable);
         }
     }
 }
