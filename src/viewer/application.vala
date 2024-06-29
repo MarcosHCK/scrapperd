@@ -37,6 +37,7 @@ namespace ScrapperD.Viewer
           add_action ("quit", null, () => quit ());
 
           add_main_option ("address", 'a', 0, GLib.OptionArg.STRING_ARRAY, "Network entry point", "ADDRESS");
+          add_main_option ("port", 'p', 0, GLib.OptionArg.INT, "Network public port", "PORT");
 
           roles = new HashTable<string, PeerImplProxy> (GLib.str_hash, GLib.str_equal);
         }
@@ -236,11 +237,29 @@ namespace ScrapperD.Viewer
         {
           unowned var good = true;
           unowned var options = cmdline.get_options_dict ();
+          unowned var port = (uint16) Hub.DEFAULT_PORT;
 
           while (true)
             {
               GLib.VariantIter iter;
               string option_s;
+              int option_i;
+
+              if (options.lookup ("port", "i", out option_i))
+                {
+                  if (option_i >= uint16.MIN && uint16.MAX < option_i)
+
+                    port = (uint16) option_i;
+                  else
+                    {
+                      good = false;
+                      cmdline.printerr ("invalid port %i\n", option_i);
+                      cmdline.set_exit_status (1);
+                      break;
+                    }
+                }
+
+              hub = new Hub (port);
 
               if (options.lookup ("address", "as", out iter)) while (iter.next ("s", out option_s))
 
@@ -413,8 +432,6 @@ namespace ScrapperD.Viewer
       public override void startup ()
         {
           base.startup ();
-
-          hub = new Hub.offline ();
 
           var display = Gdk.Display.get_default ();
           var provider = new Gtk.CssProvider ();

@@ -58,13 +58,15 @@ namespace Kademlia
           throw new IOError.FAILED ("unimplemented");
         }
 
-      public async Key[] find_peer_complete (Key id, GLib.Cancellable? cancellable = null) throws GLib.Error
+      public async Key[] find_peer_complete (Key? from, Key id, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
+          if (from != null) add_contact (from);
+
           var ni = (SList<Key>) nearest (id);
           var ar = (Key[]) new Key [ni.length ()];
           int i = 0;
 
-          foreach (unowned var n in ni) ar [i++] = n.copy ();
+          for (unowned var l = (SList<Key>) ni; l != null; l = l.next) ar [i++] = (owned) l.data;
           return (owned) ar;
         }
 
@@ -73,8 +75,9 @@ namespace Kademlia
           throw new IOError.FAILED ("unimplemented");
         }
 
-      public async bool ping_peer_complete (GLib.Cancellable? cancellable = null) throws GLib.Error
+      public async bool ping_peer_complete (Key? from, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
+          if (from != null) add_contact (from);
           return true;
         }
 
@@ -95,6 +98,18 @@ namespace Kademlia
           lock (buckets) buckets.insert (peer);
         }
 
+      [CCode (scope = "notified")]
+
+      protected CompareDataFunc<Key> create_sorter (owned Key key)
+        {
+          CompareDataFunc<Key> sorter = (a, b) =>
+            {
+              return Key.distance (a, key) - Key.distance (b, key);
+            };
+
+          return (owned) sorter;
+        }
+
       public void drop_contact (Key peer)
         {
           lock (buckets) buckets.drop (peer);
@@ -109,23 +124,19 @@ namespace Kademlia
       public async Key[] lookup_node (Key id, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
           var context = (MainContext) GLib.MainContext.ref_thread_default ();
-          var closest = new GenericArray<Key> (Buckets.MAXSPAN);
+          var closest = new GenericArray<Key> (2 * Buckets.MAXSPAN);
           var dones = new uint [ALPHA];
           var errors = new GLib.AsyncQueue<GLib.Error> ();
           var left = (int) 0;
           var lvisited = GLib.Mutex ();
           var peers = new GLib.Queue<Key> ();
           var seed = (SList<Key>) nearest (id);
+          var sorter = (CompareDataFunc<Key>) create_sorter (id.copy ());
           var visited = new GenericSet<Key> (Key.hash, Key.equal);
 
-          CompareDataFunc<Key> sorter = (a, b) =>
+          for (unowned var link = seed; link != null; link = link.next)
             {
-              return Key.distance (a, id) - Key.distance (b, id);
-            };
-
-          foreach (unowned var key in seed)
-            {
-              peers.push_head (key.copy ());
+              peers.push_head ((owned) link.data);
             }
 
           while ((left = (int) peers.length) > 0)
@@ -152,37 +163,32 @@ namespace Kademlia
 
                   lookup_node_a.begin (peer, id, cancellable, (o, res) =>
                     {
-                      Key[] newl;
+                      Key[]? newl = null;
 
                       try { newl = ((Peer) o).lookup_node_a.end (res); } catch (GLib.Error e)
                         {
                           errors.push ((owned) e);
-                          AtomicUint.set (ref dones [k], 1);
-                          return;
                         }
 
-                      if (unlikely (newl != null))
-
-                      foreach (unowned var key in newl)
+                      if (likely (newl != null))
                         {
                           lvisited.lock ();
 
-                          if (closest.find_custom (key, Key.equal))
-
-                            lvisited.unlock ();
-                          else
+                          foreach (unowned var key in newl) if (closest.find_custom (key, Key.equal) == false)
                             {
                               closest.add (key.copy ());
-                              closest.sort_with_data (sorter);
-
-                              closest.length = int.min (closest.length, (int) Buckets.MAXSPAN);
-
-                              if (visited.contains (key) == false)
-
-                                peers.push_tail (key.copy ());
-
-                              lvisited.unlock ();
                             }
+
+                          closest.sort_values_with_data (sorter);
+
+                          closest.length = int.min (closest.length, (int) Buckets.MAXSPAN);
+
+                          foreach (unowned var key in newl) if (closest.find_custom (key, Key.equal) && ! visited.contains (key))
+                            {
+                              peers.push_head (key.copy ());
+                            }
+
+                          lvisited.unlock ();
                         }
 
                       AtomicUint.set (ref dones [k], 1);
@@ -209,20 +215,15 @@ namespace Kademlia
 
       async Key[]? lookup_node_a (Key peer, Key id, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
+          bool same;
+
           try
             {
-              if (Key.equal (peer, this.id) == false)
+              if ((same = Key.equal (peer, this.id)) == false)
 
                 return yield find_peer (peer, id, cancellable);
               else
-                {
-                  var ni = nearest (id);
-                  var ar = new Key [ni.length ()];
-                  int i = 0;
-
-                  foreach (unowned var n in ni) ar [i++] = n.copy ();
-                  return (owned) ar;
-                }
+                return yield find_peer_complete (null, id, cancellable);
             }
           catch (PeerError e)
             {
@@ -231,7 +232,7 @@ namespace Kademlia
                 throw (owned) e;
               else
                 {
-                  lock (buckets) buckets.drop (peer);
+                  if (!same) drop_contact (peer);
                   return null;
                 }
             }

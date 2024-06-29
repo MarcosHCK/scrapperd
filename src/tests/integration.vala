@@ -74,11 +74,11 @@ namespace Testing
           base (GLib.str_hash, GLib.str_equal);
         }
 
-      public NetTable.random ()
+      public NetTable.random (int min_nodes = 100, int max_nodes = 1000)
         {
           this ();
 
-          for (unowned var i = 0; i < GLib.Random.int_range (10, 100); ++i)
+          for (unowned var i = 0; i < GLib.Random.int_range (min_nodes, max_nodes); ++i)
             {
               var id = new Key.random ();
               var peer = new TestValuePeer (new DummyValueStore (), id, this);
@@ -98,42 +98,53 @@ namespace Testing
           this.net = net;
         }
 
-      unowned ValuePeer getother (Key peer, bool find = false) throws GLib.Error
+      unowned ValuePeer getother (Key peer) throws GLib.Error
         {
           unowned ValuePeer other;
 
           if ((other = net.lookup (peer)) == null)
 
             throw new PeerError.UNREACHABLE ("no node in net with id (%s)", peer.to_string ());
-          else
-            {
-              if (find == false) other.buckets.insert (this.id);
-              return other;
-            }
+
+          return other;
         }
 
       protected async override Key[] find_peer (Key peer, Key id, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
-          unowned var other = getother (peer, true);
-          return yield other.find_peer_complete (id, cancellable);
+          unowned var other = getother (peer);
+          var peers = yield other.find_peer_complete (this.id, id, cancellable);
+
+          foreach (unowned var peer_ in peers)
+            {
+              if (Key.equal (peer_, this.id) == false) buckets.insert (peer_);
+            }
+          return (owned) peers;
         }
 
       protected async override Kademlia.Value find_value (Key peer, Key id, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
           unowned var other = getother (peer);
-          return yield other.find_value_complete (id, cancellable);
+          var value = yield other.find_value_complete (this.id, id, cancellable);
+
+          if (value.is_delegated)
+          foreach (unowned var peer_ in value.keys)
+            {
+              if (Key.equal (peer_, this.id) == false) buckets.insert (peer_);
+            }
+
+          return (owned) value;
         }
 
       protected async override bool store_value (Key peer, Key id, GLib.Value? value = null, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
           unowned var other = getother (peer);
-          return yield other.store_value_complete (id, value, cancellable);
+          return yield other.store_value_complete (this.id, id, value, cancellable);
         }
 
       protected async override bool ping_peer (Key peer, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
           unowned var other = getother (peer);
-          return yield other.ping_peer_complete (cancellable);
+          return yield other.ping_peer_complete (this.id, cancellable);
         }
     }
 
@@ -170,15 +181,23 @@ namespace Testing
               indices [b] = t;
             }
 
+          var average = (double) 0;
+          var timer = new GLib.Timer ();
+
           foreach (unowned var k in indices)
             {
               unowned var peer = net.lookup (peers [k]);
 
-              try { yield peer.join (peers [0]); } catch (GLib.Error e)
+              timer.start ();
+
+              try { yield peer.join (peers [0]); average += timer.elapsed (); } catch (GLib.Error e)
                 {
                   assert_no_error (e);
                 }
             }
+
+          GLib.Test.message ("average join time: %04fs", average / (double) indices.length);
+          GLib.Test.message ("network size: %i nodes", indices.length);
         }
     }
 
@@ -190,19 +209,28 @@ namespace Testing
           yield base.test ();
           var keys = net.get_keys ();
           var peer = net.lookup (keys.nth_data (GLib.Random.int_range (0, (int32) keys.length ())));
+          var ns = GLib.Random.int_range (100, 1000);
 
-          for (unowned var i = 0; i < GLib.Random.int_range (10, 100); ++i)
+          var average = (double) 0;
+          var timer = new GLib.Timer ();
+
+          for (unowned var i = 0; i < ns; ++i)
             {
               var n = GLib.Random.next_int ();
               var v = GLib.Value (typeof (uint));
 
               v.set_uint (n);
 
-              try { yield peer.insert (new Key.random (), v); } catch (GLib.Error e)
+              timer.start ();
+
+              try { yield peer.insert (new Key.random (), v); average += timer.elapsed (); } catch (GLib.Error e)
                 {
                   assert_no_error (e);
                 }
             }
+
+          GLib.Test.message ("average insert time: %04fs", average / (double) ns);
+          GLib.Test.message ("insertions count: %i", ns);
         }
     }
 
@@ -214,29 +242,41 @@ namespace Testing
           yield base.test ();
           var keys = net.get_keys ();
           var peer = net.lookup (keys.nth_data (GLib.Random.int_range (0, (int32) keys.length ())));
+          var ns = GLib.Random.int_range (100, 1000);
 
-          var unders = new GenericArray<Key> ();
-          var values = new GenericArray<uint> ();
+          var unders = new GenericArray<Key> (ns);
+          var values = new GenericArray<uint> (ns);
 
-          for (unowned var i = 0; i < GLib.Random.int_range (10, 100); ++i)
+          for (unowned var i = 0; i < ns; ++i)
             {
               unders.add (new Key.random ());
               values.add (GLib.Random.next_int ());
             }
 
-          for (unowned var i = 0; i < unders.length; ++i)
+          var average = (double) 0;
+          var timer = new GLib.Timer ();
+
+          for (unowned var i = 0; i < ns; ++i)
             {
-              try { yield peer.insert (unders.data [i], values.data [i]); } catch (GLib.Error e)
+              timer.start ();
+
+              try { yield peer.insert (unders.data [i], values.data [i]); average += timer.elapsed (); } catch (GLib.Error e)
                 {
                   assert_no_error (e);
                 }
             }
 
-          for (unowned var i = 0; i < unders.length; ++i)
+          GLib.Test.message ("average insert time: %04fs", average / (double) ns);
+          GLib.Test.message ("insertions count: %i", ns);
+          average = 0;
+
+          for (unowned var i = 0; i < ns; ++i)
             {
               GLib.Value? value;
 
-              try { value = yield peer.lookup (unders.data [i]); } catch (GLib.Error e)
+              timer.start ();
+
+              try { value = yield peer.lookup (unders.data [i]); average += timer.elapsed (); } catch (GLib.Error e)
                 {
                   assert_no_error (e);
                   break;
@@ -245,6 +285,9 @@ namespace Testing
               assert_true (value != null && value.holds (typeof (uint)));
               assert_cmpuint (values.data [i], GLib.CompareOperator.EQ, value.get_uint ());
             }
+
+          GLib.Test.message ("average lookup time: %04fs", average / (double) ns);
+          GLib.Test.message ("lookups count: %i", ns);
         }
     }
 
@@ -256,50 +299,53 @@ namespace Testing
           yield base.test ();
           var keys = net.get_keys ();
           var peer = net.lookup (keys.nth_data (GLib.Random.int_range (0, (int32) keys.length ())));
+          var ns = GLib.Random.int_range (100, 1000);
 
-          var closest_expected = new GenericArray<Key> ();
-          Key[] closest_got;
-          Key key = new Key.random ();
+          var average = (double) 0;
+          var timer = new GLib.Timer ();
 
-          CompareDataFunc<Key> sorter = (a, b) =>
+          for (unowned var i = 0; i < ns; ++i)
             {
-              return Key.distance (a, key) - Key.distance (b, key);
-            };
+              var closest_expected = new GenericArray<Key> ();
+              Key[] closest_got;
+              Key key = new Key.random ();
 
-          foreach (unowned var other in net.get_values ())
-            {
-              closest_expected.add (other.id.copy ());
-              closest_expected.sort_with_data (sorter);
-              closest_expected.length = int.min (closest_expected.length, (int) Buckets.MAXSPAN);
+              CompareDataFunc<Key> sorter = (a, b) =>
+                {
+                  return Key.distance (a, key) - Key.distance (b, key);
+                };
+
+              foreach (unowned var other in net.get_values ())
+                {
+                  closest_expected.add (other.id.copy ());
+                  closest_expected.sort_values_with_data (sorter);
+                  closest_expected.length = int.min (closest_expected.length, (int) Buckets.MAXSPAN);
+                }
+
+              closest_expected.sort_values_with_data (sorter);
+
+              timer.start ();
+
+              try { closest_got = yield peer.lookup_node (key); average += timer.elapsed (); } catch (GLib.Error e)
+                {
+                  assert_no_error (e);
+                  return;
+                }
+
+              uint join = 0;
+
+              foreach (unowned var a in closest_got)
+              foreach (unowned var b in closest_expected)
+                {
+                  join = Key.equal (a, b) == false ? join : 1 + join;
+                }
+
+              assert_cmpuint (0, GLib.CompareOperator.LT, join);
+              assert_cmpuint (Key.distance (closest_got [0], key), GLib.CompareOperator.EQ, Key.distance (closest_got [0], key));
             }
 
-          try { closest_got = yield peer.lookup_node (new Key.random ()); } catch (GLib.Error e)
-            {
-              assert_no_error (e);
-              return;
-            }
-
-          GLib.Test.message ("expected closest:");
-
-          foreach (unowned var k in closest_expected)
-
-            GLib.Test.message ("  key: %s", k.to_string ());
-
-          GLib.Test.message ("got closest:");
-
-          foreach (unowned var k in closest_got)
-
-            GLib.Test.message ("  key: %s", k.to_string ());
-
-          uint join = 0;
-
-          foreach (unowned var a in closest_got)
-          foreach (unowned var b in closest_expected)
-            {
-              join = Key.equal (a, b) == false ? join : 1 + join;
-            }
-
-          assert_cmpuint (0, GLib.CompareOperator.LT, join);
+          GLib.Test.message ("lookup_node average time: %04fs", average / (double) ns);
+          GLib.Test.message ("lookup_node count: %i", ns);
         }
     }
 }

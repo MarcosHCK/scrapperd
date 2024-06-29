@@ -30,22 +30,22 @@ namespace KademliaDBus
           Object (hub : hub, peer : peer);
         }
 
-      public async PeerRef[] find_node (PeerRef from, uint8[] key, GLib.Cancellable? cancellable = null) throws GLib.Error
+      public async PeerRef[] find_node (PeerRef from_, uint8[] key, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
-          from.know (hub, peer);
+          var from = (Key?) from_.know (hub, peer);
           var id = new Key.verbatim (key);
-          var re = yield peer.find_peer_complete (id, cancellable);
+          var re = yield peer.find_peer_complete (from, id, cancellable);
           var ar = new PeerRef [re.length];
 
           for (int i = 0; i < re.length; ++i) ar [i] = PeerRef (re [i].bytes, hub.addresses_for_peer (re [i]));
           return (owned) ar;
         }
 
-      public async ValueRef find_value (PeerRef from, uint8[] key, GLib.Cancellable? cancellable = null) throws GLib.Error
+      public async ValueRef find_value (PeerRef from_, uint8[] key, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
-          from.know (hub, peer);
+          var from = (Key?) from_.know (hub, peer);
           var id = new Key.verbatim (key);
-          var value = yield peer.find_value_complete (id, cancellable);
+          var value = yield peer.find_value_complete (from, id, cancellable);
 
           if (value.is_inmediate)
 
@@ -59,18 +59,18 @@ namespace KademliaDBus
             }
         }
 
-      public async bool store (PeerRef from, uint8[] key, uint8[] value, GLib.Cancellable? cancellable = null) throws GLib.Error
+      public async bool store (PeerRef from_, uint8[] key, uint8[] value, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
-          from.know (hub, peer);
+          var from = (Key?) from_.know (hub, peer);
           var id = (Key) new Key.verbatim (key);
-          var go = (bool) yield peer.store_value_complete (id, new GLib.Bytes (value), cancellable);
+          var go = (bool) yield peer.store_value_complete (from, id, new GLib.Bytes (value), cancellable);
           return go;
         }
 
-      public async bool ping (PeerRef from, GLib.Cancellable? cancellable = null) throws GLib.Error
+      public async bool ping (PeerRef from_, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
-          from.know (hub, peer);
-          return yield peer.ping_peer_complete (cancellable);
+          var from = (Key?) from_.know (hub, peer);
+          return yield peer.ping_peer_complete (from, cancellable);
         }
     }
 }

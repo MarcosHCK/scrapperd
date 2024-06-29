@@ -19,34 +19,6 @@
 
 namespace Kademlia
 {
-  internal static void runner (GLib.MainContext? context, uint[] dones)
-    {
-      context = context ?? MainContext.ref_thread_default ();
-
-      var alpha = dones.length;
-      var loop = new GLib.MainLoop (context, true);
-      var source = new GLib.IdleSource ();
-
-      source.set_callback (() =>
-        {
-          uint pending = 0;
-
-          for (unowned var i = 0; i < alpha; ++i)
-            {
-              pending |= AtomicUint.get (ref dones [i]) ^ 1;
-            }
-
-          if (pending == 0)
-            {
-              loop.quit ();
-              return GLib.Source.REMOVE;
-            }
-
-          return GLib.Source.CONTINUE;
-        });
-
-      source.set_priority (GLib.Priority.HIGH_IDLE);
-      source.attach (context);
-      loop.run ();
-    }
+  [CCode (cheader_filename = "runner.h")]
+  internal static void runner (GLib.MainContext? context, [CCode (array_length_pos = 2.1)] uint[] dones);
 }

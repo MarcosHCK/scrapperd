@@ -33,7 +33,6 @@ namespace KademliaDBus
       private GLib.SList<string> public_addresses;
       private GLib.SocketService socket_service;
 
-      public bool is_offline { get; construct; default = false; }
       public uint16 port { get; construct; default = DEFAULT_PORT; }
 
       construct
@@ -46,8 +45,6 @@ namespace KademliaDBus
           nodes = new HashTable<void*, uint> (GLib.direct_hash, GLib.direct_equal);
           peers = new HashTable<string, PeerImpl> (GLib.str_hash, GLib.str_equal);
           public_addresses = new SList<string> ();
-
-          if (is_offline) return;
 
           (socket_service = new SocketService ()).stop ();
 
@@ -92,11 +89,6 @@ namespace KademliaDBus
       public Hub (uint16 port = DEFAULT_PORT)
         {
           Object (port : port);
-        }
-
-      public Hub.offline ()
-        {
-          Object (is_offline : true);
         }
 
       ~Hub ()
@@ -157,17 +149,7 @@ namespace KademliaDBus
 
           try { remote = stream.get_remote_address ().to_string (); } catch { }
 
-          if (remote == null)
-            debug ("connected to peer");
-          else
-            debug ("connected to peer (%s)", remote);
-
           var connection = (DBusConnection) yield new DBusConnection (stream, null, flags, null, null);
-
-          if (remote == null)
-            debug ("DBus created for connection");
-          else
-            debug ("DBus created for connection (%s)", remote);
 
           prepare_connection (connection);
 
@@ -242,7 +224,6 @@ namespace KademliaDBus
           var key = key_.copy ();
 
           GLib.DBusConnection connection;
-          debug ("creating proxy for peer %s:%s", role, key.to_string ());
 
           while (true)
             {
@@ -250,8 +231,6 @@ namespace KademliaDBus
 
               if (likely (connection != null))
                 {
-                  debug ("using cached connection for peer %s:%s", role, key.to_string ());
-
                   Key key2;
                   string object_path;
 
@@ -281,8 +260,6 @@ namespace KademliaDBus
                 }
               else
                 {
-                  debug ("don't have a cached connection for peer %s:%s", role, key.to_string ());
-
                   GLib.SList<string> addresses;
                   bool found = false;
 
@@ -290,14 +267,11 @@ namespace KademliaDBus
 
                   foreach (unowned var address in addresses) try
                     {
-                      debug ("connecting to peer %s:%s (%s)", role, key.to_string (), address);
                       found = yield connect_to (address, cancellable);
                       break;
                     }
                   catch (GLib.Error e)
                     {
-                      debug (@"$(e.domain): $(e.code): $(e.message)");
-
                       addresses.remove (address);
 
                       if (addresses.length () == 0)
@@ -391,12 +365,6 @@ namespace KademliaDBus
           string? remote = null;
           try { remote = connection.get_remote_address ().to_string (); } catch { }
 
-          if (remote == null)
-
-            debug ("incomming connection");
-          else
-            debug ("incomming connection (%s)", remote);
-
           on_incomming_async.begin ((owned) connection, (owned) remote, null, (o, res) =>
             {
               try { ((Hub) o).on_incomming_async.end (res); } catch (GLib.Error e)
@@ -415,25 +383,11 @@ namespace KademliaDBus
           var guid = (string) DBus.generate_guid ();
           var connection = yield new DBusConnection (stream, guid, flags, null, null);
 
-          if (remote == null)
-
-            debug ("DBus created for connection");
-          else
-            debug ("DBus created for connection (%s)", remote);
-
           prepare_connection (connection, cancellable);
 
           connection.exit_on_close = false;
           connection.on_closed.connect ((c, a, b) => on_closed (c));
           connection.start_message_processing ();
-
-          connection.weak_ref ((o) =>
-            {
-              var c = (SocketConnection) ((DBusConnection) o).stream;
-
-              try { debug ("DBus disposed (%s)", c.get_remote_address ().to_string ()); }
-              catch { debug ("DBus disposed"); }
-            });
 
           return yield register_connection (connection, true, cancellable);
         }

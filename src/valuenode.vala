@@ -44,17 +44,17 @@ namespace KademliaDBus
               this.knowable = false;
             }
 
-          internal void know (Hub hub, Peer peer)
+          internal Key? know (Hub hub, Peer peer)
             {
+              Key? key = null;
+
               if (knowable)
                 {
-                  var key = new Key.verbatim (id);
-
-                  if (Key.equal (key, peer.id)) return;
-
+                  key = new Key.verbatim (id);
                   hub.known_peer (key, addresses);
-                  peer.add_contact (key);
                 }
+
+              return (owned) key;
             }
         }
 

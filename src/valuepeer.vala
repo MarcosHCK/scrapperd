@@ -38,9 +38,10 @@ namespace Kademlia
           throw new IOError.FAILED ("unimplemented");
         }
 
-      public async Value find_value_complete (Key id, GLib.Cancellable? cancellable = null) throws GLib.Error
+      public async Value find_value_complete (Key? from, Key id, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
           GLib.Value? value;
+          if (from != null) add_contact (from);
 
           if ((value = yield value_store.lookup_value (id, cancellable)) != null)
 
@@ -61,8 +62,9 @@ namespace Kademlia
           throw new IOError.FAILED ("unimplemented");
         }
 
-      public async bool store_value_complete (Key id, GLib.Value? value = null, GLib.Cancellable? cancellable = null) throws GLib.Error
+      public async bool store_value_complete (Key? from, Key id, GLib.Value? value = null, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
+          if (from != null) add_contact (from);
           yield value_store.insert_value (id, value, cancellable);
           return true;
         }
@@ -73,7 +75,7 @@ namespace Kademlia
 
       public async bool insert (Key id, GLib.Value? value = null, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
-          var context = (GLib.MainContext) MainContext.get_thread_default ();
+          var context = (GLib.MainContext) MainContext.ref_thread_default ();
           var dones = new uint [ALPHA];
           var errors = new GLib.AsyncQueue<GLib.Error> ();
           var good = new uint [1];
@@ -164,25 +166,25 @@ namespace Kademlia
 
       public async GLib.Value? lookup (Key id, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
-          var context = (MainContext) GLib.MainContext.get_thread_default ();
+          var context = (MainContext) GLib.MainContext.ref_thread_default ();
           var dones = new uint [ALPHA];
           var errors = new GLib.AsyncQueue<GLib.Error> ();
           var left = (uint) 0;
-          var peers = new GLib.AsyncQueue<unowned Key> ();
+          var peers = new GLib.Queue<Key> ();
           var seed = (SList<Key>) nearest (id);
-          var values = new GLib.AsyncQueue<Value> ();
+          var sorter = (CompareDataFunc<Key>) create_sorter (id.copy ());
+          var values = new GLib.Queue<Value> ();
           var visited = new GenericSet<Key> (Key.hash, Key.equal);
           var lvisited = GLib.Mutex ();
 
-          foreach (unowned var key in seed)
+          for (unowned var link = (SList<Key>) seed; link != null; link = link.next)
             {
-              Key id_ = key.copy ();
-
-              peers.push (id_);
-              visited.add ((owned) id_);
+              peers.push_head ((owned) link.data);
             }
 
-          while (values.length_unlocked () == 0 && (left = peers.length_unlocked ()) > 0)
+          peers.sort (sorter);
+
+          while (values.length == 0 && (left = peers.length) > 0)
             {
               for (unowned var i = 0; i < ALPHA; ++i)
                 {
@@ -191,38 +193,39 @@ namespace Kademlia
 
               for (unowned var i = 0; i < uint.min (left, ALPHA); ++i)
                 {
+                  unowned Key peer;
+  
                   lvisited.lock ();
-                  unowned var p = peers.pop_unlocked ();
-                  unowned var k = i;
+                  var k = i;
+                  var p = peers.pop_head ();
+                  peer = p;
 
+                  visited.add ((owned) p);
                   lvisited.unlock ();
-                  AtomicUint.set (ref dones [i], 0);
 
-                  lookup_in_node.begin (p, id, cancellable, (o, res) =>
+                  AtomicUint.set (ref dones [k], 0);
+
+                  lookup_in_node.begin (peer, id, cancellable, (o, res) =>
                     {
-                      Value? value;
+                      Value? value = null;
 
                       try { value = ((ValuePeer) o).lookup_in_node.end (res); } catch (GLib.Error e)
                         {
                           errors.push ((owned) e);
-                          AtomicUint.set (ref dones [k], 1);
-                          return;
                         }
 
-                      if (value != null && value.is_inmediate)
-                        {
-                          values.push ((owned) value);
-                        }
-                      else if (value != null)
+                      if (likely (value != null))
                         {
                           lvisited.lock ();
 
-                          foreach (unowned var peer in value.keys) if (visited.contains (peer) == false)
-                            {
-                              Key id_ = peer.copy ();
+                          if (value.is_inmediate)
 
-                              peers.push (id_);
-                              visited.add ((owned) id_);
+                            values.push_tail ((owned) value);
+                          else
+                            {
+                              foreach (unowned var other in value.keys) if (visited.contains (other) == false)
+
+                                peers.insert_sorted (other.copy (), sorter);
                             }
 
                           lvisited.unlock ();
@@ -248,7 +251,7 @@ namespace Kademlia
                 }
             }
 
-          return values.length_unlocked () == 0 ? null : values.pop_unlocked ().steal_value ();
+          return values.length == 0 ? null : values.pop_head ().steal_value ();
         }
 
       async Value? lookup_in_node (Key peer, Key id, GLib.Cancellable? cancellable = null) throws GLib.Error
