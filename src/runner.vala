@@ -21,6 +21,8 @@ namespace Kademlia
 {
   internal static void runner (GLib.MainContext? context, uint[] dones)
     {
+      context = context ?? MainContext.ref_thread_default ();
+
       var alpha = dones.length;
       var loop = new GLib.MainLoop (context, true);
       var source = new GLib.IdleSource ();

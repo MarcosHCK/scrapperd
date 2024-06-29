@@ -20,7 +20,7 @@ tests = \
     'buckets.vala' : 'Kademlia buckets tests',
     'integration.vala' : 'Kademlia integration tests',
     'key.vala' : 'Kademlia key tests',
-    'peer.vala' : 'Kademlia peer tests',
+    'stress.vala' : 'Kademlia stress tests',
   }
 
 foreach file, description : tests
