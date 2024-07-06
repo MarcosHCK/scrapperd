@@ -35,6 +35,7 @@ namespace Kademlia
   public class Key
     {
       internal KeyVal value;
+
       public unowned uint8[] bytes { get
         {
           unowned var ar = (uint8[]) (void*) & value.bytes [0];
@@ -149,9 +150,7 @@ namespace Kademlia
 
       public static bool equal (Key a, Key b)
         {
-          unowned var a_bytes = (uint8*) & a.value.bytes [0];
-          unowned var b_bytes = (uint8*) & b.value.bytes [0];
-          return (void*) a == (void*) b || 0 == GLib.Memory.cmp (a_bytes, b_bytes, bytelen);
+          return (void*) a == (void*) b || KeyVal.cmp (a.value, b.value);
         }
 
       public static GLib.Type get_type ()
@@ -164,14 +163,7 @@ namespace Kademlia
 
       public static uint hash (Key a)
         {
-          unowned var bytes = (uint8*) & a.value.bytes [0];;
-          unowned uint i, hash;
-
-          for (i = 0, hash = 5381; i < bytelen; ++i)
-            {
-              hash = hash * 33 + bytes [i];
-            }
-          return hash;
+          return a.value.hash ();
         }
 
       public int nth_bit (uint nth) requires (nth >= 0 && nth < KeyVal.BITLEN) ensures (result == 0 || result == 1)
@@ -193,6 +185,13 @@ namespace Kademlia
             }
 
           return builder.free_and_steal ();
+        }
+
+      public static Key xor (Key a, Key b)
+        {
+          var x = new Key ();
+          KeyVal.xor (out x.value, a.value, b.value);
+          return (owned) x;
         }
     }
 

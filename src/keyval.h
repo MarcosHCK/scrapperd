@@ -36,14 +36,19 @@ extern "C" {
 
   #define k_key_val_destroy(val)
 
-  G_STATIC_ASSERT (0 == (K_KEY_VAL_BITLEN & 0x3));
-
   #define k_key_val_nth_bit(val,nth) (G_GNUC_EXTENSION ({ \
  ; \
       const KKeyVal* __val = (val); \
       const gint __nth_ = (nth); \
       const guint __nth = __nth_ > 0 ? __nth_ : K_KEY_VAL_BITLEN + __nth_; \
       (__val->bytes [__nth >> 3] >> (__nth & 0x3)) & 1; \
+    }))
+
+  #define k_key_val_cmp(a,b) (G_GNUC_EXTENSION ({ \
+ ; \
+      const KKeyVal* __a = (a); \
+      const KKeyVal* __b = (b); \
+      (memcmp (__a, __b, sizeof (*__a)) == 0); \
     }))
 
   #define k_key_val_copy(src,dst) (G_GNUC_EXTENSION ({ \
@@ -53,23 +58,31 @@ extern "C" {
       (memcpy (__dst, __src, sizeof (*__dst)), FALSE); \
     }))
 
+  #define k_key_val_hash(val) (G_GNUC_EXTENSION ({ \
+ ; \
+      const KKeyVal* __a = (val); \
+      guint __i, __hash = 5381; \
+      for (__i = 0; __i < (K_KEY_VAL_BITLEN >> 3); ++__i) __hash = (__hash << 5) + __hash + __a->bytes [__i]; \
+      __hash; \
+    }))
+
   static __inline void k_key_val_xor (KKeyVal* d, const KKeyVal* a, const KKeyVal* b)
     {
       guint i;
   #if GLIB_SIZEOF_VOID_P >= 8
       /* 64 bits computer */
       for (i = 0; i < G_N_ELEMENTS (a->quads); ++i)
-        d->quads[i] = a->quads[i] ^ b->quads[i];
+        d->quads [i] = a->quads [i] ^ b->quads [i];
       const int first = G_SIZEOF_MEMBER (KKeyVal, quads);
   #else  // GLIB_SIZEOF_VOID_P < 8
       /* 32 bits computer */
       for (i = 0; i < G_N_ELEMENTS (a->longs); ++i)
-        d->longs[i] = a->longs[i] ^ b->longs[i];
+        d->longs [i] = a->longs [i] ^ b->longs [i];
       const int first = G_SIZEOF_MEMBER (KKeyVal, longs);
   #endif // GLIB_SIZEOF_VOID_P
 
       for (i = first; i < G_N_ELEMENTS (a->bytes); ++i)
-        d->bytes[i] = a->bytes[i] ^ b->bytes[i];
+        d->bytes [i] = a->bytes [i] ^ b->bytes [i];
     }
 
   static const gchar k_key_val_logtable [] =
@@ -94,6 +107,8 @@ extern "C" {
 
   #define _2exp(n) (2<<(((n))-1))
 
+  G_STATIC_ASSERT (0 == (K_KEY_VAL_BITLEN & 0x3));
+  //G_STATIC_ASSERT ((sizeof (KKeyVal) * 8) == K_KEY_VAL_BITLEN);
   G_STATIC_ASSERT (_2exp (sizeof (gchar) << 3) == G_N_ELEMENTS (k_key_val_logtable));
   #undef _2exp
 
@@ -101,15 +116,15 @@ extern "C" {
     {
       KKeyVal xor;
       guint8 c;
-      guint i, l;
+      guint i;
 
       k_key_val_xor (&xor, a, b);
 
-      for (i = 0; i < (l = K_KEY_VAL_BITLEN >> 3); ++i)
+      for (i = 1; i < 1 + (K_KEY_VAL_BITLEN >> 3); ++i)
         {
-          if ((c = xor.bytes [i]) > 0)
+          if ((c = xor.bytes [i - 1]) != 0)
 
-            return ((l - (i + 1)) << 3) + k_key_val_logtable [c];
+            return (K_KEY_VAL_BITLEN - (i << 3)) + k_key_val_logtable [c];
         }
       return -1; /* equals */
     }

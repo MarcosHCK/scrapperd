@@ -28,11 +28,6 @@ namespace Kademlia
           Object (id : id, value_store : value_store);
         }
 
-      static int compare_key (Key? a, Key? b)
-        {
-          return Key.equal (a, b) ? 0 : 1;
-        }
-
       protected virtual async Value find_value (Key peer, Key id, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
           throw new IOError.FAILED ("unimplemented");
@@ -49,10 +44,10 @@ namespace Kademlia
           else
             {
               var ni = (SList<Key>) nearest (id);
-              var ar = (Key[]) new Key [ni.length () - (ni.find_custom (this.id, compare_key) == null ? 0 : 1)];
+              var ar = (Key[]) new Key [ni.length ()];
               int i = 0;
 
-              foreach (unowned var n in ni) if (Key.equal (n, this.id) == false) ar [i++] = n.copy ();
+              foreach (unowned var n in ni) ar [i++] = n.copy ();
               return new Value.delegated ((owned) ar);
             }
         }
@@ -68,10 +63,6 @@ namespace Kademlia
           yield value_store.insert_value (id, value, cancellable);
           return true;
         }
-
-      [CCode (cheader_filename = "glib.h", cname = "g_atomic_int_or")]
-
-      static extern uint _g_atomic_int_or ([CCode (type = "volatile guint *")] ref uint atomic, uint val);
 
       public async bool insert (Key id, GLib.Value? value = null, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
@@ -109,8 +100,10 @@ namespace Kademlia
                       errors.push ((owned) e);
                     }
 
-                  _g_atomic_int_or (ref good [0], result ? 1 : 0);
-                  GLib.AtomicUint.set (ref dones [p], 1);
+                  if (result)
+
+                    GLib.AtomicUint.inc (ref good [0]);
+                    GLib.AtomicUint.set (ref dones [p], 1);
                 });
             }
 

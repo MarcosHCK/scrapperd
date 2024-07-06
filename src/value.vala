@@ -51,7 +51,10 @@ namespace Kademlia
 
       public GLib.Value? steal_value ()
         {
-          return (owned) _value;
+          //return (owned) _value;
+          var o = GLib.Value (_value.type ());
+          _value.copy (ref o);
+          return (owned) o;
         }
 
       extern void free ();
