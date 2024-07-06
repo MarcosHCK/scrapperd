@@ -78,7 +78,7 @@ namespace Kademlia.DBus
           if (knowable)
             {
               id = new Key.verbatim (this.id.value);
-              hub.add_contact (id, addresses);
+              hub.add_contact_addresses (id, addresses);
             }
           return (owned) id;
         }

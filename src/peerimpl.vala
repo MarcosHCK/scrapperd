@@ -21,7 +21,8 @@ namespace Kademlia.DBus
 {
   public class PeerImpl : ValuePeer
     {
-      public Hub hub { get; construct; }
+      private WeakRef _hub;
+      public Hub hub { owned get { return (Hub) _hub.get (); } internal set { _hub.set (value); } }
 
       construct
         {
@@ -30,9 +31,9 @@ namespace Kademlia.DBus
           staled_contact.connect ((k) => debug ("staled contact %s:(%s)", k.to_string (), id.to_string ()));
         }
 
-      public PeerImpl (Hub hub, ValueStore value_store, Key? id = null)
+      public PeerImpl (ValueStore value_store, Key? id = null)
         {
-          Object (hub : hub, id : id, value_store : value_store);
+          base (value_store, id);
         }
 
       protected virtual PeerRef get_self ()
@@ -40,17 +41,20 @@ namespace Kademlia.DBus
           return PeerRef (id.bytes, hub.list_local_addresses ());
         }
 
-      protected override async Key[] find_peer (Key peer, Key id, GLib.Cancellable? cancellable = null) throws GLib.Error
+      protected override async Key[] find_peer (Key peer, Key id, GLib.Cancellable? cancellable = null) throws GLib.Error requires (_hub.get () != null)
         {
+          var hub = this.hub;
           var role = yield hub.lookup_role (peer, cancellable);
           var refs = yield role.find_node (get_self (), KeyRef (id.bytes), cancellable);
           var ar = new Key [refs.length];
           for (int i = 0; i < ar.length; ++i) ar [i] = new Key.verbatim (refs [i].id.value);
+          for (int i = 0; i < ar.length; ++i) if (refs [i].knowable) hub.add_contact_addresses (ar [i], refs [i].addresses);
           return (owned) ar;
         }
 
-      protected override async Value find_value (Key peer, Key id, GLib.Cancellable? cancellable = null) throws GLib.Error
+      protected override async Value find_value (Key peer, Key id, GLib.Cancellable? cancellable = null) throws GLib.Error requires (_hub.get () != null)
         {
+          var hub = this.hub;
           var role = yield hub.lookup_role (peer, cancellable);
           var value = yield role.find_value (get_self (), KeyRef (id.bytes), cancellable);
 
@@ -61,18 +65,19 @@ namespace Kademlia.DBus
             {
               var ar = new Key [value.others.length];
               for (int i = 0; i < ar.length; ++i) ar [i] = new Key.verbatim (value.others [i].id.value);
+              for (int i = 0; i < ar.length; ++i) if (value.others [i].knowable) hub.add_contact_addresses (ar [i], value.others [i].addresses);
               return new Kademlia.Value.delegated ((owned) ar);
             }
         }
 
-      protected override async bool store_value (Key peer, Key key, GLib.Value? value = null, GLib.Cancellable? cancellable = null) throws GLib.Error
+      protected override async bool store_value (Key peer, Key key, GLib.Value? value = null, GLib.Cancellable? cancellable = null) throws GLib.Error requires (_hub.get () != null)
         {
           var role = yield hub.lookup_role (peer, cancellable);
           var result = yield role.store (get_self (), KeyRef (key.bytes), ValueRef.nat2net (value), cancellable);
           return result;
         }
 
-      protected override async bool ping_peer (Key peer, GLib.Cancellable? cancellable = null) throws GLib.Error
+      protected override async bool ping_peer (Key peer, GLib.Cancellable? cancellable = null) throws GLib.Error requires (_hub.get () != null)
         {
           var role = yield hub.lookup_role (peer, cancellable);
           var result = yield role.ping (get_self (), cancellable);

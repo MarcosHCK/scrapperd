@@ -55,10 +55,10 @@ namespace Testing
 
   public interface PeerProvider : GLib.Object
     {
-      public abstract GLib.List<ValuePeer> list_peers ();
+      public abstract GLib.List<unowned ValuePeer> list_peers ();
       public abstract GLib.List<unowned Key> list_peers_id ();
-      public abstract ValuePeer pick (Key key);
-      public abstract ValuePeer pick_any ();
+      public abstract async ValuePeer pick (Key key);
+      public abstract async ValuePeer pick_any ();
     }
 
   public abstract class TestIntegrationBase : AsyncTest
@@ -115,7 +115,7 @@ namespace Testing
 
           foreach (unowned var k in indices)
             {
-              var peer = net.pick (peers [k]);
+              var peer = yield net.pick (peers [k]);
 
               timer.start ();
 
@@ -141,8 +141,7 @@ namespace Testing
       protected override async void test ()
         {
           yield base.test ();
-          var keys = net.list_peers_id ();
-          var peer = net.pick (keys.nth_data (GLib.Random.int_range (0, (int32) keys.length ())));
+          var peer = yield net.pick_any ();
           var ns = GLib.Random.int_range (100, 1000);
 
           var average = (double) 0;
@@ -179,8 +178,7 @@ namespace Testing
       protected override async void test ()
         {
           yield base.test ();
-          var keys = net.list_peers_id ();
-          var peer = net.pick (keys.nth_data (GLib.Random.int_range (0, (int32) keys.length ())));
+          var peer = yield net.pick_any ();
           var ns = GLib.Random.int_range (100, 1000);
 
           var values = new HashTable<Key, uint> (Key.hash, Key.equal);
@@ -249,8 +247,7 @@ namespace Testing
       protected override async void test ()
         {
           yield base.test ();
-          var keys = net.list_peers_id ();
-          var peer = net.pick (keys.nth_data (GLib.Random.int_range (0, (int32) keys.length ())));
+          var peer = yield net.pick_any ();
           var ns = GLib.Random.int_range (100, 1000);
 
           var average = (double) 0;

@@ -39,43 +39,52 @@ namespace Testing
             {
               var id = new Key.random ();
               var value_store = new DummyValueStore ();
-              var value_peer = new PeerImpl (this, value_store, id);
-              var node = new NodeSkeleton (this);
-              var role = new RoleSkeleton (this, "testing", value_peer);
+              var value_peer = new PeerImpl (value_store, id);
 
-              add_contact (id, new Address [0]);
-              add_contact_complete (id, node, role);
+              add_local_peer ("testing", value_peer);
             }
         }
 
-      public GLib.List<ValuePeer> list_peers ()
+      public GLib.List<unowned ValuePeer> list_peers ()
         {
-          var list = new GLib.List<ValuePeer> ();
+          var list = new GLib.List<unowned ValuePeer> ();
 
-          foreach (unowned var role in roles.get_values ())
+          foreach (unowned var local in locals.get_values ())
 
-            list.append (((RoleSkeleton) role).value_peer);
+            list.append (local.peer);
 
           return (owned) list;
         }
 
       public GLib.List<unowned Key> list_peers_id ()
         {
-          return roles.get_keys ();
+          return locals.get_keys ();
         }
 
-      public ValuePeer pick (Key id)
+      public async ValuePeer pick (Key id)
         {
-          var role = roles.lookup (id); assert (role != null);
+          Role? role = null;
+
+          try { role = yield lookup_role (id); assert (role != null && role is RoleSkeleton); } catch (GLib.Error e)
+            {
+              assert_no_error (e);
+            }
+
           return ((RoleSkeleton) role).value_peer;
         }
 
-      public ValuePeer pick_any () requires (roles.length > 0)
+      public async ValuePeer pick_any () requires (roles.length > 0)
         {
-          var iter = HashTableIter<Key, Role> (roles);
-          var role = (Role?) null;
-          iter.next (null, out role);
-          return ((RoleSkeleton) role).value_peer;
+          try { return yield create_proxy ("testing"); } catch (GLib.Error e)
+            {
+              assert_no_error (e);
+              assert_not_reached ();
+            }
+        }
+
+      public override async bool reconnect (Key id, GLib.Cancellable? cancellable = null) throws GLib.Error
+        {
+          throw new PeerError.UNREACHABLE ("can not reach node '%s'", id.to_string ());
         }
     }
 }

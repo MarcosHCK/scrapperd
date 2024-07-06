@@ -19,22 +19,38 @@
 
 namespace Kademlia.DBus
 {
-  public class Hub : GLib.Object
+  public abstract class Hub : GLib.Object
     {
       public GenericSet<Address?> addresses { get; construct; }
       public GLib.HashTable<Key, GenericSet<Address?>> contacts { get; construct; }
-      public GLib.HashTable<Key, Node> nodes { get; construct; }
+      public GLib.HashTable<Key, Local?> locals { get; construct; }
       public GLib.HashTable<Key, Role> roles { get; construct; }
+
+      public struct Local
+        {
+          public string role;
+          public PeerImpl peer;
+
+          public Local (string role, PeerImpl peer)
+            {
+              this.role = role;
+              this.peer = peer;
+            }
+        }
+
+      [CCode (scope = "notified")]
+
+      public delegate void ForeachLocalFunc (Key id, string role, PeerImpl peer) throws GLib.Error;
 
       construct
         {
           addresses = new GenericSet<Address?> (Address.hash, Address.equal);
           contacts = new HashTable<Key, GenericSet<Address?>> (Key.hash, Key.equal);
-          nodes = new HashTable<Key, Node> (Key.hash, Key.equal);
+          locals = new HashTable<Key, Local?> (Key.hash, Key.equal);
           roles = new HashTable<Key, Role> (Key.hash, Key.equal);
         }
 
-      public virtual void add_contact (Key id, Address[] addresses)
+      public virtual void add_contact_addresses (Key id, Address[] addresses)
         {
           lock (contacts)
             {
@@ -57,33 +73,82 @@ namespace Kademlia.DBus
             }
         }
 
-      protected void add_contact_complete (Key id, Node node, Role role)
+      protected void add_contact_role (Key id, Role role)
         {
-          lock (contacts)
-            {
-              lock (nodes) nodes.insert (id.copy (), node);
-              lock (roles) roles.insert (id.copy (), role);
-            }
+          lock (contacts) lock (roles) roles.insert (id.copy (), role);
+        }
+
+      public void add_local_address (string address, uint16 port)
+        {
+          lock (addresses) addresses.add (Address (address, port));
+        }
+
+      public void add_local_peer (string role, PeerImpl peer) requires (peer.hub == null)
+        {
+          lock (locals) locals.insert (peer.id.copy (), Local (role, peer));
+          peer.hub = this;
+
+          debug ("exposing peer %s", peer.id.to_string ());
+        }
+
+      public async ValuePeer create_proxy (string role, GLib.Cancellable? cancellable = null) throws GLib.Error
+        {
+          var proxy = new PeerImplProxy (this, role);
+          foreach (unowned var id in roles.get_keys ()) yield proxy.join (id, cancellable);
+          return proxy;
         }
 
       public void drop_all (Key id)
         {
-          lock (contacts) lock (nodes) lock (roles)
+          lock (contacts) lock (roles)
             {
               contacts.remove_all ();
-              nodes.remove_all ();
               roles.remove_all ();
             }
         }
 
       public void drop_contact (Key id)
         {
-          lock (contacts) lock (nodes) lock (roles)
+          lock (contacts) lock (roles)
             {
               contacts.remove (id);
-              nodes.remove (id);
               roles.remove (id);
             }
+        }
+
+      protected void drop_contact_address (Key id, Address? address)
+        {
+          GenericSet<Address?> addresses;
+
+          lock (contacts) if ((addresses = contacts.lookup (id)) != null)
+            {
+              addresses.remove (address);
+              if (addresses.length == 0) contacts.remove (id);
+            }
+        }
+
+      public void foreach_local (owned ForeachLocalFunc callback) throws GLib.Error
+        {
+          lock (locals)
+            {
+              var iter = HashTableIter<Key, Local?> (locals);
+              unowned Key? id;
+              unowned Local? local;
+
+              while (iter.next (out id, out local)) callback (id, local.role, local.peer);
+            }
+        }
+
+      public async bool join (Key id, string role, GLib.Cancellable? cancellable = null) throws GLib.Error
+        {
+          var any = 0;
+
+          lock (locals) foreach (unowned var local in locals.get_values ()) if (local.role == role)
+            {
+              any += (yield local.peer.join (id, cancellable)) ? 1 : 0;
+            }
+
+          return any > 0;
         }
 
       public Address[] list_local_addresses ()
@@ -105,15 +170,15 @@ namespace Kademlia.DBus
 
       public KeyRef[] list_local_ids ()
         {
-          lock (roles)
+          lock (locals)
             {
               var ar = new Array<KeyRef> ();
-              var iter = HashTableIter<Key, Role> (roles);
-              var role = (Role?) null;
+              var iter = HashTableIter<Key, Local?> (locals);
+              unowned Local? local;
 
-              while (iter.next (null, out role)) if (role is RoleSkeleton)
+              while (iter.next (null, out local))
 
-                ar.append_val (KeyRef (role.id.value));
+                ar.append_val (KeyRef (local.peer.id.bytes));
 
               return ar.steal ();
             }
@@ -140,28 +205,54 @@ namespace Kademlia.DBus
           return new Address [0];
         }
 
-      public async Node lookup_node (Key key, GLib.Cancellable? cancellable = null) throws GLib.Error
-        {
-          Node? node;
-          lock (nodes) node = nodes.lookup (key);
-
-          if (unlikely (node != null))
-
-            return node;
-          else
-            throw new PeerError.UNREACHABLE ("can not reach node %s", key.to_string ());
-        }
-
-      public async Role lookup_role (Key key, GLib.Cancellable? cancellable = null) throws GLib.Error
+      public async Role lookup_role (Key id, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
           Role? role;
-          lock (roles) role = roles.lookup (key);
+          Local? local;
 
-          if (unlikely (role != null))
+          while (true)
+            {
+              lock (roles) role = roles.lookup (id);
 
-            return role;
-          else
-            throw new PeerError.UNREACHABLE ("can not reach node %s", key.to_string ());
+              if (unlikely (role != null))
+
+                return role;
+              else
+                {
+                  lock (locals) local = locals.lookup (id);
+
+                  if (likely (local != null))
+                    {
+                      add_contact_role (id, new RoleSkeleton (this, local.role, local.peer));
+                      continue;
+                    }
+                  else while (false == yield reconnect (id, cancellable))
+                    {
+                      GLib.Thread.yield ();
+                      continue;
+                    }
+                }
+            }
+        }
+
+      public abstract async bool reconnect (Key id, GLib.Cancellable? cancellable = null) throws GLib.Error;
+
+      public void remove_local_peer (Key id)
+        {
+          Local? local = null;
+
+          lock (locals) locals.steal_extended (id, null, out local);
+          if (local != null) local.peer.hub = null;
+        }
+
+      public Address? pick_contact_address (Key id)
+        {
+          lock (contacts)
+            {
+              var addresses = contacts.lookup (id);
+              var iter = addresses == null ? (GenericSetIter<Address?>?) null : addresses.iterator ();
+              return iter == null ? null : iter.next_value ();
+            }
         }
     }
 }

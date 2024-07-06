@@ -23,6 +23,7 @@ namespace Kademlia.DBus
 
   public interface Node : GLib.Object
     {
+      public const string BASE_PATH = "/org/hck/Kademlia";
       [DBus (name = "ListAddresses")] public abstract async Address[] list_addresses (GLib.Cancellable? cancellable = null) throws GLib.Error;
       [DBus (name = "ListIds")] public abstract async KeyRef[] list_ids (GLib.Cancellable? cancellable = null) throws GLib.Error;
     }

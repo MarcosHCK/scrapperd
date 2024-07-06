@@ -63,9 +63,11 @@ libkademlia_dbus = library \
     sources :
       [
         'hub.vala',
+        'networkhub.vala',
         'node.vala',
         'nodeskeleton.vala',
         'peerimpl.vala',
+        'peerimplproxy.vala',
         'refs.vala',
       ],
   )

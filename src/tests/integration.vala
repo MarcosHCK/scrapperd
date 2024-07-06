@@ -48,15 +48,9 @@ namespace Testing
             }
         }
 
-      public GLib.List<ValuePeer> list_peers ()
+      public GLib.List<unowned ValuePeer> list_peers ()
         {
-          var list = new GLib.List<ValuePeer> ();
-
-          foreach (unowned var peer in table.get_values ())
-
-            list.append (peer);
-
-          return (owned) list;
+          return table.get_values ();
         }
 
       public GLib.List<unowned Key> list_peers_id ()
@@ -64,13 +58,13 @@ namespace Testing
           return table.get_keys ();
         }
 
-      public ValuePeer pick (Key id)
+      public async ValuePeer pick (Key id)
         {
           var peer = table.lookup (id); assert (peer != null);
           return (owned) peer;
         }
 
-      public ValuePeer pick_any () requires (table.length > 0)
+      public async ValuePeer pick_any () requires (table.length > 0)
         {
           var iter = HashTableIter<Key, ValuePeer> (table);
           var peer = (ValuePeer?) null;
@@ -89,11 +83,11 @@ namespace Testing
           this.net = net;
         }
 
-      ValuePeer getother (Key peer) throws GLib.Error
+      async ValuePeer getother (Key peer) throws GLib.Error
         {
           ValuePeer other;
 
-          if ((other = net.pick (peer)) == null)
+          if ((other = yield net.pick (peer)) == null)
 
             throw new PeerError.UNREACHABLE ("no node in net with id (%s)", peer.to_string ());
 
@@ -102,7 +96,7 @@ namespace Testing
 
       protected async override Key[] find_peer (Key peer, Key id, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
-          var other = getother (peer);
+          var other = yield getother (peer);
           var peers = yield other.find_peer_complete (this.id, id, cancellable);
 
           foreach (unowned var peer_ in peers)
@@ -114,7 +108,7 @@ namespace Testing
 
       protected async override Kademlia.Value find_value (Key peer, Key id, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
-          var other = getother (peer);
+          var other = yield getother (peer);
           var value = yield other.find_value_complete (this.id, id, cancellable);
 
           if (value.is_delegated)
@@ -128,13 +122,13 @@ namespace Testing
 
       protected async override bool store_value (Key peer, Key id, GLib.Value? value = null, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
-          var other = getother (peer);
+          var other = yield getother (peer);
           return yield other.store_value_complete (this.id, id, value, cancellable);
         }
 
       protected async override bool ping_peer (Key peer, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
-          var other = getother (peer);
+          var other = yield getother (peer);
           return yield other.ping_peer_complete (this.id, cancellable);
         }
     }

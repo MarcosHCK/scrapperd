@@ -21,11 +21,11 @@ namespace ScrapperD
 {
   public abstract class Application : GLib.Application
     {
-      public Kademlia.DBus.Hub hub { get; private construct; }
+      public Kademlia.DBus.NetworkHub hub { get; private construct; }
 
       construct
         {
-          hub = new Kademlia.DBus.Hub ();
+          hub = new Kademlia.DBus.NetworkHub ();
           add_main_option ("address", 'a', 0, GLib.OptionArg.STRING_ARRAY, "Address of entry node", "ADDRESS");
           add_main_option ("port", 'p', 0, GLib.OptionArg.INT, "Port where to listen for peer hails", "PORT");
           add_main_option ("public", 0, 0, GLib.OptionArg.STRING_ARRAY, "Public addresses to publish", "ADDRESS");
@@ -63,7 +63,7 @@ namespace ScrapperD
 
               var addresses = new GLib.SList<string> ();
               var entries = new GLib.SList<string> ();
-              var port = (uint16) 0;//Kademlia.DBus.Hub.DEFAULT_PORT;
+              var port = (uint16) Kademlia.DBus.NetworkHub.DEFAULT_PORT;
 
               if (options.lookup ("address", "as", out iter)) while (iter.next ("s", out option_s))
                 {
@@ -89,19 +89,56 @@ namespace ScrapperD
                   addresses.prepend ((owned) option_s);
                 }
 
+              try { yield hub.add_local_address ("localhost", port, cancellable); } catch (GLib.Error e)
+                {
+                  good = false;
+                  cmdline.printerr ("can not listen on localhost: %s: %u: %s\n", e.domain.to_string (), e.code, e.message);
+                  cmdline.set_exit_status (1);
+                  break;
+                }
+
+              foreach (unowned var address in addresses) try { yield hub.add_local_address (address, port, cancellable); } catch (GLib.Error e)
+                {
+                  good = false;
+                  cmdline.printerr ("can not listen on localhost: %s: %u: %s\n", e.domain.to_string (), e.code, e.message);
+                  cmdline.set_exit_status (1);
+                  break;
+                }
+
+              if (unlikely (good == false)) break;
+
+              try { yield register_peers (); } catch (GLib.Error e)
+                {
+                  good = false;
+                  cmdline.printerr ("can not register peers: %s: %u: %s\n", e.domain.to_string (), e.code, e.message);
+                  cmdline.set_exit_status (1);
+                  break;
+                }
+
+              var default_port = Kademlia.DBus.NetworkHub.DEFAULT_PORT;
+
+              foreach (unowned var host_and_port in entries) try { yield hub.join_at (host_and_port, default_port, null, cancellable); } catch (GLib.Error e)
+                {
+                  var address = host_and_port;
+                  try { address = GLib.NetworkAddress.parse (host_and_port, default_port).to_string (); } catch (GLib.Error e) { }
+
+                  good = false;
+                  cmdline.printerr ("can not join to network (%s): %s: %u: %s\n", address, e.domain.to_string (), e.code, e.message);
+                  cmdline.set_exit_status (1);
+                  break;
+                }
+
               if (unlikely (good == false)) break;
 
               hold ();
+              hub.start ();
               break;
             }
 
           return good;
         }
 
-      protected virtual async bool register_on_hub_async () throws GLib.Error
-        {
-          return true;
-        }
+      protected virtual async void register_peers () throws GLib.Error { }
 
       public override int handle_local_options (GLib.VariantDict options)
         {
