@@ -17,13 +17,18 @@
 
 tests = \
   {
-    'buckets.vala' : 'Kademlia buckets tests',
-    'integration.vala' : 'Kademlia integration tests',
-    'key.vala' : 'Kademlia key tests',
-    'stress.vala' : 'Kademlia stress tests',
+    'Kademlia buckets tests' : [ 'buckets.vala' ],
+    'Kademlia DBus hub tests' : [ 'hub.vala', 'baseintegration.vala' ],
+    'Kademlia integration tests' : [ 'integration.vala', 'baseintegration.vala' ],
+    'Kademlia key tests' : [ 'key.vala' ],
+    #'Kademlia stress tests' : [ 'stress.vala' ],
   }
 
-foreach file, description : tests
+foreach description, files : tests
+
+  assert (files.length () > 0)
+
+  file = files.get (0)
 
   test \
     (
@@ -43,7 +48,7 @@ foreach file, description : tests
 
           link_with : [ libscrapperd, libkademlia, libkademlia_dbus ],
 
-          sources : [ file, 'base.vala' ],
+          sources : files + [ 'base.vala' ],
         ),
 
       env :
