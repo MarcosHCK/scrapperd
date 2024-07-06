@@ -36,6 +36,20 @@ namespace Kademlia.DBus
           base (value_store, id);
         }
 
+      private void @catch (Key peer, owned GLib.IOError? e) throws GLib.Error
+        {
+          switch (e.code)
+            {
+              case GLib.IOError.CLOSED:
+              case GLib.IOError.CONNECTION_CLOSED:
+
+                hub.drop_role (peer);
+                break;
+
+              default: throw (owned) e;
+            }
+        }
+
       protected virtual PeerRef get_self ()
         {
           return PeerRef (id.bytes, hub.list_local_addresses ());
@@ -43,45 +57,73 @@ namespace Kademlia.DBus
 
       protected override async Key[] find_peer (Key peer, Key id, GLib.Cancellable? cancellable = null) throws GLib.Error requires (_hub.get () != null)
         {
-          var hub = this.hub;
-          var role = yield hub.lookup_role (peer, cancellable);
-          var refs = yield role.find_node (get_self (), KeyRef (id.bytes), cancellable);
-          var ar = new Key [refs.length];
-          for (int i = 0; i < ar.length; ++i) ar [i] = new Key.verbatim (refs [i].id.value);
-          for (int i = 0; i < ar.length; ++i) if (refs [i].knowable) hub.add_contact_addresses (ar [i], refs [i].addresses);
-          return (owned) ar;
+          while (true) try
+            {
+              var hub = this.hub;
+              var role = yield hub.lookup_role (peer, cancellable);
+              var refs = yield role.find_node (get_self (), KeyRef (id.bytes), cancellable);
+              var ar = new Key [refs.length];
+              for (int i = 0; i < ar.length; ++i) ar [i] = new Key.verbatim (refs [i].id.value);
+              for (int i = 0; i < ar.length; ++i) if (refs [i].knowable) hub.add_contact_addresses (ar [i], refs [i].addresses);
+              return (owned) ar;
+            }
+          catch (GLib.IOError e)
+            {
+              @catch (peer, (owned) e);
+            }
         }
 
       protected override async Value find_value (Key peer, Key id, GLib.Cancellable? cancellable = null) throws GLib.Error requires (_hub.get () != null)
         {
-          var hub = this.hub;
-          var role = yield hub.lookup_role (peer, cancellable);
-          var value = yield role.find_value (get_self (), KeyRef (id.bytes), cancellable);
-
-          if (value.found)
-
-            return new Kademlia.Value.inmediate (value.get_value ());
-          else
+          while (true) try
             {
-              var ar = new Key [value.others.length];
-              for (int i = 0; i < ar.length; ++i) ar [i] = new Key.verbatim (value.others [i].id.value);
-              for (int i = 0; i < ar.length; ++i) if (value.others [i].knowable) hub.add_contact_addresses (ar [i], value.others [i].addresses);
-              return new Kademlia.Value.delegated ((owned) ar);
+              var hub = this.hub;
+              var role = yield hub.lookup_role (peer, cancellable);
+              var value = yield role.find_value (get_self (), KeyRef (id.bytes), cancellable);
+
+              if (value.found)
+
+                return new Kademlia.Value.inmediate (value.get_value ());
+              else
+                {
+                  var ar = new Key [value.others.length];
+                  for (int i = 0; i < ar.length; ++i) ar [i] = new Key.verbatim (value.others [i].id.value);
+                  for (int i = 0; i < ar.length; ++i) if (value.others [i].knowable) hub.add_contact_addresses (ar [i], value.others [i].addresses);
+                  return new Kademlia.Value.delegated ((owned) ar);
+                }
+            }
+          catch (GLib.IOError e)
+            {
+              @catch (peer, (owned) e);
             }
         }
 
       protected override async bool store_value (Key peer, Key key, GLib.Value? value = null, GLib.Cancellable? cancellable = null) throws GLib.Error requires (_hub.get () != null)
         {
-          var role = yield hub.lookup_role (peer, cancellable);
-          var result = yield role.store (get_self (), KeyRef (key.bytes), ValueRef.nat2net (value), cancellable);
-          return result;
+          while (true) try
+            {
+              var role = yield hub.lookup_role (peer, cancellable);
+              var result = yield role.store (get_self (), KeyRef (key.bytes), ValueRef.nat2net (value), cancellable);
+              return result;
+            }
+          catch (GLib.IOError e)
+            {
+              @catch (peer, (owned) e);
+            }
         }
 
       protected override async bool ping_peer (Key peer, GLib.Cancellable? cancellable = null) throws GLib.Error requires (_hub.get () != null)
         {
-          var role = yield hub.lookup_role (peer, cancellable);
-          var result = yield role.ping (get_self (), cancellable);
-          return result;
+          while (true) try
+            {
+              var role = yield hub.lookup_role (peer, cancellable);
+              var result = yield role.ping (get_self (), cancellable);
+              return result;
+            }
+          catch (GLib.IOError e)
+            {
+              @catch (peer, (owned) e);
+            }
         }
     }
 }

@@ -25,6 +25,7 @@ namespace ScrapperD.Scrapper
     {
       private Scrapper? scrapper = null;
       private Store? store = null;
+      private Object? store_proxy = null;
 
       construct
         {
@@ -50,13 +51,15 @@ namespace ScrapperD.Scrapper
               assert (store != null);
               bool first = true;
 
-              try { store.store_peer = yield hub.create_proxy ("storage", cancellable); } catch (GLib.Error e)
+              try { store_proxy = yield hub.create_proxy ("storage", cancellable); } catch (GLib.Error e)
                 {
                   good = false;
                   cmdline.printerr ("can not connect to network: %s: %u: %s", e.domain.to_string (), e.code, e.message);
                   cmdline.set_exit_status (1);
                   return false;
                 }
+
+              store.store_peer = (Kademlia.ValuePeer) store_proxy;
 
               foreach (unowned var uri_string in cmdline.get_arguments ()) if (first) first = false; else try
                 {

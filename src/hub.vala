@@ -116,6 +116,11 @@ namespace Kademlia.DBus
             }
         }
 
+      public void drop_role (Key id)
+        {
+          lock (roles) roles.remove (id);
+        }
+
       protected void drop_contact_address (Key id, Address? address)
         {
           GenericSet<Address?> addresses;
