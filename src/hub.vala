@@ -88,7 +88,7 @@ namespace Kademlia.DBus
           lock (locals) locals.insert (peer.id.copy (), Local (role, peer));
           peer.hub = this;
 
-          debug ("exposing peer %s", peer.id.to_string ());
+          debug ("exposing peer %s:%s", role, peer.id.to_string ());
         }
 
       public async ValuePeer create_proxy (string role, GLib.Cancellable? cancellable = null) throws GLib.Error

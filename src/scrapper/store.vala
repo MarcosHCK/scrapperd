@@ -23,14 +23,14 @@ namespace ScrapperD.Scrapper
   public class Store : GLib.Object, ValueStore
     {
       public Scrapper scrapper { get; construct; }
-      public ValuePeer store_peer { get; construct; }
-
       private WeakRef _scrapper_peer;
       public ValuePeer scrapper_peer { owned get { return (ValuePeer) _scrapper_peer.get (); } set { _scrapper_peer.set (value); } }
+      private WeakRef _store_peer;
+      public ValuePeer store_peer { owned get { return (ValuePeer) _store_peer.get (); } set { _store_peer.set (value); } }
 
-      public Store (Scrapper scrapper, ValuePeer store_peer)
+      public Store (Scrapper scrapper)
         {
-          Object (scrapper : scrapper, store_peer : store_peer);
+          Object (scrapper : scrapper);
         }
 
       private async void scrap_and_save (owned Key id, GLib.Uri uri, GLib.Bytes? other) throws GLib.Error

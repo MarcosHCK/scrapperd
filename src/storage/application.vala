@@ -14,7 +14,6 @@
  * You should have received a copy of the GNU General Public License
  * along with ScrapperD. If not, see <http://www.gnu.org/licenses/>.
  */
-using KademliaDBus;
 
 [CCode (cprefix = "ScrapperdStorage", lower_case_cprefix = "scrapperd_storage_")]
 
@@ -35,10 +34,9 @@ namespace ScrapperD.Storage
           return (new Application ()).run (argv);
         }
 
-      protected override async bool register_on_hub_async () throws GLib.Error
+      protected override async void register_peers () throws GLib.Error
         {
-          hub.add_peer (new PeerImpl ("storage", new Store ()));
-          return true;
+          hub.add_local_peer ("storage", new Kademlia.DBus.PeerImpl (new Store ()));
         }
     } 
 }

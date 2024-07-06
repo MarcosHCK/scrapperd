@@ -14,7 +14,6 @@
  * You should have received a copy of the GNU General Public License
  * along with ScrapperD. If not, see <http://www.gnu.org/licenses/>.
  */
-using KademliaDBus;
 
 [CCode (cprefix = "ScrapperdScrapper", lower_case_cprefix = "scrapperd_scrapper_")]
 
@@ -51,6 +50,14 @@ namespace ScrapperD.Scrapper
               assert (store != null);
               bool first = true;
 
+              try { store.store_peer = yield hub.create_proxy ("storage", cancellable); } catch (GLib.Error e)
+                {
+                  good = false;
+                  cmdline.printerr ("can not connect to network: %s: %u: %s", e.domain.to_string (), e.code, e.message);
+                  cmdline.set_exit_status (1);
+                  return false;
+                }
+
               foreach (unowned var uri_string in cmdline.get_arguments ()) if (first) first = false; else try
                 {
                   var value = (string?) null;
@@ -59,24 +66,16 @@ namespace ScrapperD.Scrapper
 
                   try { yield store.insert_value (id, new Bytes (value.data), cancellable); } catch (GLib.Error e)
                     {
-                      unowned var code = e.code;
-                      unowned var domain = e.domain.to_string ();
-                      unowned var message = e.message.to_string ();
-
                       good = false;
-                      cmdline.printerr ("can not scrap uri: %s: %u: %s", domain, code, message);
+                      cmdline.printerr ("can not scrap uri: %s: %u: %s", e.domain.to_string (), e.code, e.message);
                       cmdline.set_exit_status (1);
                       break;
                     }
                 }
               catch (GLib.UriError e)
                 {
-                  unowned var code = e.code;
-                  unowned var domain = e.domain.to_string ();
-                  unowned var message = e.message.to_string ();
-
                   good = false;
-                  cmdline.printerr ("can not parse uri '%s': %s: %u: %s", uri_string, domain, code, message);
+                  cmdline.printerr ("can not parse uri '%s': %s: %u: %s", uri_string, e.domain.to_string (), e.code, e.message);
                   cmdline.set_exit_status (1);
                   break;
                 }
@@ -85,15 +84,13 @@ namespace ScrapperD.Scrapper
           return good;
         }
 
-      protected override async bool register_on_hub_async () throws GLib.Error
+      protected override async void register_peers () throws GLib.Error
         {
-          var store_peer = new PeerImplProxy ("storage");
-          var scrapper_peer = new PeerImpl ("scrapper", store = new Store (scrapper, store_peer));
+          var value_store = new Store (scrapper);
+          var scrapper_peer = new Kademlia.DBus.PeerImpl (value_store);
 
-          hub.add_peer (store_peer);
-          hub.add_peer (scrapper_peer);
-          store.scrapper_peer = scrapper_peer;
-          return true;
+          hub.add_local_peer ("scrapper", scrapper_peer);
+          (store = value_store).scrapper_peer = scrapper_peer;
         }
     } 
 }
