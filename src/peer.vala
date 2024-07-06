@@ -149,19 +149,14 @@ namespace Kademlia
 
               for (unowned uint i = 0; i < uint.min (left, ALPHA); ++i)
                 {
-                  unowned Key peer;
-
                   lvisited.lock ();
                   var k = i;
                   var p = peers.pop_head ();
-                  peer = p;
 
-                  visited.add ((owned) p);
                   lvisited.unlock ();
-
                   AtomicUint.set (ref dones [k], 0);
 
-                  lookup_node_a.begin (peer, id, cancellable, (o, res) =>
+                  lookup_node_a.begin ((owned) p, id, cancellable, (o, res) =>
                     {
                       Key[]? newl = null;
 
@@ -185,6 +180,7 @@ namespace Kademlia
 
                           foreach (unowned var key in newl) if (closest.find_custom (key, Key.equal) && ! visited.contains (key))
                             {
+                              visited.add (key.copy ());
                               peers.push_head (key.copy ());
                             }
 
@@ -213,7 +209,7 @@ namespace Kademlia
         return closest.steal ();
         }
 
-      async Key[]? lookup_node_a (Key peer, Key id, GLib.Cancellable? cancellable = null) throws GLib.Error
+      async Key[]? lookup_node_a (owned Key peer, Key id, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
           bool same;
 

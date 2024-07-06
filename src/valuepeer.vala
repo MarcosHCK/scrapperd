@@ -186,19 +186,14 @@ namespace Kademlia
 
               for (unowned var i = 0; i < uint.min (left, ALPHA); ++i)
                 {
-                  unowned Key peer;
-  
                   lvisited.lock ();
                   var k = i;
                   var p = peers.pop_head ();
-                  peer = p;
 
-                  visited.add ((owned) p);
                   lvisited.unlock ();
-
                   AtomicUint.set (ref dones [k], 0);
 
-                  lookup_in_node.begin (peer, id, cancellable, (o, res) =>
+                  lookup_in_node.begin ((owned) p, id, cancellable, (o, res) =>
                     {
                       Value? value = null;
 
@@ -212,13 +207,13 @@ namespace Kademlia
                           lvisited.lock ();
 
                           if (value.is_inmediate)
-
-                            values.push_tail ((owned) value);
-                          else
                             {
-                              foreach (unowned var other in value.keys) if (visited.contains (other) == false)
-
-                                peers.insert_sorted (other.copy (), sorter);
+                              values.push_tail ((owned) value);
+                            }
+                          else foreach (unowned var other in value.keys) if (visited.contains (other) == false)
+                            {
+                              visited.add (other.copy ());
+                              peers.insert_sorted (other.copy (), sorter);
                             }
 
                           lvisited.unlock ();
@@ -247,7 +242,7 @@ namespace Kademlia
           return values.length == 0 ? null : values.pop_head ().steal_value ();
         }
 
-      async Value? lookup_in_node (Key peer, Key id, GLib.Cancellable? cancellable = null) throws GLib.Error
+      async Value? lookup_in_node (owned Key peer, Key id, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
           bool same;
 

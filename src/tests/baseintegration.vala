@@ -178,8 +178,8 @@ namespace Testing
       protected override async void test ()
         {
           yield base.test ();
-          var peer = yield net.pick_any ();
           var ns = GLib.Random.int_range (100, 1000);
+          var peer = yield net.pick_any ();
 
           var values = new HashTable<Key, uint> (Key.hash, Key.equal);
           var iter = (HashTableIter<Key, uint>?) null;
@@ -197,7 +197,25 @@ namespace Testing
           var average = (double) 0;
           var timer = new GLib.Timer ();
 
+          while (true)
+            {
+              GLib.Value? value;
+              timer.start ();
+
+              try { value = yield peer.lookup (new Key.random ()); average += timer.elapsed (); } catch (GLib.Error e)
+                {
+                  assert_no_error (e);
+                  break;
+                }
+
+              assert_true (value == null);
+              break;
+            }
+
+          GLib.Test.message ("unset lookup time: %04fs", average);
+
           iter = HashTableIter<Key, uint> (values);
+          average = 0;
 
           while (iter.next (out id_, out value_))
             {
