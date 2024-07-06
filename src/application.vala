@@ -21,10 +21,11 @@ namespace ScrapperD
 {
   public abstract class Application : GLib.Application
     {
-      public KademliaDBus.Hub hub { get; private set; }
+      public Kademlia.DBus.Hub hub { get; private construct; }
 
       construct
         {
+          hub = new Kademlia.DBus.Hub ();
           add_main_option ("address", 'a', 0, GLib.OptionArg.STRING_ARRAY, "Address of entry node", "ADDRESS");
           add_main_option ("port", 'p', 0, GLib.OptionArg.INT, "Port where to listen for peer hails", "PORT");
           add_main_option ("public", 0, 0, GLib.OptionArg.STRING_ARRAY, "Public addresses to publish", "ADDRESS");
@@ -62,7 +63,7 @@ namespace ScrapperD
 
               var addresses = new GLib.SList<string> ();
               var entries = new GLib.SList<string> ();
-              var port = (uint16) KademliaDBus.Hub.DEFAULT_PORT;
+              var port = (uint16) 0;//Kademlia.DBus.Hub.DEFAULT_PORT;
 
               if (options.lookup ("address", "as", out iter)) while (iter.next ("s", out option_s))
                 {
@@ -88,38 +89,9 @@ namespace ScrapperD
                   addresses.prepend ((owned) option_s);
                 }
 
-              hub = new KademliaDBus.Hub (port);
-
-              foreach (unowned var hostname in addresses) try { yield hub.add_public_address (hostname); } catch (GLib.Error e)
-                {
-                  good = false;
-                  cmdline.printerr ("%s: %u: %s\n", e.domain.to_string (), e.code, e.message);
-                  cmdline.set_exit_status (1);
-                  break;
-                }
-
-              if (unlikely (good == false)) break;
-
-              try { yield register_on_hub_async (); } catch (GLib.Error e)
-                {
-                  good = false;
-                  cmdline.printerr ("%s: %u: %s\n", e.domain.to_string (), e.code, e.message);
-                  cmdline.set_exit_status (1);
-                  break;
-                }
-
-              foreach (unowned var entry in entries) try { yield hub.join (entry, cancellable); } catch (GLib.Error e)
-                {
-                  good = false;
-                  cmdline.printerr ("%s: %u: %s\n", e.domain.to_string (), e.code, e.message);
-                  cmdline.set_exit_status (1);
-                  break;
-                }
-
               if (unlikely (good == false)) break;
 
               hold ();
-              hub.begin ();
               break;
             }
 

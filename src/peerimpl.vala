@@ -14,117 +14,68 @@
  * You should have received a copy of the GNU General Public License
  * along with ScrapperD. If not, see <http://www.gnu.org/licenses/>.
  */
-using Kademlia;
 
-[CCode (cprefix = "KDBus", lower_case_cprefix = "kdbus_")]
+[CCode (cprefix = "KDBus", lower_case_cprefix = "k_dbus_")]
 
-namespace KademliaDBus
+namespace Kademlia.DBus
 {
   public class PeerImpl : ValuePeer
     {
-      public string role { get; construct; }
-
-      private GLib.WeakRef _hub;
-      private GLib.HashTable<void*, NodeIds?> ifaces;
-      private Hub hub { owned get { return (Hub) _hub.get (); } }
-
-      struct NodeIds
-        {
-          public uint role_id;
-          public uint value_id;
-
-          public NodeIds (uint role_id, uint value_id)
-            {
-              this.role_id = role_id;
-              this.value_id = value_id;
-            }
-        }
+      public Hub hub { get; construct; }
 
       construct
         {
           added_contact.connect ((k) => debug ("added contact %s:(%s)", k.to_string (), id.to_string ()));
           dropped_contact.connect ((k) => debug ("dropped contact %s:(%s)", k.to_string (), id.to_string ()));
           staled_contact.connect ((k) => debug ("staled contact %s:(%s)", k.to_string (), id.to_string ()));
-          ifaces = new HashTable<void*, NodeIds?> (GLib.direct_hash, GLib.direct_equal);
         }
 
-      public PeerImpl (string role, ValueStore value_store)
+      public PeerImpl (Hub hub, ValueStore value_store, Key? id = null)
         {
-          base (value_store, new Key.random ());
-          this._role = role;
+          Object (hub : hub, id : id, value_store : value_store);
         }
 
-      protected virtual ValueNode.PeerRef get_self ()
+      protected virtual PeerRef get_self ()
         {
-          return ValueNode.PeerRef (id.bytes, hub.get_public_addresses ());
+          return PeerRef (id.bytes, hub.list_local_addresses ());
         }
 
-      internal void register_on_connection (GLib.DBusConnection connection, string object_path) throws GLib.Error
+      protected override async Key[] find_peer (Key peer, Key id, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
-          unowned var id1 = connection.register_object<ValueNode> (@"$object_path/$role", new ValueNodeSkeleton (hub, this));
-          unowned var id2 = connection.register_object<NodeRole> (@"$object_path/$role", new NodeRoleSkeleton (this));
-          lock (ifaces) ifaces.insert (connection, NodeIds (id1, id2));
+          var role = yield hub.lookup_role (peer, cancellable);
+          var refs = yield role.find_node (get_self (), KeyRef (id.bytes), cancellable);
+          var ar = new Key [refs.length];
+          for (int i = 0; i < ar.length; ++i) ar [i] = new Key.verbatim (refs [i].id.value);
+          return (owned) ar;
         }
 
-      internal void register_on_hub (Hub? hub) requires (hub == null || _hub.get () == null)
+      protected override async Value find_value (Key peer, Key id, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
-          _hub.set (hub);
-        }
-
-      internal void unregister_on_connection (GLib.DBusConnection connection)
-        {
-          NodeIds? ids;
-          lock (ifaces) ids = ifaces.lookup (connection);
-          connection.unregister_object (ids.role_id);
-          connection.unregister_object (ids.value_id);
-        }
-
-      protected override async Key[] find_peer (Key peer, Key key, GLib.Cancellable? cancellable = null) throws GLib.Error
-        {
-          var proxy = yield hub.get_proxy<ValueNode> (peer, role, cancellable);
-          var peers = yield proxy.find_node (get_self (), id.bytes, cancellable);
-          var keys = new Key [peers.length];
-
-          for (unowned var i = 0; i < keys.length; ++i)
-            {
-              keys [i] = new Key.verbatim (peers [i].id);
-              peers [i].know (hub, this);
-            }
-          return (owned) keys;
-        }
-
-      protected override async Kademlia.Value find_value (Key peer, Key key, GLib.Cancellable? cancellable = null) throws GLib.Error
-        {
-          var proxy = yield hub.get_proxy<ValueNode> (peer, role, cancellable);
-          var value = yield proxy.find_value (get_self (), key.bytes, cancellable);
+          var role = yield hub.lookup_role (peer, cancellable);
+          var value = yield role.find_value (get_self (), KeyRef (id.bytes), cancellable);
 
           if (value.found)
 
-            return new Kademlia.Value.inmediate (new GLib.Bytes (value.value));
+            return new Kademlia.Value.inmediate (value.get_value ());
           else
             {
-              var keys = new Key [value.peers.length];
-
-              for (unowned var i = 0; i < keys.length; ++i)
-                {
-                  keys [i] = new Key.verbatim (value.peers [i].id);
-                  value.peers [i].know (hub, this);
-                }
-              return new Kademlia.Value.delegated ((owned) keys);
+              var ar = new Key [value.others.length];
+              for (int i = 0; i < ar.length; ++i) ar [i] = new Key.verbatim (value.others [i].id.value);
+              return new Kademlia.Value.delegated ((owned) ar);
             }
         }
 
       protected override async bool store_value (Key peer, Key key, GLib.Value? value = null, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
-          var proxy = yield hub.get_proxy<ValueNode> (peer, role, cancellable);
-          var result = yield proxy.store (get_self (), key.bytes, ValueNode.ValueRef.inmediate (value).value, cancellable);
+          var role = yield hub.lookup_role (peer, cancellable);
+          var result = yield role.store (get_self (), KeyRef (key.bytes), ValueRef.nat2net (value), cancellable);
           return result;
         }
 
       protected override async bool ping_peer (Key peer, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
-          var proxy = yield hub.get_proxy<ValueNode> (peer, role, cancellable);
-          var result = yield proxy.ping (get_self (), cancellable);
+          var role = yield hub.lookup_role (peer, cancellable);
+          var result = yield role.ping (get_self (), cancellable);
           return result;
         }
     }

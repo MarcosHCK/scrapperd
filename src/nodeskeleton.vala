@@ -15,37 +15,88 @@
  * along with ScrapperD. If not, see <http://www.gnu.org/licenses/>.
  */
 
-[CCode (cprefix = "KDBus", lower_case_cprefix = "kdbus_")]
+[CCode (cprefix = "KDBus", lower_case_cprefix = "k_dbus_")]
 
-namespace KademliaDBus
+namespace Kademlia.DBus
 {
-  internal class NodeSkeleton : GLib.Object, KademliaDBus.Node
+  public class NodeSkeleton : GLib.Object, Kademlia.DBus.Node
     {
-      public string[] public_addresses { get; construct; }
-      public string[] roles { get; construct; }
+      private WeakRef _hub;
+      public Hub hub { owned get { return (Hub) _hub.get (); } set { _hub.set (value); } }
 
-      public string[] PublicAddresses { owned get { return public_addresses; } }
-      public string[] Roles { owned get { return roles; } }
-
-      public NodeSkeleton (string[] public_addresses, string[] roles)
+      public NodeSkeleton (Hub hub)
         {
-          Object (public_addresses : public_addresses, roles : roles);
+          this._hub.set (hub);
         }
 
-      public async bool Ping () throws GLib.Error
+      public async Address[] list_addresses (GLib.Cancellable? cancellable = null) throws GLib.Error
         {
-          return true;
+          return hub.list_local_addresses ();
+        }
+
+      public async KeyRef[] list_ids (GLib.Cancellable? cancellable = null) throws GLib.Error
+        {
+          return hub.list_local_ids ();
         }
     }
 
-  internal class NodeRoleSkeleton : GLib.Object, KademliaDBus.NodeRole
+  public class RoleSkeleton : GLib.Object, Kademlia.DBus.Role
     {
-      public PeerImpl peer { get; construct; }
-      public override uint8[] Id { owned get { return peer.id.bytes.copy (); } }
+      private WeakRef _hub;
+      public Hub hub { owned get { return (Hub) _hub.get (); } set { _hub.set (value); } }
+      public string name { get; construct; }
+      public ValuePeer value_peer { get; construct; }
 
-      public NodeRoleSkeleton (PeerImpl peer)
+      public KeyRef id { owned get { return KeyRef (value_peer.id.bytes); } }
+      public string role { owned get { return _name; } }
+
+      public RoleSkeleton (Hub hub, string role, ValuePeer value_peer)
         {
-          Object (peer : peer);
+          Object (hub : hub, name : role, value_peer : value_peer);
+        }
+
+      public async PeerRef[] find_node (PeerRef from_, KeyRef key, GLib.Cancellable? cancellable) throws GLib.Error
+        {
+          var from = from_.know (hub);
+          var id = new Key.verbatim (key.value);
+          var re = yield value_peer.find_peer_complete (from, id, cancellable);
+          var ar = new PeerRef [re.length];
+
+          for (int i = 0; i < ar.length; ++i) ar [i] = PeerRef (re [i].bytes, hub.list_remote_addresses (re [i]));
+          return (owned) ar;
+        }
+
+      public async ValueRef find_value (PeerRef from_, KeyRef key, GLib.Cancellable? cancellable) throws GLib.Error
+        {
+          var from = (Key?) from_.know (hub);
+          var id = (Key) new Key.verbatim (key.value);
+          var value = (Value) yield value_peer.find_value_complete (from, id, cancellable);
+
+          if (value.is_inmediate)
+
+            return ValueRef.inmediate (value.value);
+          else
+            {
+              var ks = (Key[]) value.steal_keys ();
+              var ar = new PeerRef [ks.length];
+
+              for (int i = 0; i < ks.length; ++i) ar [i] = PeerRef (ks [i].bytes, hub.list_remote_addresses (ks [i]));
+              return ValueRef.delegated ((owned) ar);
+            }
+        }
+
+      public async bool store (PeerRef from_, KeyRef key, GLib.Variant value, GLib.Cancellable? cancellable = null) throws GLib.Error
+        {
+          var from = (Key?) from_.know (hub);
+          var id = (Key) new Key.verbatim (key.value);
+          var go = (bool) yield value_peer.store_value_complete (from, id, ValueRef.net2nat (value), cancellable);
+          return go;
+        }
+
+      public async bool ping (PeerRef from_, GLib.Cancellable? cancellable = null) throws GLib.Error
+        {
+          var from = (Key?) from_.know (hub);
+          return yield value_peer.ping_peer_complete (from, cancellable);
         }
     }
 }

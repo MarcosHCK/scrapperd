@@ -14,441 +14,154 @@
  * You should have received a copy of the GNU General Public License
  * along with ScrapperD. If not, see <http://www.gnu.org/licenses/>.
  */
-using Kademlia;
 
-[CCode (cprefix = "KDBus", lower_case_cprefix = "kdbus_")]
+[CCode (cprefix = "KDBus", lower_case_cprefix = "k_dbus_")]
 
-namespace KademliaDBus
+namespace Kademlia.DBus
 {
   public class Hub : GLib.Object
     {
-      public const uint16 DEFAULT_PORT = 33334;
-
-      private bool cached = true;
-      private GLib.HashTable<Key, GLib.DBusConnection> cached_connections;
-      private GLib.HashTable<Key, GLib.SList<string>> cached_public_addresses;
-      private GLib.ThreadPool<GLib.SocketConnection> incomming_pool;
-      private GLib.HashTable<void*, uint> nodes;
-      private GLib.HashTable<string, PeerImpl> peers;
-      private GLib.SList<string> public_addresses;
-      private GLib.SocketService socket_service;
-
-      public uint16 port { get; construct; default = DEFAULT_PORT; }
+      public GenericSet<Address?> addresses { get; construct; }
+      public GLib.HashTable<Key, GenericSet<Address?>> contacts { get; construct; }
+      public GLib.HashTable<Key, Node> nodes { get; construct; }
+      public GLib.HashTable<Key, Role> roles { get; construct; }
 
       construct
         {
-          unowned GLib.HashFunc<Key> hash_func = Key.hash;
-          unowned GLib.EqualFunc<Key> equal_func = Key.equal;
+          addresses = new GenericSet<Address?> (Address.hash, Address.equal);
+          contacts = new HashTable<Key, GenericSet<Address?>> (Key.hash, Key.equal);
+          nodes = new HashTable<Key, Node> (Key.hash, Key.equal);
+          roles = new HashTable<Key, Role> (Key.hash, Key.equal);
+        }
 
-          cached_connections = new HashTable<Key, DBusConnection> (hash_func, equal_func);
-          cached_public_addresses = new HashTable<Key, SList<string>> (hash_func, equal_func);
-          nodes = new HashTable<void*, uint> (GLib.direct_hash, GLib.direct_equal);
-          peers = new HashTable<string, PeerImpl> (GLib.str_hash, GLib.str_equal);
-          public_addresses = new SList<string> ();
-
-          (socket_service = new SocketService ()).stop ();
-
-          var exclusive = false;
-          var max_threads = (int) GLib.get_num_processors ();
-
-          try { incomming_pool = new GLib.ThreadPool<SocketConnection>.with_owned_data (on_incomming, max_threads, exclusive); } catch (GLib.Error e)
+      public virtual void add_contact (Key id, Address[] addresses)
+        {
+          lock (contacts)
             {
-              error (@"$(e.domain): $(e.code): $(e.message)");
-            }
+              unowned GLib.EqualFunc<Address?> equal_func = Address.equal;
+              unowned GLib.HashFunc<Address?> hash_func = Address.hash;
+              GenericSet<Address?> older;
+              Key oldkey;
 
-          socket_service.incoming.connect ((connection) =>
-            {
-              try { incomming_pool.add (connection); } catch (GLib.Error e)
+              if (contacts.steal_extended (id, out oldkey, out older) == false)
                 {
-                  critical (@"$(e.domain): $(e.code): $(e.message)");
+                  oldkey = id.copy ();
+                  older = new GenericSet<Address?> (hash_func, equal_func);
                 }
-              return true;
-            });
 
-          var localhost = new InetSocketAddress []
-            {
-              new InetSocketAddress (new InetAddress.loopback (GLib.SocketFamily.IPV4), port),
-              new InetSocketAddress (new InetAddress.loopback (GLib.SocketFamily.IPV6), port),
-            };
+              foreach (unowned var address in addresses)
 
-          foreach (unowned var address in localhost)
-            {
-              var protocol = GLib.SocketProtocol.DEFAULT;
-              var type = GLib.SocketType.STREAM;
+                older.add (address);
 
-              public_addresses.prepend (address.to_string ());
-
-              try { socket_service.add_address (address, type, protocol, address, null); } catch (GLib.Error e)
-                {
-                  critical (@"$(e.domain): $(e.code): $(e.message)");
-                  continue;
-                }
+              contacts.insert ((owned) oldkey, (owned) older);
             }
         }
 
-      public Hub (uint16 port = DEFAULT_PORT)
+      protected void add_contact_complete (Key id, Node node, Role role)
         {
-          Object (port : port);
-        }
-
-      ~Hub ()
-        {
-          var peer = (PeerImpl) null;
-          var iter = HashTableIter<string, PeerImpl> (peers);
-
-          while (iter.next (null, out peer)) peer.register_on_hub (null);
-        }
-
-      public void add_peer (PeerImpl peer)
-        {
-          peers.insert (peer.role, peer);
-          peer.register_on_hub (this);
-
-          debug ("exposing peer %s:%s", peer.role, peer.id.to_string ());
-        }
-
-      public async void add_public_address (string hostname) throws GLib.Error
-        {
-          var resolver = GLib.Resolver.get_default ();
-
-          foreach (unowned var inet_address in yield resolver.lookup_by_name_async (hostname))
+          lock (contacts)
             {
-              var address = new GLib.InetSocketAddress (inet_address, port);
-              var protocol = GLib.SocketProtocol.TCP;
-              var type = GLib.SocketType.STREAM;
-
-              socket_service.add_address (address, type, protocol, address, null);
-              public_addresses.prepend (hostname);
+              lock (nodes) nodes.insert (id.copy (), node);
+              lock (roles) roles.insert (id.copy (), role);
             }
         }
 
-      public string[] addresses_for_peer (Key key)
+      public void drop_all (Key id)
         {
-          lock (cached)
+          lock (contacts) lock (nodes) lock (roles)
             {
-              unowned var addrs = cached_public_addresses.lookup (key);
-              var ar = (string[]) new string [addrs.length ()];
+              contacts.remove_all ();
+              nodes.remove_all ();
+              roles.remove_all ();
+            }
+        }
+
+      public void drop_contact (Key id)
+        {
+          lock (contacts) lock (nodes) lock (roles)
+            {
+              contacts.remove (id);
+              nodes.remove (id);
+              roles.remove (id);
+            }
+        }
+
+      public Address[] list_local_addresses ()
+        {
+          lock (addresses)
+            {
+              var addr = (Address?) null;
+              var ar = (Address[]) new Address [addresses.length];
+              var iter = (GenericSetIter<Address?>) addresses.iterator ();
               int i = 0;
-              foreach (unowned var addr in addrs) ar [i++] = addr;
+
+              while ((addr = iter.next_value ()) != null)
+
+                ar [i++] = addr;
+
               return (owned) ar;
             }
         }
 
-      public void begin ()
+      public KeyRef[] list_local_ids ()
         {
-          socket_service.start ();
-        }
-
-      public async bool connect_to (string address, GLib.Cancellable? cancellable = null) throws GLib.Error
-        {
-          var flags1 = GLib.DBusConnectionFlags.AUTHENTICATION_CLIENT;
-          var flags2 = GLib.DBusConnectionFlags.DELAY_MESSAGE_PROCESSING;
-          var flags = flags1 | flags2;
-          var remote = (string?) null;
-          var stream = (SocketConnection) yield (new SocketClient ()).connect_to_host_async (address, DEFAULT_PORT, cancellable);
-
-          try { remote = stream.get_remote_address ().to_string (); } catch { }
-
-          var connection = (DBusConnection) yield new DBusConnection (stream, null, flags, null, null);
-
-          prepare_connection (connection);
-
-          connection.exit_on_close = false;
-          connection.on_closed.connect ((c, a, b) => on_closed (c));
-          connection.start_message_processing ();
-
-          return yield register_connection (connection, false, cancellable);
-        }
-
-      public async bool finish (GLib.Cancellable? cancellable = null) throws GLib.Error
-        {
-          socket_service.stop ();
-          socket_service.close ();
-
-          return yield forget_all (cancellable);
-        }
-
-      public async bool forget (Key key, GLib.Cancellable? cancellable = null) throws GLib.Error
-        {
-          GLib.DBusConnection connection;
-          lock (cached) connection = cached_connections.lookup (key);
-
-          if (connection != null)
-
-            yield connection.close (cancellable);
-
-          return true;
-        }
-
-      public async bool forget_all (GLib.Cancellable? cancellable = null) throws GLib.Error
-        {
-          var connections = new SList<GLib.DBusConnection> ();
-
-          lock (cached)
+          lock (roles)
             {
-              var connection = (DBusConnection) null;
-              var iterator = HashTableIter<Key, GLib.DBusConnection> (cached_connections);
+              var ar = new Array<KeyRef> ();
+              var iter = HashTableIter<Key, Role> (roles);
+              var role = (Role?) null;
 
-              while (iterator.next (null, out connection))
+              while (iter.next (null, out role)) if (role is RoleSkeleton)
 
-                connections.prepend ((owned) connection);
-            }
+                ar.append_val (KeyRef (role.id.value));
 
-          foreach (unowned var connection in connections)
-
-            yield connection.close (cancellable);
-
-          return true;
-        }
-
-      public string[] get_public_addresses ()
-        {
-          var ar = new string [public_addresses.length ()];
-          int i = 0;
-          foreach (unowned var item in public_addresses) ar [i++] = item;
-          return (owned) ar;
-        }
-
-      public async T? get_proxy<T> (Key key_, string role, GLib.Cancellable? cancellable = null) throws GLib.Error
-        {
-          /*
-           * There is a major bug (but very silent) with vala code generation
-           * the argument key_ here is a compact class without ref-unref semantics
-           * which makes it uncopyable, so when you call connection.get_proxy,
-           * which is a GIO function with *REAL* GTask driven asynchronous method,
-           * key_ is freed (by this function's caller), but upon completion the value
-           * get reused (pointing to a freed memory), so to mend this I need to create
-           * an owned local variable (which is only freed when local variable block is
-           * freed too).
-           */
-          var key = key_.copy ();
-
-          GLib.DBusConnection connection;
-
-          while (true)
-            {
-              lock (cached) connection = cached_connections.lookup (key);
-
-              if (likely (connection != null))
-                {
-                  Key key2;
-                  string object_path;
-
-                  object_path = Node.BASE_PATH;
-                  var node = yield connection.get_proxy<Node> (null, object_path, 0, cancellable);
-
-                  if ((role in node.Roles) == false)
-                    {
-                      debug ("no role on peer %s:%s", role, key.to_string ());
-                      throw new Kademlia.PeerError.UNREACHABLE ("no role %s in node %s", role, key.to_string ());
-                    }
-
-                  object_path = @"$object_path/$role";
-                  var node_role = yield connection.get_proxy<NodeRole> (null, object_path, 0, cancellable);
-
-                  if (Key.equal (key, (key2 = new Key.verbatim (node_role.Id))))
-
-                    return yield connection.get_proxy<T> (null, object_path, 0, cancellable);
-                  else
-                    {
-                      debug ("resetted peer %s:%s", role, key.to_string ());
-
-                      yield forget (key2, cancellable);
-                      lock (cached) cached_public_addresses.remove (key2);
-                      throw new Kademlia.PeerError.UNREACHABLE ("can not locate node %s", key.to_string ());
-                    }
-                }
-              else
-                {
-                  GLib.SList<string> addresses;
-                  bool found = false;
-
-                  lock (cached) addresses = cached_public_addresses.lookup (key).copy_deep ((s) => s);
-
-                  foreach (unowned var address in addresses) try
-                    {
-                      found = yield connect_to (address, cancellable);
-                      break;
-                    }
-                  catch (GLib.Error e)
-                    {
-                      addresses.remove (address);
-
-                      if (addresses.length () == 0)
-
-                        lock (cached) cached_public_addresses.remove (key);
-                      else
-                        {
-                          var @new = addresses.copy_deep ((s) => s);
-                          lock (cached) cached_public_addresses.insert (key.copy (), (owned) @new);
-                        }
-                      continue;
-                    }
-
-                  if (found == false)
-                    {
-                      debug ("can not connect to peer %s:%s", role, key.to_string ());
-                      throw new Kademlia.PeerError.UNREACHABLE ("can not locate node %s", key.to_string ());
-                    }
-                }
+              return ar.steal ();
             }
         }
 
-      public async bool join (string? address = null, GLib.Cancellable? cancellable = null) throws GLib.Error
+      public Address[] list_remote_addresses (Key key)
         {
-          Key[] keys;
+          GenericSet<Address?> addresses;
 
-          if (address != null)
+          lock (contacts) if ((addresses = contacts.lookup (key)) != null)
             {
-              yield connect_to (address, cancellable);
-            }
-
-          lock (cached)
-            {
-              var items = (List<unowned Key>) cached_public_addresses.get_keys ();
-              var ar = new Key [items.length ()];
+              var addr = (Address?) null;
+              var ar = (Address[]) new Address [addresses.length];
+              var iter = (GenericSetIter<Address?>) addresses.iterator ();
               int i = 0;
 
-              foreach (unowned var item in items) ar [i++] = item.copy ();
-              keys = (owned) ar;
+              while ((addr = iter.next_value ()) != null)
+
+                ar [i++] = addr;
+
+              return (owned) ar;
             }
 
-          foreach (unowned var peer in peers.get_values ())
-            {
-              foreach (unowned var key in keys) try { yield peer.join (key, cancellable); } catch (PeerError e)
-                {
-                  if (e.code == PeerError.UNREACHABLE) continue;
-                  throw (owned) e;
-                }
-            }
-
-          return true;
+          return new Address [0];
         }
 
-      public void known_peer (Key key, string[] public_addresses)
+      public async Node lookup_node (Key key, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
-          lock (cached)
-            {
-              var @set = new GenericSet<string> (GLib.str_hash, GLib.str_equal);
+          Node? node;
+          lock (nodes) node = nodes.lookup (key);
 
-              foreach (unowned var addr in cached_public_addresses.lookup (key)) @set.add (addr);
-              foreach (unowned var addr in public_addresses) @set.add (addr);
+          if (unlikely (node != null))
 
-              var item = (string?) null;
-              var iter = (GenericSetIter<string>) @set.iterator ();
-              var list = new GLib.SList<string> ();
-
-              while ((item = iter.next_value ()) != null) list.prepend ((owned) item);
-
-              cached_public_addresses.insert (key.copy (), (owned) list);
-            }
+            return node;
+          else
+            throw new PeerError.UNREACHABLE ("can not reach node %s", key.to_string ());
         }
 
-      void on_closed (GLib.DBusConnection connection)
+      public async Role lookup_role (Key key, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
-          var id = (uint) 0;
-          var peer = (PeerImpl) null;
-          var iter = HashTableIter<string, PeerImpl> (peers);
+          Role? role;
+          lock (roles) role = roles.lookup (key);
 
-          while (iter.next (null, out peer))
-           
-            peer.unregister_on_connection (connection);
+          if (unlikely (role != null))
 
-          lock (cached) cached_connections.foreach_remove ((k, c) => c == connection);
-          lock (nodes) id = nodes.lookup (connection);
-
-          connection.unregister_object (id);
-        }
-
-      void on_incomming (owned GLib.SocketConnection connection)
-        {
-          string? remote = null;
-          try { remote = connection.get_remote_address ().to_string (); } catch { }
-
-          on_incomming_async.begin ((owned) connection, (owned) remote, null, (o, res) =>
-            {
-              try { ((Hub) o).on_incomming_async.end (res); } catch (GLib.Error e)
-                {
-                  critical (@"$(e.domain): $(e.code): $(e.message)");
-                }
-            });
-        }
-
-      async bool on_incomming_async (owned GLib.SocketConnection stream, owned string? remote, GLib.Cancellable? cancellable = null) throws GLib.Error
-        {
-          var flags1 = GLib.DBusConnectionFlags.AUTHENTICATION_ALLOW_ANONYMOUS;
-          var flags2 = GLib.DBusConnectionFlags.AUTHENTICATION_SERVER;
-          var flags3 = GLib.DBusConnectionFlags.DELAY_MESSAGE_PROCESSING;
-          var flags = flags1 | flags2 | flags3;
-          var guid = (string) DBus.generate_guid ();
-          var connection = yield new DBusConnection (stream, guid, flags, null, null);
-
-          prepare_connection (connection, cancellable);
-
-          connection.exit_on_close = false;
-          connection.on_closed.connect ((c, a, b) => on_closed (c));
-          connection.start_message_processing ();
-
-          return yield register_connection (connection, true, cancellable);
-        }
-
-      void prepare_connection (GLib.DBusConnection connection, GLib.Cancellable? cancellable = null) throws GLib.Error
-        {
-          var peer = (PeerImpl) null;
-          var iter = HashTableIter<string, PeerImpl> (peers);
-
-          var public_addresses = new (unowned string) [this.public_addresses.length ()];
-          var peers = new (unowned string) [this.peers.length];
-
-          int i;
-          i = 0; foreach (unowned var item in this.public_addresses) public_addresses [i++] = item;
-          i = 0; foreach (unowned var item in this.peers.get_keys ()) peers [i++] = item;
-
-          var node = new NodeSkeleton (public_addresses, peers);
-
-          while (iter.next (null, out peer))
-           
-            peer.register_on_connection (connection, Node.BASE_PATH);
-
-          lock (nodes) nodes.insert (connection, connection.register_object<Node> (Node.BASE_PATH, node));
-        }
-
-      async bool register_connection (GLib.DBusConnection connection, bool incomming, GLib.Cancellable? cancellable = null) throws GLib.Error
-        {
-          var object_path = Node.BASE_PATH;
-          var node_proxy = yield connection.get_proxy<Node> (null, object_path, 0, cancellable);
-
-          yield node_proxy.Ping ();
-
-          int i = 0;
-          var roles = node_proxy.Roles;
-          var keys = new Key [roles.length];
-          var pubs = new SList<string> ();
-
-          foreach (unowned var address in node_proxy.PublicAddresses)
-            {
-              pubs.prepend (address);
-            }
-
-          foreach (unowned var role in roles)
-            {
-              var node_role = yield connection.get_proxy<NodeRole> (null, @"$object_path/$role", 0, cancellable);
-              var node_key = new Key.verbatim (node_role.Id);
-
-              keys [i++] = (owned) node_key;
-            }
-
-          i = 0;
-
-          lock (cached) foreach (unowned var role in roles)
-            {
-              var list = pubs.copy_deep ((s) => s);
-
-              cached_connections.insert (keys [i].copy (), connection);
-              cached_public_addresses.insert ((owned) keys [i], (owned) list);
-              ++i;
-            }
-          return true;
+            return role;
+          else
+            throw new PeerError.UNREACHABLE ("can not reach node %s", key.to_string ());
         }
     }
 }

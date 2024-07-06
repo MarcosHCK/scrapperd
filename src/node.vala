@@ -15,26 +15,27 @@
  * along with ScrapperD. If not, see <http://www.gnu.org/licenses/>.
  */
 
-[CCode (cprefix = "KDBus", lower_case_cprefix = "kdbus_")]
+[CCode (cprefix = "KDBus", lower_case_cprefix = "k_dbus_")]
 
-namespace KademliaDBus
+namespace Kademlia.DBus
 {
-  [DBus (name = "org.hck.kademlia.Node")]
+  [DBus (name = "org.hck.Kademlia.DBus.Node")]
 
   public interface Node : GLib.Object
     {
-      public const string BASE_PATH = "/org/hck/Kademlia";
-
-      public abstract string[] PublicAddresses { owned get; }
-      public abstract string[] Roles { owned get; }
-
-      public abstract async bool Ping () throws GLib.Error;
+      [DBus (name = "ListAddresses")] public abstract async Address[] list_addresses (GLib.Cancellable? cancellable = null) throws GLib.Error;
+      [DBus (name = "ListIds")] public abstract async KeyRef[] list_ids (GLib.Cancellable? cancellable = null) throws GLib.Error;
     }
 
-  [DBus (name = "org.hck.kademlia.NodeRole")]
+  [DBus (name = "org.hck.Kademlia.DBus.Role")]
 
-  public interface NodeRole : GLib.Object
+  public interface Role : GLib.Object
     {
-      public abstract uint8[] Id { owned get; }
+      [DBus (name = "Id")] public abstract KeyRef id { owned get; }
+      [DBus (name = "FindNode")] public abstract async PeerRef[] find_node (PeerRef from, KeyRef key, GLib.Cancellable? cancellable = null) throws GLib.Error;
+      [DBus (name = "FindValue")] public abstract async ValueRef find_value (PeerRef from, KeyRef key, GLib.Cancellable? cancellable = null) throws GLib.Error;
+      [DBus (name = "Role")] public abstract string role { owned get; }
+      [DBus (name = "Store")] public abstract async bool store (PeerRef from, KeyRef key, GLib.Variant value, GLib.Cancellable? cancellable = null) throws GLib.Error;
+      [DBus (name = "Ping")] public abstract async bool ping (PeerRef from, GLib.Cancellable? cancellable = null) throws GLib.Error;
     }
 }

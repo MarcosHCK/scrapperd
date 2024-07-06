@@ -66,9 +66,7 @@ libkademlia_dbus = library \
         'node.vala',
         'nodeskeleton.vala',
         'peerimpl.vala',
-        'peerimplproxy.vala',
-        'valuenode.vala',
-        'valuenodeskeleton.vala',
+        'refs.vala',
       ],
   )
 
@@ -95,7 +93,7 @@ libscrapperd = library \
 
 libsdir = include_directories ('.')
 
-subdir ('scrapper')
-subdir ('storage')
+#subdir ('scrapper')
+#subdir ('storage')
 subdir ('tests')
-subdir ('viewer')
+#subdir ('viewer')
