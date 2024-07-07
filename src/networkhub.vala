@@ -22,6 +22,8 @@ namespace Kademlia.DBus
   public class NetworkHub : Hub
     {
       public const uint16 DEFAULT_PORT = 33334;
+
+      private GLib.ThreadPool<GLib.SocketConnection> incomming_pool;
       private GLib.SocketService socket_service;
 
       struct RegIds
@@ -38,10 +40,21 @@ namespace Kademlia.DBus
 
       construct
         {
-          socket_service = new GLib.SocketService ();
+          int max_threads;
 
-          socket_service.stop ();
-          socket_service.incoming.connect (on_incomming);
+          try
+            {
+              max_threads = (int) GLib.get_num_processors ();
+              incomming_pool = new GLib.ThreadPool<GLib.SocketConnection>.with_owned_data (on_incoming_pooled, max_threads, false);
+              socket_service = new GLib.SocketService ();
+
+              socket_service.stop ();
+              socket_service.incoming.connect (on_incoming);
+            }
+          catch (GLib.Error e)
+            {
+              error (@"$(e.domain): $(e.code): $(e.message)");
+            }
         }
 
       public new async void add_local_address (string host_and_port, uint16 default_port, GLib.Cancellable? cancellable = null) throws GLib.Error
@@ -106,20 +119,16 @@ namespace Kademlia.DBus
             dbus.unregister_object (regids.node_regid);
         }
 
-      private bool on_incomming (GLib.SocketConnection socket_connection)
+      private bool on_incoming (GLib.SocketConnection socket_connection)
         {
-          on_incomming_async.begin (socket_connection, null, (o, res) =>
+          try { incomming_pool.add (socket_connection); } catch (GLib.Error e)
             {
-
-              try { ((NetworkHub) o).on_incomming_async.end (res); } catch (GLib.Error e)
-                {
-                  critical (@"$(e.domain): $(e.code): $(e.message)");
-                }
-            });
+              critical (@"$(e.domain): $(e.code): $(e.message)");
+            }
           return true;
         }
 
-      private async Node? on_incomming_async (GLib.SocketConnection socket_connection, GLib.Cancellable? cancellable = null) throws GLib.Error
+      private async Node? on_incoming_async (GLib.SocketConnection socket_connection, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
           var flags1 = GLib.DBusConnectionFlags.AUTHENTICATION_ALLOW_ANONYMOUS;
           var flags2 = GLib.DBusConnectionFlags.AUTHENTICATION_SERVER;
@@ -134,6 +143,18 @@ namespace Kademlia.DBus
           dbus.start_message_processing ();
 
           return yield register_connection (dbus, cancellable);
+        }
+
+      private void on_incoming_pooled (owned GLib.SocketConnection socket_connection)
+        {
+          on_incoming_async.begin (socket_connection, null, (o, res) =>
+            {
+
+              try { ((NetworkHub) o).on_incoming_async.end (res); } catch (GLib.Error e)
+                {
+                  critical (@"$(e.domain): $(e.code): $(e.message)");
+                }
+            });
         }
 
       private async bool prepare_connection (GLib.DBusConnection dbus, GLib.Cancellable? cancellable = null) throws GLib.Error
