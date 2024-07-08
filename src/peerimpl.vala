@@ -43,6 +43,7 @@ namespace Kademlia.DBus
               case GLib.IOError.CLOSED:
               case GLib.IOError.CONNECTION_CLOSED:
 
+                debug ("contact lost %s:(%s)", peer.to_string (), id.to_string ());
                 hub.drop_role (peer);
                 break;
 

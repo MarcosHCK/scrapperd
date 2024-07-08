@@ -94,6 +94,7 @@ namespace Kademlia.DBus
         {
           this.found = false;
           this.others = (owned) others;
+          this.value = new Variant.byte (0);
         }
 
       public ValueRef.inmediate (owned GLib.Value? value)
@@ -111,52 +112,67 @@ namespace Kademlia.DBus
 
       static extern GLib.Type _fundamental_type (GLib.Type g_type);
 
+      static bool is_a_or_equal (GLib.Type gtype, GLib.Type a_or_equal)
+        {
+          return gtype == a_or_equal || gtype.is_a (a_or_equal);
+        }
+
       internal static GLib.Variant nat2net (GLib.Value? value)
         {
           var vtype = new GLib.VariantType ("(sv)");
           var builder = new GLib.VariantBuilder (vtype);
           var good = true;
 
-          builder.add ("s", value.type_name ());
-
-          switch (_fundamental_type (value.type ()))
+          if (value == null)
             {
-              case GLib.Type.BOOLEAN: builder.add ("v", new GLib.Variant.boolean (value.get_boolean ())); break;
-              case GLib.Type.CHAR: builder.add ("v", new GLib.Variant.byte (value.get_schar ())); break;
-              case GLib.Type.DOUBLE: builder.add ("v", new GLib.Variant.double (value.get_double ())); break;
-              case GLib.Type.ENUM: builder.add ("v", new GLib.Variant.int32 (value.get_int ())); break;
-              case GLib.Type.FLAGS: builder.add ("v", new GLib.Variant.int32 (value.get_int ())); break;
-              case GLib.Type.FLOAT: builder.add ("v", new GLib.Variant.double (value.get_float ())); break;
-              case GLib.Type.INT: builder.add ("v", new GLib.Variant.int32 (value.get_int ())); break;
-              case GLib.Type.INT64: builder.add ("v", new GLib.Variant.int64 (value.get_int64 ())); break;
-              case GLib.Type.LONG: builder.add ("v", new GLib.Variant.int64 (value.get_long ())); break;
-              case GLib.Type.STRING: builder.add ("v", new GLib.Variant.string (value.get_string ())); break;
-              case GLib.Type.UCHAR: builder.add ("v", new GLib.Variant.byte (value.get_uchar ())); break;
-              case GLib.Type.UINT: builder.add ("v", new GLib.Variant.uint32 (value.get_uint ())); break;
-              case GLib.Type.UINT64: builder.add ("v", new GLib.Variant.uint64 (value.get_uint64 ())); break;
-              case GLib.Type.ULONG: builder.add ("v", new GLib.Variant.uint64 (value.get_ulong ())); break;
-              case GLib.Type.VARIANT: builder.add ("v", new GLib.Variant.variant (value.get_variant ())); break;
-
-              case GLib.Type.BOXED:
-
-                if (value.holds (typeof (GLib.Bytes)))
-                  {
-                    unowned var vtype_ = GLib.VariantType.BYTESTRING;
-                    builder.add ("v", new GLib.Variant.from_bytes (vtype_, (Bytes) value.get_boxed (), false));
-                  }
-                else
-                  {
-                    good = false;
-                  }
-
-                break;
-
-              default: good = false; break;
+              builder.add_value (new Variant.string (GLib.Type.NONE.name ()));
+              builder.add_value (new Variant.variant (new Variant.maybe (null, null)));
             }
-
-          if (unlikely (good == false))
+          else
             {
-              error ("unsupported type '%s'", value.type_name ());
+              builder.add_value (new Variant.string (value.type_name ()));
+
+              switch (_fundamental_type (value.type ()))
+                {
+                  case GLib.Type.BOOLEAN: builder.add_value (new Variant.variant (new Variant.boolean (value.get_boolean ()))); break;
+                  case GLib.Type.CHAR: builder.add_value (new Variant.variant (new Variant.byte (value.get_schar ()))); break;
+                  case GLib.Type.DOUBLE: builder.add_value (new Variant.variant (new Variant.double (value.get_double ()))); break;
+                  case GLib.Type.ENUM: builder.add_value (new Variant.variant (new Variant.int32 (value.get_int ()))); break;
+                  case GLib.Type.FLAGS: builder.add_value (new Variant.variant (new Variant.int32 (value.get_int ()))); break;
+                  case GLib.Type.FLOAT: builder.add_value (new Variant.variant (new Variant.double (value.get_float ()))); break;
+                  case GLib.Type.INT: builder.add_value (new Variant.variant (new Variant.int32 (value.get_int ()))); break;
+                  case GLib.Type.INT64: builder.add_value (new Variant.variant (new Variant.int64 (value.get_int64 ()))); break;
+                  case GLib.Type.LONG: builder.add_value (new Variant.variant (new Variant.int64 (value.get_long ()))); break;
+                  case GLib.Type.STRING: builder.add_value (new Variant.variant (new Variant.string (value.get_string ()))); break;
+                  case GLib.Type.UCHAR: builder.add_value (new Variant.variant (new Variant.byte (value.get_uchar ()))); break;
+                  case GLib.Type.UINT: builder.add_value (new Variant.variant (new Variant.uint32 (value.get_uint ()))); break;
+                  case GLib.Type.UINT64: builder.add_value (new Variant.variant (new Variant.uint64 (value.get_uint64 ()))); break;
+                  case GLib.Type.ULONG: builder.add_value (new Variant.variant (new Variant.uint64 (value.get_ulong ()))); break;
+                  case GLib.Type.VARIANT: builder.add_value (new Variant.variant (new Variant.variant (value.get_variant ()))); break;
+
+                  case GLib.Type.BOXED:
+
+                    if (is_a_or_equal (value.type (), typeof (GLib.Bytes)))
+                      {
+                        var bytes_ = (Bytes) value.dup_boxed (); 
+                        var vtype_ = new VariantType ("ay");
+
+                        builder.add_value (new Variant.variant (new Variant.from_bytes (vtype_, bytes_, false)));
+                      }
+                    else
+                      {
+                        good = false;
+                      }
+
+                    break;
+
+                  default: good = false; break;
+                }
+
+              if (unlikely (good == false))
+                {
+                  error ("unsupported type '%s'", value.type_name ());
+                }
             }
 
           return builder.end ();
@@ -164,83 +180,55 @@ namespace Kademlia.DBus
 
       internal static GLib.Value? net2nat (GLib.Variant variant)
         {
+          GLib.Value? value = null;
+
+          typeof (GLib.Bytes).ensure ();
+
           if (unlikely (variant.check_format_string ("(sv)", false) == false))
 
             error ("invalid variant type '%s'", variant.get_type_string ());
 
+          var good = true;
           var packed = (GLib.Variant?) null;
           unowned var type_name = (string?) null;
           unowned var gtype = GLib.Type.from_name (type_name = variant.get_child_value (0).get_string ());
-          unowned var vtype = (packed = variant.get_child_value (1).get_variant ()).get_type ();
+          unowned var vtype = (packed = variant.get_child_value (1).get_variant ())?.get_type ();
 
           if (unlikely (gtype == (GLib.Type) 0))
 
             error ("invalid type '%s'", type_name);
 
-          var good = true;
-          var value = GLib.Value (gtype);
+          switch (_fundamental_type (gtype))
+            {
+              case GLib.Type.BOOLEAN: (value = GLib.Value (gtype)).set_boolean (packed.get_boolean ()); break;
+              case GLib.Type.CHAR: (value = GLib.Value (gtype)).set_schar ((int8) packed.get_byte ()); break;
+              case GLib.Type.DOUBLE: (value = GLib.Value (gtype)).set_double (packed.get_double ()); break;
+              case GLib.Type.ENUM: (value = GLib.Value (gtype)).set_enum (packed.get_int32 ()); break;
+              case GLib.Type.FLAGS: (value = GLib.Value (gtype)).set_flags (packed.get_int32 ()); break;
+              case GLib.Type.FLOAT: (value = GLib.Value (gtype)).set_float ((float) packed.get_double ()); break;
+              case GLib.Type.INT: (value = GLib.Value (gtype)).set_int ((int) packed.get_int32 ()); break;
+              case GLib.Type.INT64: (value = GLib.Value (gtype)).set_int64 (packed.get_int64 ()); break;
+              case GLib.Type.LONG: (value = GLib.Value (gtype)).set_long ((long) packed.get_int64 ()); break;
+              case GLib.Type.NONE: break;
+              case GLib.Type.STRING: (value = GLib.Value (gtype)).set_string (packed.get_string ()); break;
+              case GLib.Type.UCHAR: (value = GLib.Value (gtype)).set_uchar (packed.get_byte ()); break;
+              case GLib.Type.UINT: (value = GLib.Value (gtype)).set_uint ((uint) packed.get_uint32 ()); break;
+              case GLib.Type.UINT64: (value = GLib.Value (gtype)).set_uint64 ((uint64) packed.get_uint64 ()); break;
+              case GLib.Type.ULONG: (value = GLib.Value (gtype)).set_ulong ((ulong) packed.get_uint64 ()); break;
+              case GLib.Type.VARIANT: (value = GLib.Value (gtype)).set_variant (packed.get_variant ()); break;
 
-          if (vtype.is_basic () == false)
-            {
-              if (unlikely (vtype.is_array () == false || vtype.element ().equal (GLib.VariantType.BYTE) == false))
-                {
-                  value.set_boxed (new GLib.Bytes (packed.get_bytestring ().data));
-                }
-            }
-          else switch ((string) vtype.peek_string ())
-            {
-              case "b": if (unlikely ((good = value.holds (typeof (bool))) == false))
+              case GLib.Type.BOXED:
+
+                if (is_a_or_equal (gtype, typeof (GLib.Bytes)))
                   {
-                    value.set_boolean (packed.get_boolean ());
+                    (value = GLib.Value (gtype)).set_boxed (new GLib.Bytes (packed.get_bytestring ().data));
+                  }
+                else
+                  {
+                    good = false;
                   }
                 break;
-              case "d": switch (_fundamental_type (gtype))
-                  {
-                    case GLib.Type.DOUBLE: value.set_double (packed.get_double ()); break;
-                    case GLib.Type.FLOAT: value.set_float ((float) packed.get_double ()); break;
-                    default: good = false; break;
-                  }
-                break;
-              case "i": switch (_fundamental_type (gtype))
-                  {
-                    case GLib.Type.ENUM: value.set_enum (packed.get_int32 ()); break;
-                    case GLib.Type.FLAGS: value.set_flags (packed.get_int32 ()); break;
-                    case GLib.Type.INT: value.set_int (packed.get_int32 ()); break;
-                    default: good = false; break;
-                  }
-                break;
-              case "s": if (unlikely ((good = value.holds (typeof (string))) == false))
-                  {
-                    value.set_string (packed.get_string ());
-                  }
-                break;
-              case "t": switch (_fundamental_type (gtype))
-                  {
-                    case GLib.Type.UINT64: value.set_uint64 (packed.get_uint64 ()); break;
-                    case GLib.Type.ULONG: value.set_ulong ((ulong) packed.get_uint64 ()); break;
-                    default: good = false; break;
-                  }
-                break;
-              case "u": switch (_fundamental_type (gtype))
-                  {
-                    case GLib.Type.UINT: value.set_uint (packed.get_uint32 ()); break;
-                    default: good = false; break;
-                  }
-                break;
-              case "x": switch (_fundamental_type (gtype))
-                  {
-                    case GLib.Type.INT64: value.set_int64 (packed.get_int64 ()); break;
-                    case GLib.Type.LONG: value.set_long ((long) packed.get_int64 ()); break;
-                    default: good = false; break;
-                  }
-                break;
-              case "y": switch (_fundamental_type (gtype))
-                  {
-                    case GLib.Type.CHAR: value.set_schar ((int8) packed.get_byte ()); break;
-                    case GLib.Type.UCHAR: value.set_uchar (packed.get_byte ()); break;
-                    default: good = false; break;
-                  }
-                break;
+
               default: good = false; break;
             }
 
@@ -249,7 +237,7 @@ namespace Kademlia.DBus
               error ("invalid packed variant type '%s'", vtype.dup_string ());
             }
 
-          return value;
+          return (owned) value;
         }
     }
 }

@@ -23,6 +23,7 @@ namespace Testing
       GLib.Test.init (ref args, null);
       GLib.Test.add_func (TESTPATHROOT + "/Integration/connect", () => (new TestIntegrationConnect (new TestHub ())).run ());
       GLib.Test.add_func (TESTPATHROOT + "/Integration/insert", () => (new TestIntegrationInsert (new TestHub ())).run ());
+      GLib.Test.add_func (TESTPATHROOT + "/Integration/insert_exotic", () => (new TestIntegrationInsertExotic (new TestHub ())).run ());
       GLib.Test.add_func (TESTPATHROOT + "/Integration/lookup", () => (new TestIntegrationLookup (new TestHub ())).run ());
       GLib.Test.add_func (TESTPATHROOT + "/Integration/lookup_node", () => (new TestIntegrationLookupNode (new TestHub ())).run ());
       return GLib.Test.run ();

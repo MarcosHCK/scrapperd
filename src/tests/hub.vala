@@ -24,6 +24,7 @@ namespace Testing
       GLib.Test.init (ref args, null);
       GLib.Test.add_func (TESTPATHROOT + "/Hub/connect", () => (new TestIntegrationConnect (new TestHub ())).run ());
       GLib.Test.add_func (TESTPATHROOT + "/Hub/insert", () => (new TestIntegrationInsert (new TestHub ())).run ());
+      GLib.Test.add_func (TESTPATHROOT + "/Hub/insert_exotic", () => (new TestIntegrationInsertExotic (new TestHub ())).run ());
       GLib.Test.add_func (TESTPATHROOT + "/Hub/lookup", () => (new TestIntegrationLookup (new TestHub ())).run ());
       GLib.Test.add_func (TESTPATHROOT + "/Hub/lookup_node", () => (new TestIntegrationLookupNode (new TestHub ())).run ());
       GLib.Test.add_func (TESTPATHROOT + "/Hub/new", () => new TestHub ());

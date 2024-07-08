@@ -167,6 +167,52 @@ namespace Testing
         }
     }
 
+  public class TestIntegrationInsertExotic : TestIntegrationConnect
+    {
+
+      public TestIntegrationInsertExotic (PeerProvider hub)
+        {
+          base (hub);
+        }
+
+      protected override async void test ()
+        {
+          yield base.test ();
+          var peer = yield net.pick_any ();
+
+          var values = new GLib.Value []
+            {
+              (int8) 8,
+              (uint8) 8,
+              (int16) 8,
+              (uint16) 8,
+              (int32) 8,
+              (uint32) 8,
+              (int64) 8,
+              (uint64) 8,
+              (char) 'a',
+              (string) "testing",
+              new GLib.Bytes ("testing".data),
+            };
+
+          var ids = new Key [values.length];
+
+          for (unowned int i = 0; i < ids.length; ++i)
+
+            ids [i] = new Key.random ();
+
+          for (unowned int i = 0; i < ids.length; ++i) try { yield peer.insert (ids [i], values [i]); } catch (GLib.Error e)
+            {
+              assert_no_error (e);
+            }
+
+          for (unowned int i = 0; i < ids.length; ++i) try { yield peer.lookup (ids [i]); } catch (GLib.Error e)
+            {
+              assert_no_error (e);
+            }
+        }
+    }
+
   public class TestIntegrationLookup : TestIntegrationConnect
     {
 

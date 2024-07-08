@@ -24,19 +24,19 @@ namespace Kademlia.DBus
   public interface Node : GLib.Object
     {
       public const string BASE_PATH = "/org/hck/Kademlia";
-      [DBus (name = "ListAddresses")] public abstract async Address[] list_addresses (GLib.Cancellable? cancellable = null) throws GLib.Error;
-      [DBus (name = "ListIds")] public abstract async KeyRef[] list_ids (GLib.Cancellable? cancellable = null) throws GLib.Error;
+      [DBus (name = "ListAddresses", timeout = 3000)] public abstract async Address[] list_addresses (GLib.Cancellable? cancellable = null) throws GLib.Error;
+      [DBus (name = "ListIds", timeout = 3000)] public abstract async KeyRef[] list_ids (GLib.Cancellable? cancellable = null) throws GLib.Error;
     }
 
   [DBus (name = "org.hck.Kademlia.DBus.Role")]
 
   public interface Role : GLib.Object
     {
-      [DBus (name = "Id")] public abstract KeyRef id { owned get; }
-      [DBus (name = "FindNode")] public abstract async PeerRef[] find_node (PeerRef from, KeyRef key, GLib.Cancellable? cancellable = null) throws GLib.Error;
-      [DBus (name = "FindValue")] public abstract async ValueRef find_value (PeerRef from, KeyRef key, GLib.Cancellable? cancellable = null) throws GLib.Error;
-      [DBus (name = "Role")] public abstract string role { owned get; }
-      [DBus (name = "Store")] public abstract async bool store (PeerRef from, KeyRef key, GLib.Variant value, GLib.Cancellable? cancellable = null) throws GLib.Error;
-      [DBus (name = "Ping")] public abstract async bool ping (PeerRef from, GLib.Cancellable? cancellable = null) throws GLib.Error;
+      [DBus (name = "Id", timeout = 3000)] public abstract KeyRef id { owned get; }
+      [DBus (name = "FindNode", timeout = 3000)] public abstract async PeerRef[] find_node (PeerRef from, KeyRef key, GLib.Cancellable? cancellable = null) throws GLib.Error;
+      [DBus (name = "FindValue", timeout = 3000)] public abstract async ValueRef find_value (PeerRef from, KeyRef key, GLib.Cancellable? cancellable = null) throws GLib.Error;
+      [DBus (name = "Role", timeout = 3000)] public abstract string role { owned get; }
+      [DBus (name = "Store", timeout = 3000)] public abstract async bool store (PeerRef from, KeyRef key, GLib.Variant value, GLib.Cancellable? cancellable = null) throws GLib.Error;
+      [DBus (name = "Ping", timeout = 3000)] public abstract async bool ping (PeerRef from, GLib.Cancellable? cancellable = null) throws GLib.Error;
     }
 }
