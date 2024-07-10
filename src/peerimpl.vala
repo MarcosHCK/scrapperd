@@ -36,18 +36,49 @@ namespace Kademlia.DBus
           base (value_store, id);
         }
 
-      private void @catch (Key peer, owned GLib.IOError? e) throws GLib.Error
+      private void @catch (Key peer, owned GLib.Error? e) throws GLib.Error
+        {
+          if (e.domain == IOError.quark ()) catch_io (peer, (IOError?) (owned) e);
+          else if (e.domain == NetworkError.quark ()) catch_network (peer, (NetworkError?) (owned) e);
+          else throw (owned) e;
+        }
+
+      private void catch_io (Key peer, owned GLib.IOError? e) throws GLib.Error
         {
           switch (e.code)
             {
               case GLib.IOError.CLOSED:
               case GLib.IOError.CONNECTION_CLOSED:
+              case GLib.IOError.TIMED_OUT:
 
                 debug ("contact lost %s:(%s)", peer.to_string (), id.to_string ());
                 hub.drop_role (peer);
                 break;
 
               default: throw (owned) e;
+            }
+        }
+
+      private void catch_network (Key peer, owned NetworkError? e) throws GLib.Error
+        {
+          switch (e.code)
+            {
+              case NetworkError.RESETTED_PEER:
+
+                debug ("contact lost %s:(%s)", peer.to_string (), id.to_string ());
+                hub.drop_role (peer);
+                break;
+
+              default: throw (owned) e;
+            }
+        }
+
+      private void know (Hub hub, Key peer, PeerRef? @ref)
+        {
+          if (Key.equal (id, peer) == false)
+            {
+              hub.add_contact_addresses (peer, @ref.addresses);
+              this.add_contact (peer);
             }
         }
 
@@ -65,10 +96,10 @@ namespace Kademlia.DBus
               var refs = yield role.find_node (get_self (), KeyRef (id.bytes), cancellable);
               var ar = new Key [refs.length];
               for (int i = 0; i < ar.length; ++i) ar [i] = new Key.verbatim (refs [i].id.value);
-              for (int i = 0; i < ar.length; ++i) if (refs [i].knowable) hub.add_contact_addresses (ar [i], refs [i].addresses);
+              for (int i = 0; i < ar.length; ++i) if (refs [i].knowable) know (hub, ar [i], refs [i]);
               return (owned) ar;
             }
-          catch (GLib.IOError e)
+          catch (GLib.Error e)
             {
               @catch (peer, (owned) e);
             }
@@ -89,11 +120,11 @@ namespace Kademlia.DBus
                 {
                   var ar = new Key [value.others.length];
                   for (int i = 0; i < ar.length; ++i) ar [i] = new Key.verbatim (value.others [i].id.value);
-                  for (int i = 0; i < ar.length; ++i) if (value.others [i].knowable) hub.add_contact_addresses (ar [i], value.others [i].addresses);
+                  for (int i = 0; i < ar.length; ++i) if (value.others [i].knowable) know (hub, ar [i], value.others [i]);
                   return new Kademlia.Value.delegated ((owned) ar);
                 }
             }
-          catch (GLib.IOError e)
+          catch (GLib.Error e)
             {
               @catch (peer, (owned) e);
             }
@@ -107,7 +138,7 @@ namespace Kademlia.DBus
               var result = yield role.store (get_self (), KeyRef (key.bytes), ValueRef.nat2net (value), cancellable);
               return result;
             }
-          catch (GLib.IOError e)
+          catch (GLib.Error e)
             {
               @catch (peer, (owned) e);
             }
@@ -121,7 +152,7 @@ namespace Kademlia.DBus
               var result = yield role.ping (get_self (), cancellable);
               return result;
             }
-          catch (GLib.IOError e)
+          catch (GLib.Error e)
             {
               @catch (peer, (owned) e);
             }

@@ -93,8 +93,22 @@ namespace Kademlia.DBus
 
       public async ValuePeer create_proxy (string role, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
+          var tolist = new GLib.SList<Key> ();
           var proxy = new PeerImplProxy (this, role);
-          foreach (unowned var id in roles.get_keys ()) yield proxy.join (id, cancellable);
+
+          lock (roles)
+            {
+              unowned Key to;
+              unowned Role? rol;
+
+              var iter = HashTableIter<Key, Role> (roles);
+
+              while (iter.next (out to, out rol)) if (role == rol.role)
+
+                tolist.prepend (to.copy ());
+            }
+
+          foreach (unowned var to in tolist) yield proxy.join (to, cancellable);
           return proxy;
         }
 
@@ -215,7 +229,7 @@ namespace Kademlia.DBus
           Role? role;
           Local? local;
 
-          while (true)
+          for (unowned var tries = 0; tries < 3; ++tries)
             {
               lock (roles) role = roles.lookup (id);
 
@@ -229,15 +243,15 @@ namespace Kademlia.DBus
                   if (likely (local != null))
                     {
                       add_contact_role (id, new RoleSkeleton (this, local.role, local.peer));
-                      continue;
                     }
                   else while (false == yield reconnect (id, cancellable))
                     {
                       GLib.Thread.yield ();
-                      continue;
                     }
                 }
             }
+
+          throw new PeerError.UNREACHABLE ("can not reach node %s", id.to_string ());
         }
 
       public abstract async bool reconnect (Key id, GLib.Cancellable? cancellable = null) throws GLib.Error;
@@ -258,6 +272,11 @@ namespace Kademlia.DBus
               var iter = addresses == null ? (GenericSetIter<Address?>?) null : addresses.iterator ();
               return iter == null ? null : iter.next_value ();
             }
+        }
+
+      public Role? pick_contact_role (Key id)
+        {
+          lock (roles) return roles.lookup (id);
         }
     }
 }

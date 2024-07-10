@@ -67,7 +67,7 @@ namespace ScrapperD.Scrapper
                   var uri = (Uri) Scrapper.normal_uri (uri_string);
                   var id = new Kademlia.Key.from_data ((value = uri.to_string ()).data);
 
-                  try { yield store.insert_value (id, new Bytes (value.data), cancellable); } catch (GLib.Error e)
+                  try { yield store.insert_value (id, value, cancellable); } catch (GLib.Error e)
                     {
                       good = false;
                       cmdline.printerr ("can not scrap uri: %s: %u: %s", e.domain.to_string (), e.code, e.message);

@@ -88,31 +88,28 @@ namespace ScrapperD.Scrapper
             }
 
           if (unlikely (false == yield store_peer.insert (id, contents)))
-
-            debug ("uri data was not saved %s:('%s')", id.to_string (), uri.to_string ());
-
-          foreach (unowned var link in result.links)
+            {
+              debug ("uri data was not saved %s:('%s')", id.to_string (), uri.to_string ());
+            }
+          else foreach (unowned var link in result.links)
             {
               var uri_string = (string?) null;
               var child = Scrapper.normalize_uri (link);
               var child_id = new Key.from_data ((uri_string = child.to_string ()).data);
 
               debug ("found link in uri '%s' <= %s:('%s')", child.to_string (), id.to_string (), uri.to_string ());
-              yield scrapper_peer.insert (child_id, new GLib.Bytes (uri_string.data));
+              yield scrapper_peer.insert (child_id, uri_string);
             }
         }
 
       public async override bool insert_value (Kademlia.Key id, GLib.Value? value, GLib.Cancellable? cancellable) throws GLib.Error
         {
-          if (value.holds (typeof (GLib.Bytes)) == false)
+          if (value.holds (typeof (string)) == false)
 
             throw new IOError.INVALID_ARGUMENT ("value should be an URI");
           else
             {
-              unowned var uri_bytes = (Bytes) value.get_boxed ();
-              unowned var uri_string = (string) uri_bytes.get_data ();
-
-              var uri = (Uri) Scrapper.normal_uri (uri_string.substring (0, (long) uri_bytes.get_size ()));
+              var uri = (Uri) Scrapper.normal_uri (value.get_string ());
               var other = (GLib.Value?) null;
 
               if (Scrapper.uri_is_valid (uri) == false)

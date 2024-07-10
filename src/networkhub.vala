@@ -19,6 +19,14 @@
 
 namespace Kademlia.DBus
 {
+  public errordomain NetworkError
+    {
+      FAILED,
+      RESETTED_PEER;
+
+      public static extern GLib.Quark quark ();
+    }
+
   public class NetworkHub : Hub
     {
       public const uint16 DEFAULT_PORT = 33334;
@@ -183,6 +191,7 @@ namespace Kademlia.DBus
       protected override async bool reconnect (Key id, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
           var address = pick_contact_address (id);
+          var prevrole = pick_contact_role (id)?.role;
 
           if (unlikely (address == null))
             {
@@ -192,11 +201,53 @@ namespace Kademlia.DBus
             }
           else try
             {
-              return null != yield connect_to (address.address, address.port, cancellable);
+              var done = null != yield connect_to (address.address, address.port, cancellable);
+              var role = done == false ? null : pick_contact_role (id);
+              var newid = new Key.verbatim (role.id.value);
+
+              if (unlikely (done == false && prevrole == null))
+
+                throw new PeerError.UNREACHABLE ("peer has no roles %s", id.to_string ());
+
+              else if (unlikely (done == false && prevrole != null))
+                {
+                  debug ("peer registered as %s, vanished", id.to_string ());
+                  throw new NetworkError.RESETTED_PEER ("peer vanished %s:%s", prevrole, id.to_string ());
+                }
+
+              if (unlikely (Key.equal (id, newid) == false || (prevrole != null && prevrole != role.role)))
+                {
+
+                  if (Key.equal (id, newid) == false)
+
+                    debug ("peer registered as %s, id changed to %s", id.to_string (), newid.to_string ());
+
+                  else if (prevrole != null && prevrole != role.role)
+
+                    debug ("peer registered role was %s, changed to %s:%s", prevrole, role.role, newid.to_string ());
+
+                  throw new NetworkError.RESETTED_PEER ("peer role was resetted (maybe address collision?)");
+                }
+
+              return done;
+            }
+          catch (IOError e)
+            {
+              switch (e.code)
+                {
+                  case GLib.IOError.CONNECTION_REFUSED:
+                  case GLib.IOError.HOST_UNREACHABLE:
+                  case GLib.IOError.NETWORK_UNREACHABLE:
+
+                    drop_contact_address (id, address);  
+                    break;
+
+                  default: throw (owned) e;
+                }
             }
           catch (GLib.Error e)
             {
-              drop_contact_address (id, address);
+              throw (owned) e;
             }
 
           return false;
@@ -206,6 +257,7 @@ namespace Kademlia.DBus
         {
           unowned var object_path = Node.BASE_PATH;
 
+          var any = false;
           var node = yield dbus.get_proxy<Node> (null, object_path, 0, cancellable);
           var addresses = yield node.list_addresses (cancellable);
           var keyrefs = yield node.list_ids (cancellable);
@@ -217,9 +269,10 @@ namespace Kademlia.DBus
 
               add_contact_addresses (id, addresses);
               add_contact_role (id, role);
+              any = true;
             }
 
-          return (owned) node;
+          return any == false ? null : (owned) node;
         }
     }
 }
