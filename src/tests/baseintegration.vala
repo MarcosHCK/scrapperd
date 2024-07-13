@@ -206,7 +206,7 @@ namespace Testing
               assert_no_error (e);
             }
 
-          for (unowned int i = 0; i < ids.length; ++i) try { yield peer.lookup (ids [i]); } catch (GLib.Error e)
+          for (unowned int i = 0; i < ids.length; ++i) try { assert_cmpvariant (ValueRef.inmediate (values [i]).value, ValueRef.inmediate (yield peer.lookup (ids [i])).value); } catch (GLib.Error e)
             {
               assert_no_error (e);
             }

@@ -178,6 +178,10 @@ namespace Kademlia.DBus
           return builder.end ();
         }
 
+      [CCode (array_length_pos = 1.1, array_length_type = "gsize", cheader_filename = "glib.h", cname = "g_variant_get_fixed_array", simple_generics = true)]
+
+      static extern unowned T[] _g_variant_get_fixed_array<T> (GLib.Variant variant, size_t element_size = sizeof (T));
+
       internal static GLib.Value? net2nat (GLib.Variant variant)
         {
           GLib.Value? value = null;
@@ -209,7 +213,7 @@ namespace Kademlia.DBus
               case GLib.Type.INT: (value = GLib.Value (gtype)).set_int ((int) packed.get_int32 ()); break;
               case GLib.Type.INT64: (value = GLib.Value (gtype)).set_int64 (packed.get_int64 ()); break;
               case GLib.Type.LONG: (value = GLib.Value (gtype)).set_long ((long) packed.get_int64 ()); break;
-              case GLib.Type.NONE: break;
+              case GLib.Type.NONE: return null;
               case GLib.Type.STRING: (value = GLib.Value (gtype)).set_string (packed.get_string ()); break;
               case GLib.Type.UCHAR: (value = GLib.Value (gtype)).set_uchar (packed.get_byte ()); break;
               case GLib.Type.UINT: (value = GLib.Value (gtype)).set_uint ((uint) packed.get_uint32 ()); break;
@@ -221,7 +225,7 @@ namespace Kademlia.DBus
 
                 if (is_a_or_equal (gtype, typeof (GLib.Bytes)))
                   {
-                    (value = GLib.Value (gtype)).set_boxed (new GLib.Bytes (packed.get_bytestring ().data));
+                    (value = GLib.Value (gtype)).set_boxed (new GLib.Bytes (_g_variant_get_fixed_array (packed)));
                   }
                 else
                   {
