@@ -55,6 +55,7 @@
                   <object class="GtkListBox" id="listbox1">
 
                     <property name="hexpand">True</property>
+                    <property name="selection-mode">none</property>
                     <property name="vexpand">False</property>
                   </object>
                 </child>

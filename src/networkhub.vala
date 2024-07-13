@@ -101,6 +101,22 @@ namespace Kademlia.DBus
           return yield register_connection (dbus, cancellable);
         }
 
+      public async ValuePeer create_proxy_at (string host_and_port, uint16 default_port, string role, GLib.Cancellable? cancellable) throws GLib.Error
+        {
+          var node = (Node?) yield connect_to (host_and_port, default_port, cancellable);
+          var proxy = new PeerImplProxy (this, role);
+
+          foreach (unowned var keyref in yield node.list_ids (cancellable))
+            {
+              var id = (Key) new Key.verbatim (keyref.value);
+              var rol = (Role) yield lookup_role (id, cancellable);
+
+              if (role == rol.role) yield proxy.join (id, cancellable);
+            }
+
+          return (owned) proxy;
+        }
+
       public async bool join_at (string host_and_port, uint16 default_port, string? role, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
           var any = 0;

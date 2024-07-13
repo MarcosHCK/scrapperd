@@ -22,10 +22,9 @@ namespace ScrapperD.Viewer
 {
   public enum RoleTargetType
     {
-      
       CONSOLE,
+      DATA,
       FILE,
-      POPUP,
     }
 
   public class RoleTarget : RoleTransport
@@ -34,26 +33,36 @@ namespace ScrapperD.Viewer
       public RoleTargetType target_type { get; private set; }
 
       private RoleTarget () { }
+      public signal void show_output (string value);
 
       public RoleTarget.parse (string value) throws GLib.Error
         {
-          RoleTransport.parse<RoleTargetType> (value, RoleTargetType.POPUP, out _target, out _target_type);
+          RoleTransport.parse<RoleTargetType> (value, RoleTargetType.DATA, out _target, out _target_type);
         }
 
       public async void set_output (GLib.Value? value, GLib.Cancellable? cancellable) throws GLib.Error
         {
-          if (value.holds (typeof (GLib.Bytes)) == false)
-            {
-              throw new IOError.INVALID_DATA ("invalid value type returned from peer");
-            }
-
           switch (target_type)
             {
               case RoleTargetType.CONSOLE:
                 {
-                  var bytes = (GLib.Bytes) value.dup_boxed ();
-                  var variant = new GLib.Variant.from_bytes (GLib.VariantType.BYTESTRING, bytes, false);
-                  print ("%s\n", variant.print_string (null, false).str);
+                  print ("%s\n", Kademlia.DBus.ValueRef.inmediate (value).value.print (false));
+                  break;
+                }
+
+              case RoleTargetType.DATA:
+                {
+                  string data;
+
+                  if (unlikely (value.holds (typeof (string)) == false))
+
+                    throw new RoleTransportError.INVALID ("key didn't hold a valid UTF-8 value, use another target");
+
+                  if (unlikely ((data = value.get_string ().make_valid ()) == null))
+
+                    throw new RoleTransportError.INVALID ("key didn't hold a valid UTF-8 value, use another target");
+
+                  show_output (data);                  
                   break;
                 }
 

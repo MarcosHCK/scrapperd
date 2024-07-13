@@ -27,11 +27,6 @@
         <attribute name="action">app.jointo</attribute>
         <attribute name="label">Join</attribute>
       </item>
-
-      <item>
-        <attribute name="action">app.joinrole</attribute>
-        <attribute name="label">Join role</attribute>
-      </item>
     </section>
 
     <section>

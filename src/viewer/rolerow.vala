@@ -193,6 +193,7 @@ namespace ScrapperD.Viewer
               return;
             }
 
+          target_source.show_output.connect (v => this.entrybuffer2.set_text (v.data));
           role.on_get (key_source, target_source);
         }
 

@@ -14,7 +14,6 @@
  * You should have received a copy of the GNU General Public License
  * along with ScrapperD. If not, see <http://www.gnu.org/licenses/>.
  */
-using KademliaDBus;
 
 [CCode (cprefix = "ScrapperdViewer", lower_case_cprefix = "scrapperd_viewer_")]
 
@@ -24,22 +23,31 @@ namespace ScrapperD.Viewer
 
   public class Application : Gtk.Application
     {
-      private Hub hub;
-      private HashTable<string, PeerImplProxy> roles;
+      private Kademlia.DBus.NetworkHub hub;
+
+      struct JoinToProxy
+        {
+          string role;
+          Kademlia.ValuePeer role_proxy;
+
+          public JoinToProxy (owned string role, owned Kademlia.ValuePeer role_proxy)
+            {
+              this.role = (owned) role;
+              this.role_proxy = (owned) role_proxy;
+            }
+        }
 
       construct
         {
           add_action ("about", null, () => about_dialog ());
           add_action ("jointo", null, () => jointo_dialog ());
           add_action ("jointo_p", GLib.VariantType.STRING, (a, p) => jointo_action (p.get_string (null)));
-          add_action ("joinrole", null, () => joinrole_dialog ());
-          add_action ("joinrole_p", GLib.VariantType.STRING, (a, p) => joinrole_action (p.get_string (null)));
           add_action ("quit", null, () => quit ());
 
           add_main_option ("address", 'a', 0, GLib.OptionArg.STRING_ARRAY, "Network entry point", "ADDRESS");
           add_main_option ("port", 'p', 0, GLib.OptionArg.INT, "Network public port", "PORT");
 
-          roles = new HashTable<string, PeerImplProxy> (GLib.str_hash, GLib.str_equal);
+          hub = new Kademlia.DBus.NetworkHub ();
         }
 
       public Application ()
@@ -49,25 +57,13 @@ namespace ScrapperD.Viewer
 
       public static int main (string[] argv)
         {
-          typeof (ScrapperD.Viewer.ApplicationWindow).ensure ();
-          typeof (ScrapperD.Viewer.InfoBar).ensure ();
-          typeof (ScrapperD.Viewer.InfoBarMessage).ensure ();
-          typeof (ScrapperD.Viewer.JoinDialog).ensure ();
-          typeof (ScrapperD.Viewer.RoleRow).ensure ();
-
           return (new Application ()).run (argv);
         }
 
       public override void activate ()
         {
-          ApplicationWindow window;
-          Gtk.Window.set_interactive_debugging (true);
-
-          (window = new ApplicationWindow (this)).present ();
-
-          foreach (unowned var role in roles.get_keys ())
-
-            added_role_for (role, window, true);
+          //Gtk.Window.set_interactive_debugging (true);
+          new ApplicationWindow (this);
         }
 
       private new void add_action (string name, GLib.VariantType? parameter_type, owned GLib.SimpleActionActivateCallback callback)
@@ -77,26 +73,21 @@ namespace ScrapperD.Viewer
           base.add_action (action);
         }
 
-      private void added_role (string role)
+      private void added_role (Kademlia.ValuePeer role_proxy, string role)
         {
           ApplicationWindow window;
-
-          if ((window = active_window as ApplicationWindow) != null)
-
-            added_role_for (role, window);
+          if ((window = active_window as ApplicationWindow) != null) added_role_for (role_proxy, role, window);
         }
 
-      private void added_role_for (string role, ApplicationWindow window, bool expand = false) requires (roles.contains (role))
+      static void added_role_for (Kademlia.ValuePeer role_proxy, string role, ApplicationWindow window, bool expand = false)
         {
           var role_dto = (Role) new Role ();
-          var role_row = (RoleRow) new RoleRow (role_dto); 
-          var role_proxy = (PeerImpl) roles.lookup (role);
-          var weak1 = WeakRef (role_proxy);
-          var weak2 = WeakRef (window);
+          var role_row = (RoleRow) new RoleRow (role_dto);
+          var weak1 = WeakRef (window);
 
           role_dto.on_get.connect ((key, target) =>
             {
-              on_role_dto_get.begin ((PeerImplProxy) weak1.get (), key, target, null, (o, res) =>
+              on_role_dto_get.begin (role_proxy, key, target, null, (o, res) =>
                 {
                   try { on_role_dto_get.end (res); } catch (GLib.Error e)
                     {
@@ -107,7 +98,7 @@ namespace ScrapperD.Viewer
 
           role_dto.on_set.connect ((key, value) =>
             {
-              on_role_dto_set.begin ((PeerImplProxy) weak1.get (), key, value, null, (o, res) =>
+              on_role_dto_set.begin (role_proxy, key, value, null, (o, res) =>
                 {
                   try { on_role_dto_set.end (res); } catch (GLib.Error e)
                     {
@@ -116,23 +107,25 @@ namespace ScrapperD.Viewer
                 });
             });
 
-          role_row.close.connect ((row) =>
+          role_row.close.connect (row =>
             {
-              ((ApplicationWindow?) weak2.get ())?.remove_row (row);
+              ((ApplicationWindow?) weak1.get ())?.remove_row (row);
             });
 
-          role_row.externalize.connect ((row) =>
+          role_row.externalize.connect (row =>
             {
+              Application application;
               ApplicationWindow window2;
-              (window2 = new ApplicationWindow (this)).present ();
-              added_role_for (row.role.role, window2, true);
+              (application = ((Application) GLib.Application.get_default ()));
+              (window2 = new ApplicationWindow (application)).present ();
+              added_role_for (role_proxy, role, window2, true);
               row.close ();
             });
 
+          role_dto.id = role_proxy.id.to_string ();
+          role_dto.role = role;
           role_row.expanded = expand;
 
-          role_proxy.bind_property ("role", role_dto, "role", GLib.BindingFlags.SYNC_CREATE);
-          role_proxy.bind_property ("id", role_dto, "id", GLib.BindingFlags.SYNC_CREATE, transform_id);
           window.append_row (role_row);
         }
 
@@ -225,11 +218,10 @@ namespace ScrapperD.Viewer
 
           command_line_async.begin (cmdline, null, (o, res) =>
             {
-              if (command_line_async.end (res) == true)
-
-                activate ();
-                release ();
+              command_line_async.end (res);
+              release ();
             });
+
           return base.command_line (cmdline);
         }
 
@@ -237,42 +229,43 @@ namespace ScrapperD.Viewer
         {
           unowned var good = true;
           unowned var options = cmdline.get_options_dict ();
-          unowned var port = (uint16) Hub.DEFAULT_PORT;
 
           while (true)
             {
               GLib.VariantIter iter;
+              GLib.List<JoinToProxy?> proxies;
               string option_s;
-              int option_i;
 
-              if (options.lookup ("port", "i", out option_i))
+              activate ();
+
+              if (options.lookup ("address", "as", out iter)) while (iter.next ("s", out option_s))
                 {
-                  if (option_i >= uint16.MIN && uint16.MAX < option_i)
 
-                    port = (uint16) option_i;
-                  else
+                  try { proxies = yield jointo_async (option_s, cancellable); } catch (GLib.Error e)
                     {
                       good = false;
-                      cmdline.printerr ("invalid port %i\n", option_i);
+                      cmdline.printerr ("%s: %u: %s\n", e.domain.to_string (), e.code, e.message);
                       cmdline.set_exit_status (1);
                       break;
                     }
+
+                  foreach (unowned var proxy in proxies)
+                    {
+                      unowned var role = proxy.role;
+                      unowned var role_proxy = proxy.role_proxy;
+
+                      added_role (role_proxy, role);
+                    }
                 }
 
-              hub = new Hub (port);
+              if (unlikely (good == false))
+                {
+                  active_window.close ();
+                  active_window.destroy ();
+                  break;
+                }
 
-              if (options.lookup ("address", "as", out iter)) while (iter.next ("s", out option_s))
-
-                try { yield jointo_async (option_s); } catch (GLib.Error e)
-                  {
-                    good = false;
-                    cmdline.printerr ("%s: %u: %s\n", e.domain.to_string (), e.code, e.message);
-                    cmdline.set_exit_status (1);
-                    break;
-                  }
-
-              if (unlikely (good == false)) break;
-
+              active_window.present ();
               break;
             }
 
@@ -298,80 +291,48 @@ namespace ScrapperD.Viewer
 
           jointo_async.begin (address, null, (o, res) =>
             {
-              try { jointo_async.end (res); } catch (GLib.Error e)
+              GLib.List<JoinToProxy?>? proxies = null;
+
+              try { proxies = jointo_async.end (res); } catch (GLib.Error e)
                 {
                   notify_recoverable_error (e);
+                }
+
+              if (likely (proxies != null)) foreach (unowned var proxy in proxies)
+                {
+                  unowned var role = proxy.role;
+                  unowned var role_proxy = proxy.role_proxy;
+
+                  added_role (role_proxy, role);
                 }
 
               release ();
             });
         }
 
-      private async void jointo_async (string address, GLib.Cancellable? cancellable = null) throws GLib.Error
+      private async GLib.List<JoinToProxy?> jointo_async (string address, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
           string[] elements;
+          var default_port = Kademlia.DBus.NetworkHub.DEFAULT_PORT;
+          var proxies = new GLib.List<JoinToProxy?> ();
 
           if ((elements = address.split ("#", -1)).length == 0)
 
             throw new UriError.FAILED ("empty address not valid");
           else
             {
+              unowned var host_and_port = elements [0];
+
               for (unowned var i = 1; i < elements.length; ++i)
                 {
-                  if (roles.lookup (elements [i]) != null)
-                    continue;
-
                   var role = elements [i];
-                  var proxy = new PeerImplProxy (role);
+                  var proxy = yield hub.create_proxy_at (host_and_port, default_port, role, cancellable);
 
-                  hub.add_peer (proxy);
-                  roles.insert ((owned) role, (owned) proxy);
+                  proxies.append (JoinToProxy ((owned) role, (owned) proxy));
                 }
-
-              yield hub.join (elements [0], cancellable);
-            }
-        }
-
-      private void joinrole_dialog ()
-        {
-          var active_window = this.active_window;
-          var join_dialog = new JoinDialog (this);
-
-          join_dialog.action_name = "joinrole_p";
-          join_dialog.action_target = this;
-          join_dialog.expecting = _ ("Role");
-
-          join_dialog.set_transient_for (active_window);
-          join_dialog.present ();
-        }
-
-      private void joinrole_action (string role)
-        {
-          if (roles.lookup (role) != null)
-            {
-              added_role (role);
-              return;
             }
 
-          hold ();
-
-          joinrole_async.begin (role, null, (o, res) =>
-            {
-              try { joinrole_async.end (res); added_role (role); } catch (GLib.Error e)
-                {
-                  notify_recoverable_error (e);
-                }
-
-              release ();
-            });
-        }
-
-      private async void joinrole_async (string role, GLib.Cancellable? cancellable = null) throws GLib.Error
-        {
-          PeerImplProxy proxy;
-          hub.add_peer (proxy = new PeerImplProxy (role));
-          roles.insert (role, (owned) proxy);
-          yield hub.join (null, cancellable);
+          return (owned) proxies;
         }
 
       public void notify_desktop_error (GLib.Error error)
@@ -411,14 +372,14 @@ namespace ScrapperD.Viewer
             window.infobar.push_unrecoverable_error (error);
         }
 
-      static async void on_role_dto_get (PeerImplProxy peer, owned RoleSource key_source, owned RoleTarget target_source, GLib.Cancellable? cancellable = null) throws GLib.Error
+      static async void on_role_dto_get (Kademlia.ValuePeer peer, owned RoleSource key_source, owned RoleTarget target_source, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
           var key = yield key_source.get_key ();
           var value = yield peer.lookup (key, cancellable);
           yield target_source.set_output (value, cancellable);
         }
 
-      static async void on_role_dto_set (PeerImplProxy peer, owned RoleSource key_source, owned RoleSource value_source, GLib.Cancellable? cancellable = null) throws GLib.Error
+      static async void on_role_dto_set (Kademlia.ValuePeer peer, owned RoleSource key_source, owned RoleSource value_source, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
           var key = yield key_source.get_key (cancellable);
           var value = yield value_source.get_input (cancellable);
@@ -450,15 +411,6 @@ namespace ScrapperD.Viewer
           provider.load_from_resource (@"$resource_base_path/gtk/styles.css");
 
           _gtk_style_context_add_provider_for_display (display, provider, priority);
-        }
-
-      static bool transform_id (GLib.Binding binding, GLib.Value source, ref GLib.Value target)
-
-          requires (source.holds (typeof (Kademlia.Key)))
-          requires (target.holds (typeof (string)))
-        {
-          target.set_string (((Kademlia.Key) source.get_boxed ()).to_string ());
-          return true;
         }
     }
 }

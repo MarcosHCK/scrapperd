@@ -37,7 +37,8 @@ namespace ScrapperD.Viewer
 
           if ((bits = value.split (":", 2)).length == 0)
             {
-              throw new RoleTransportError.INVALID ("invalid empty transport");
+              source = "";
+              type = default_;
             }
           else if (bits.length == 1)
             {

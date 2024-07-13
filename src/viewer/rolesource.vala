@@ -89,14 +89,14 @@ namespace ScrapperD.Viewer
             {
               case RoleSourceType.DATA:
                 {
-                  var bytes = new GLib.Bytes (source.data);
-                  var value = GLib.Value (typeof (GLib.Bytes));
-                    value.take_boxed ((owned) bytes);
+                  GLib.Value value;
+                  (value = GLib.Value (typeof (string))).set_string (source);
                   return (owned) value;
                 }
 
               case RoleSourceType.FILE:
                 {
+                  GLib.Value value;
                   var file = GLib.File.new_for_commandline_arg (source);
                   var file_stream = yield file.read_async (GLib.Priority.LOW, cancellable);
                   var byte_stream = new GLib.MemoryOutputStream.resizable ();
@@ -106,20 +106,15 @@ namespace ScrapperD.Viewer
                   unowned var flags = flags1 | flags2;
 
                   yield byte_stream.splice_async (file_stream, flags, GLib.Priority.LOW, cancellable);
-
-                  var bytes = byte_stream.steal_as_bytes ();
-                  var value = GLib.Value (typeof (GLib.Bytes));
-                    value.take_boxed ((owned) bytes);
+                  (value = GLib.Value (typeof (GLib.Bytes))).set_boxed (byte_stream.steal_as_bytes ());
                   return (owned) value;
                 }
 
               case RoleSourceType.NULL: return null;
 
-              case RoleSourceType.VERBATIM:
+              default:
 
                 throw new RoleTransportError.UNKNOWN_TYPE ("unsupported source '%s' for data", source_type.to_string ());
-
-              default: assert_not_reached ();
             }
         }
     }
