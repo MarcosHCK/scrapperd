@@ -1,0 +1,2 @@
+#! /bin/sh
+pandoc -o report.pdf report.md
