@@ -1,3 +1,3 @@
 # Autores
 
-- Marcos Antonio Perez Lorenzo, C-412
+- Marcos Antonio Pérez Lorenzo, C-412
