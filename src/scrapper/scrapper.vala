@@ -29,12 +29,12 @@ namespace ScrapperD.Scrapper
 
       [Compact] public class Result
         {
-          public GLib.Bytes contents;
+          public GLib.Variant content;
           public GLib.SList<GLib.Uri> links;
 
-          public Result (GLib.Bytes contents, owned SList<Uri> links)
+          public Result (GLib.Variant content, owned SList<Uri> links)
             {
-              this.contents = contents;
+              this.content = content;
               this.links = (owned) links;
             }
         }
@@ -55,16 +55,6 @@ namespace ScrapperD.Scrapper
             {
               builder.add ("{ss}", @as ?? name, value);
             }
-        }
-
-      static GLib.Bytes finish (GLib.VariantBuilder builder)
-        {
-          uint8[] buffer;
-          GLib.Variant result;
-
-          result = builder.end ();
-          result.store (buffer = new uint8 [result.get_size ()]);
-          return new Bytes.take ((owned) buffer);
         }
 
       [CCode (cheader_filename = "validuri.h", cname = "_g_uri_is_valid")]
@@ -164,7 +154,7 @@ namespace ScrapperD.Scrapper
           annotate (builder, response_headers, "Server", "server");
           builder.close ();
 
-          return new Result (finish (builder), (owned) links);
+          return new Result (builder.end (), (owned) links);
         }
     }
 }
