@@ -43,7 +43,7 @@ namespace Kademlia
             return ar;
         }}
 
-      public const uint BITLEN = 160;
+      public const uint BITLEN = 256;
       private const string charset = "0123456789abcdef";
 
       internal Key ()

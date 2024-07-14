@@ -35,7 +35,7 @@ namespace Testing
 
       construct
         {
-          table = new HashTable<Key, ValuePeer> (GLib.str_hash, GLib.str_equal);
+          table = new HashTable<Key, ValuePeer> (Key.hash, Key.equal);
         }
 
       public TestHub (int min_nodes = 100, int max_nodes = 1000)
