@@ -15,25 +15,10 @@
  * along with ScrapperD. If not, see <http://www.gnu.org/licenses/>.
  */
 
-[CCode (cprefix = "DH", lower_case_cprefix = "dh_")]
+[CCode (cprefix = "KryptDh", lower_case_cprefix = "krypt_dh_")]
 
-namespace Dh
+namespace Krypt.Dh
 {
-  [CCode (cheader_filename = "dhprotc.h")]
-
-  public errordomain Error
-    {
-      FAILED;
-
-      public static extern GLib.Quark quark ();
-
-      public static void rethrow (owned GLib.Error error) throws Dh.Error requires (error.domain == ErrorCode.domain ())
-        {
-          error.domain = quark ();
-          throw (Dh.Error) (owned) error;
-        }
-    }
-
   [Compact (opaque = true)] public class SharedSecret
     {
       internal Scalar x { get; private owned set; }
@@ -55,7 +40,7 @@ namespace Dh
           return Scalar.cmp (a.x, b.x) == 0;
         }
 
-      public void derivate (uint8[] buffer, uint bitlen) throws Dh.Error
+      public void derivate (uint8[] buffer, uint bitlen) throws Krypt.Error
 
           requires (buffer.length >= ((bitlen + 7) >> 3))
         {
@@ -65,8 +50,8 @@ namespace Dh
               buf.length = (int) (bitlen + 7) >> 3;
 
               var ps = new uint8 [(x.nbits + 7) >> 3];
-              x.to_buffer (Dh.ExternalFormat.USG, ps, null);
-              Kdf.derive (ps, Dh.KdfAlgos.SCRYPT, 8, "some salt".data, 8, buf);
+              x.to_buffer (ExternalFormat.USG, ps, null);
+              Kdf.derive (ps, KdfAlgos.SCRYPT, 8, "some salt".data, 8, buf);
             }
           catch (GLib.Error e)
             {
@@ -75,24 +60,16 @@ namespace Dh
             }
         }
 
-      public uint8[] derivate_key (uint bitlen) throws Dh.Error
+      public uint8[] derivate_key (uint bitlen) throws Krypt.Error
         {
           uint8[] buffer;
-          try { derivate (buffer = new uint8 [(bitlen + 7) >> 3], bitlen); } catch (GLib.Error e)
-            {
-              Error.rethrow ((owned) e);
-              assert_not_reached ();
-            }
+          derivate (buffer = new uint8 [(bitlen + 7) >> 3], bitlen);
           return (owned) buffer;
         }
 
-      public GLib.Bytes derivate_key_as_bytes (uint bitlen) throws Dh.Error
+      public GLib.Bytes derivate_key_as_bytes (uint bitlen) throws Krypt.Error
         {
-          try { return new Bytes.take (derivate_key (bitlen)); } catch (GLib.Error e)
-            {
-              Error.rethrow ((owned) e);
-              assert_not_reached ();
-            }
+          return new Bytes.take (derivate_key (bitlen));
         }
     }
 
@@ -101,7 +78,7 @@ namespace Dh
       internal Curve curve { get; private owned set; }
       internal Scalar d { get; private owned set; }
 
-      private PrivateSecret (string? curve_name) throws Dh.Error
+      private PrivateSecret (string? curve_name) throws Krypt.Error
         {
           d = new Scalar ();
 
@@ -112,7 +89,7 @@ namespace Dh
             }
         }
 
-      public PrivateSecret.generate (string? curve_name = "Curve25519") throws Dh.Error
+      public PrivateSecret.generate (string? curve_name = "Curve25519") throws Krypt.Error
         {
           this (curve_name);
 
@@ -149,7 +126,7 @@ namespace Dh
           curve.mul (q, d, g);
         }
 
-      public PublicSecret.from_buffer (uint8[] buffer) throws Dh.Error
+      public PublicSecret.from_buffer (uint8[] buffer) throws Krypt.Error
         {
           try { this.q = new Point.unpack (buffer); } catch (GLib.Error e)
             {
@@ -163,7 +140,7 @@ namespace Dh
           return Point.cmp (a.q, b.q) == 0;
         }
 
-      public uint8[] get_data () throws Dh.Error
+      public uint8[] get_data () throws Krypt.Error
         {
           try { return q.pack (); } catch (GLib.Error e)
             {
@@ -172,7 +149,7 @@ namespace Dh
             }
         }
 
-      public GLib.Bytes get_data_as_bytes () throws Dh.Error
+      public GLib.Bytes get_data_as_bytes () throws Krypt.Error
         {
           return new Bytes.take (get_data ());
         }
@@ -180,7 +157,7 @@ namespace Dh
 
   public abstract class IOStream : GLib.IOStream
     {
-      protected SharedSecret? shared_secret;
+      protected SharedSecret? shared_secret = null;
       public GLib.IOStream base_stream { get; construct; }
 
       public async override bool close_async (int io_priority, GLib.Cancellable? cancellable) throws GLib.IOError
@@ -188,7 +165,7 @@ namespace Dh
           return yield base_stream.close_async (io_priority, cancellable);
         }
 
-      public async bool handshake_client (int io_priority, GLib.Cancellable? cancellable = null) throws GLib.Error
+      public virtual async bool handshake_client (int io_priority, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
           var private_secret = new PrivateSecret.generate ();
           var public_secret = new PublicSecret.generate (private_secret);
@@ -202,7 +179,7 @@ namespace Dh
           return true;
         }
 
-      public async bool handshake_server (int io_priority, GLib.Cancellable? cancellable = null) throws GLib.Error
+      public virtual async bool handshake_server (int io_priority, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
           var private_secret = new PrivateSecret.generate ();
           var public_secret = new PublicSecret.generate (private_secret);

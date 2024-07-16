@@ -14,18 +14,18 @@
  * You should have received a copy of the GNU General Public License
  * along with ScrapperD. If not, see <http://www.gnu.org/licenses/>.
  */
-using Dh;
+using Krypt.Dh;
 
 namespace Testing
 {
   public static int main (string[] args)
     {
       GLib.Test.init (ref args, null);
-      GLib.Test.add_func (TESTPATHROOT + "/DHProto/derivate", () => (new TestDerivate ()).run ());
-      GLib.Test.add_func (TESTPATHROOT + "/DHProto/export", () => (new TestExport ()).run ());
-      GLib.Test.add_func (TESTPATHROOT + "/DHProto/import", () => (new TestImport ()).run ());
-      GLib.Test.add_func (TESTPATHROOT + "/DHProto/new", () => (new TestNew ()).run ());
-      GLib.Test.add_func (TESTPATHROOT + "/DHProto/stream", () => (new TestStream ()).run ());
+      GLib.Test.add_func (TESTPATHROOT + "/Krypto/DH/derivate", () => (new TestDerivate ()).run ());
+      GLib.Test.add_func (TESTPATHROOT + "/Krypto/DH/export", () => (new TestExport ()).run ());
+      GLib.Test.add_func (TESTPATHROOT + "/Krypto/DH/import", () => (new TestImport ()).run ());
+      GLib.Test.add_func (TESTPATHROOT + "/Krypto/DH/new", () => (new TestNew ()).run ());
+      GLib.Test.add_func (TESTPATHROOT + "/Krypto/DH/stream", () => (new TestStream ()).run ());
       return GLib.Test.run ();
     }
 
@@ -124,8 +124,8 @@ namespace Testing
 
   class TestNew : SyncTest
     {
-      protected Dh.PrivateSecret[] privates;
-      protected Dh.PublicSecret[] publics;
+      protected PrivateSecret[] privates;
+      protected PublicSecret[] publics;
 
       protected override void test ()
         {
@@ -134,8 +134,8 @@ namespace Testing
           var average = (double) 0;
           var timer = new GLib.Timer ();
 
-          privates = new Dh.PrivateSecret [ni];
-          publics = new Dh.PublicSecret [ni];
+          privates = new PrivateSecret [ni];
+          publics = new PublicSecret [ni];
 
           for (unowned var i = 0; i < ni; ++i)
             {
@@ -143,8 +143,8 @@ namespace Testing
 
               try
                 {
-                  privates [i] = new Dh.PrivateSecret.generate ();
-                  publics [i] = new Dh.PublicSecret.generate (privates [i]);
+                  privates [i] = new PrivateSecret.generate ();
+                  publics [i] = new PublicSecret.generate (privates [i]);
                   average += timer.elapsed ();
                 }
               catch (GLib.Error e)
@@ -191,7 +191,7 @@ namespace Testing
         }
     }
 
-  class TestStreamImpl : Dh.IOStream
+  class TestStreamImpl : Krypt.Dh.IOStream
     {
       public override GLib.InputStream input_stream { get { return base_stream.input_stream; } }
       public override GLib.OutputStream output_stream { get { return base_stream.output_stream; } }

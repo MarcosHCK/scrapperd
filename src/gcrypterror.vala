@@ -14,28 +14,21 @@
  * You should have received a copy of the GNU General Public License
  * along with ScrapperD. If not, see <http://www.gnu.org/licenses/>.
  */
-#include <config.h>
-#include <dhprotc.h>
-#include <gcrypt.h>
 
-G_DEFINE_QUARK (gcrypt-error-quark, _gcry_error);
-G_LOCK_DEFINE_STATIC (gcry_strerror);
+[CCode (cprefix = "Krypt", lower_case_cprefix = "krypt_")]
 
-void _gcry_init (void)
+namespace Krypt
 {
-  static gsize __good_flag__ = 0;
-
-  if (g_once_init_enter (&__good_flag__))
+  public errordomain Error
     {
-      gcry_check_version (GCRYPT_VERSION);
-      g_once_init_leave (&__good_flag__, 1);
-    }
-}
+      FAILED;
 
-const gchar* _gcry_strerror (gcry_error_t code)
-{
-  const gchar* message;
-  G_LOCK (gcry_strerror);
-  message = gcry_strerror (code);
-  return (G_UNLOCK (gcry_strerror), message);
+      public static extern GLib.Quark quark ();
+
+      public static void rethrow (owned GLib.Error error) throws Krypt.Error requires (error.domain == ErrorCode.domain ())
+        {
+          error.domain = quark ();
+          throw (Krypt.Error) (owned) error;
+        }
+    }
 }

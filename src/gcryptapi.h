@@ -16,12 +16,8 @@
  */
 #ifndef __DH_PROTC__
 #define __DH_PROTC__ 1
-#include <glib.h>
 #include <gcrypt.h>
-
-typedef struct gcry_context DHCurve;
-typedef struct gcry_mpi_point DHPoint;
-typedef struct gcry_mpi DHScalar;
+#include <glib.h>
 
 #if __cplusplus
 extern "C" {
@@ -31,7 +27,7 @@ extern "C" {
   G_GNUC_INTERNAL GQuark _gcry_error_quark (void);
   G_GNUC_INTERNAL const gchar* _gcry_strerror (gcry_error_t code);
 
-  static __inline gpointer dh_packed_compact (gcry_mpi_t x, gcry_mpi_t y, gcry_mpi_t z, guint* buflen, gpointer* xp, guint* xB, gpointer* yp, guint* yB, gpointer* zp, guint* zB)
+  static __inline gpointer gcrypt_api_packed_compact (gcry_mpi_t x, gcry_mpi_t y, gcry_mpi_t z, guint* buflen, gpointer* xp, guint* xB, gpointer* yp, guint* yB, gpointer* zp, guint* zB)
     {
       g_return_val_if_fail (x != NULL, NULL);
       g_return_val_if_fail (y != NULL, NULL);
@@ -50,7 +46,7 @@ extern "C" {
       return (*buflen = bytes, buffer);
     }
 
-  static __inline gboolean dh_packed_extract (gpointer buffer, gsize buflen, gpointer* xp, guint* xB, gpointer* yp, guint* yB, gpointer* zp, guint* zB)
+  static __inline gboolean gcrypt_api_packed_extract (gpointer buffer, gsize buflen, gpointer* xp, guint* xB, gpointer* yp, guint* yB, gpointer* zp, guint* zB)
     {
       g_return_val_if_fail (buffer != NULL, FALSE);
       g_return_val_if_fail (buflen >= 3 * sizeof (guint16), FALSE);
