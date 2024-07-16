@@ -17,12 +17,17 @@
 
 namespace Testing
 {
-  public const string TESTPATHROOT = "/org/hck/ScrapperD/Kademlia";
+  public const string TESTPATHROOT = "/org/hck/ScrapperD";
 
-  public abstract class AsyncTest : GLib.Object
+  public abstract class BaseTestCase : GLib.Object
+    {
+      public abstract void run (GLib.MainContext? context = null);
+    }
+
+  public abstract class AsyncTest : BaseTestCase
     {
 
-      public void run (GLib.MainContext? context = null)
+      public override void run (GLib.MainContext? context = null)
         {
           var loop = new GLib.MainLoop (context, false);
 
@@ -75,6 +80,17 @@ namespace Testing
           source.attach (context);
           loop.run ();
         }
+    }
+
+  public abstract class SyncTest : BaseTestCase
+    {
+
+      public override void run (GLib.MainContext? context = null)
+        {
+          test ();
+        }
+
+      protected abstract void test ();
     }
 
   [CCode (scope = "notified")]

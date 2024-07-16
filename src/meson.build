@@ -15,6 +15,29 @@
 # along with ScrapperD. If not, see <http://www.gnu.org/licenses/>.
 #
 
+libdhproto = library \
+  (
+    'dhproto',
+
+    dependencies :
+      [
+        cc.find_library ('libgcrypt'),
+        vala.find_library ('gio-2.0'), libgio_dep,
+        vala.find_library ('glib-2.0'), libglib_dep,
+        vala.find_library ('gobject-2.0'), libgobject_dep,
+      ],
+
+    include_directories : [ configdir ],
+
+    sources :
+      [
+        'dhprotc.c',
+        'dhprotc.h',
+        'dhprotc.vapi',
+        'dhproto.vala',
+      ],
+  )
+
 libkademlia = library \
   (
     'kademlia',
