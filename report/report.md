@@ -4,7 +4,7 @@
 
 - Compilador de C/C++ (preferiblemente Clang)
 - Compilador de Vala
-- glib, gobject, gio
+- gcrypt, glib, gobject, gio, soup3
 - Gtk 4
 - meson
 
@@ -13,8 +13,10 @@
 ```sh
 apt install clang
 apt install vala
+api install libgcrypt20-dev
 apt install libglib2.0-dev
 apt install libgtk-4-dev
+apt install libsoup-3.0-dev
 apt install meson
 ```
 
