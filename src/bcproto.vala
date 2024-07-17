@@ -181,6 +181,8 @@ namespace Krypt.Bc
       bool doreset = false;
       bool finished = false;
 
+      public bool blocking { get; set; default = true; }
+
       public EncryptConverter (string algo_name, string mode_name) throws GLib.Error
         {
           Object (algo_name : algo_name, mode_name : mode_name);
@@ -231,7 +233,7 @@ namespace Krypt.Bc
                   if (blocksz > outbuf.length)
 
                     throw new IOError.NO_SPACE ("bigger output buffer needed");
-                  else if ((flags & (ConverterFlags.FLUSH | ConverterFlags.INPUT_AT_END)) == 0)
+                  else if (blocking == true && (flags & (ConverterFlags.FLUSH | ConverterFlags.INPUT_AT_END)) == 0)
 
                     throw new IOError.PARTIAL_INPUT ("more input data needed");
                   else

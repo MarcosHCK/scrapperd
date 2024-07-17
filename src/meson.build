@@ -67,6 +67,7 @@ libkrypt = library \
         'gcryptapi.c',
         'gcryptapi.h',
         'gcrypterror.vala',
+        'krypt.vala',
       ],
   )
 
@@ -83,7 +84,7 @@ libkademlia_dbus = library \
 
     include_directories : [ configdir ],
 
-    link_with : [ libkademlia ],
+    link_with : [ libkademlia, libkrypt ],
 
     sources :
       [
