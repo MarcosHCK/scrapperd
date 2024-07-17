@@ -18,8 +18,8 @@
 #define __KADEMLIA_KEYVAL__ 1
 #include <glib.h>
 
-#define K_KEY_VAL_BITLEN 160
-#define K_KEY_VAL_CHECKSUM G_CHECKSUM_SHA1
+#define K_KEY_VAL_BITLEN 256
+#define K_KEY_VAL_CHECKSUM G_CHECKSUM_SHA256
 typedef union _KKeyVal KKeyVal;
 
 #if __cplusplus

@@ -33,7 +33,9 @@ namespace ScrapperD.Scrapper
           Object (scrapper : scrapper);
         }
 
-      private async void scrap_and_save (owned Key id, GLib.Uri uri, GLib.Bytes? other) throws GLib.Error
+      private async void scrap_and_save (owned Key id, GLib.Uri uri, owned GLib.Value? otherv) throws GLib.Error
+
+          requires (otherv == null || otherv.holds (typeof (GLib.Bytes)))
         {
           Scrapper.Result? result = null;
 
@@ -49,45 +51,30 @@ namespace ScrapperD.Scrapper
 
           debug ("uri scrapped %s:('%s')", id.to_string (), uri.to_string ());
 
-          GLib.Bytes contents;
+          GLib.Variant contents;
 
-          if (other == null)
-
-            contents = result.contents;
+          if (otherv == null)
+            {
+              Variant arv [1] = { result.content };
+              contents = new Variant.array (null, arv);
+            }
           else
             {
-              var otherv = new GLib.Variant.from_bytes (Scrapper.scrap_variant_type, other, false);
-              var arv = (GLib.Variant) null;
+              var type = new VariantType.array (Scrapper.scrap_variant_type);
+              var other = new Variant.from_bytes (type, (Bytes) otherv.get_boxed (), false);
+              var builder = new VariantBuilder (type);
+              var iter = new VariantIter (other);
+              var child = (GLib.Variant?) null;
 
-              if (otherv.is_of_type (GLib.VariantType.ARRAY) == false)
-                {
-                  GLib.Variant newv;
+              while ((child = iter.next_value ()) != null)
 
-                  newv = new GLib.Variant.from_bytes (Scrapper.scrap_variant_type, result.contents, false);
-                  arv = new GLib.Variant.array (Scrapper.scrap_variant_type, { otherv, newv });
-                }
-              else
-                {
-                  var othern = arv.n_children ();
-                  var othervs = new GLib.Variant [1 + othern];
-                  var i = 0;
+                builder.add_value (child);
+                builder.add_value (result.content);
 
-                  foreach (var child in otherv)
-                    {
-                      othervs [++i] = (owned) child;
-                    }
-
-                  othervs [0] = new GLib.Variant.from_bytes (Scrapper.scrap_variant_type, result.contents, false);
-                  arv = new GLib.Variant.array (Scrapper.scrap_variant_type, othervs);
-                }
-
-              var data = new uint8 [arv.get_size ()];
-
-              arv.store (& data [0]);
-              contents = new GLib.Bytes.take (data);
+              contents = builder.end ();
             }
 
-          if (unlikely (false == yield store_peer.insert (id, contents)))
+          if (unlikely (false == yield store_peer.insert (id, contents.get_data_as_bytes ())))
             {
               debug ("uri data was not saved %s:('%s')", id.to_string (), uri.to_string ());
             }
@@ -125,7 +112,7 @@ namespace ScrapperD.Scrapper
                 debug ("uri already scrapped %s:('%s')", id.to_string (), uri.to_string ());
               else
 
-                scrap_and_save.begin (id.copy (), uri, (Bytes?) other?.get_boxed (), (o, res) =>
+                scrap_and_save.begin (id.copy (), uri, (owned) other, (o, res) =>
                   {
                     try { ((Store) o).scrap_and_save.end (res); } catch (GLib.Error e)
                       {

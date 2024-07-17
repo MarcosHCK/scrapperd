@@ -45,6 +45,32 @@ libkademlia = library \
       ],
   )
 
+libkrypt = library \
+  (
+    'krypt',
+
+    dependencies :
+      [
+        cc.find_library ('libgcrypt'),
+        vala.find_library ('gio-2.0'), libgio_dep,
+        vala.find_library ('glib-2.0'), libglib_dep,
+        vala.find_library ('gobject-2.0'), libgobject_dep,
+      ],
+
+    include_directories : [ configdir ],
+
+    sources :
+      [
+        'bcproto.vala',
+        'dhproto.vala',
+        'gcrypt.vapi',
+        'gcryptapi.c',
+        'gcryptapi.h',
+        'gcrypterror.vala',
+        'krypt.vala',
+      ],
+  )
+
 libkademlia_dbus = library \
   (
     'kademlia_dbus',
@@ -58,7 +84,7 @@ libkademlia_dbus = library \
 
     include_directories : [ configdir ],
 
-    link_with : [ libkademlia ],
+    link_with : [ libkademlia, libkrypt ],
 
     sources :
       [

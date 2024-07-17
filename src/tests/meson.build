@@ -17,6 +17,8 @@
 
 tests = \
   {
+    'Krypto BC implementation' : [ 'bcproto.vala' ],
+    'Krypto ECDHE implementation' : [ 'dhproto.vala' ],
     'Kademlia buckets tests' : [ 'buckets.vala' ],
     'Kademlia DBus hub tests' : [ 'hub.vala', 'baseintegration.vala' ],
     'Kademlia integration tests' : [ 'integration.vala', 'baseintegration.vala' ],
@@ -46,7 +48,7 @@ foreach description, files : tests
 
           include_directories : [ configdir, include_directories ('..') ],
 
-          link_with : [ libscrapperd, libkademlia, libkademlia_dbus ],
+          link_with : [ libkademlia, libkademlia_dbus, libkrypt, libscrapperd ],
 
           sources : files + [ 'base.vala' ],
         ),
