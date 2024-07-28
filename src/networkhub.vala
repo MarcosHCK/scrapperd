@@ -91,10 +91,9 @@ namespace Kademlia.DBus
           var flags2 = GLib.DBusConnectionFlags.DELAY_MESSAGE_PROCESSING;
           var flags = flags1 | flags2;
           var socket_connection = yield (new SocketClient ()).connect_to_host_async (host_and_port, default_port, cancellable);
-          //var krypt_stream = new Krypt.IOStream ("AES", "CBC", socket_connection);
-          //yield krypt_stream.handshake_client (GLib.Priority.LOW, cancellable);
-          //var stream = new TcpWrapperConnection (krypt_stream, socket_connection.socket);
-          var dbus = yield new GLib.DBusConnection (socket_connection, null, flags, null, cancellable);
+          var krypt_stream = new Krypt.IOStream ("AES", "CBC", socket_connection);
+          yield krypt_stream.handshake_client (GLib.Priority.LOW, cancellable);
+          var dbus = yield new GLib.DBusConnection (krypt_stream, null, flags, null, cancellable);
 
           yield prepare_connection (dbus, cancellable);
 
@@ -162,10 +161,9 @@ namespace Kademlia.DBus
           var flags3 = GLib.DBusConnectionFlags.DELAY_MESSAGE_PROCESSING;
           var flags = flags1 | flags2 | flags3;
           var guid = GLib.DBus.generate_guid ();
-          //var krypt_stream = new Krypt.IOStream ("AES", "CBC", socket_connection);
-          //yield krypt_stream.handshake_server (GLib.Priority.LOW, cancellable);
-          //var stream = new TcpWrapperConnection (krypt_stream, socket_connection.socket);
-          var dbus = yield new GLib.DBusConnection (socket_connection, guid, flags, null, cancellable);
+          var krypt_stream = new Krypt.IOStream ("AES", "CBC", socket_connection);
+          yield krypt_stream.handshake_server (GLib.Priority.LOW, cancellable);
+          var dbus = yield new GLib.DBusConnection (krypt_stream, guid, flags, null, cancellable);
 
           yield prepare_connection (dbus, cancellable);
 

@@ -293,10 +293,12 @@ namespace Krypt
       [CCode (cname = "GCRY_KDF_BALLOON")] BALLOON,
     }
 
-  [CCode (cheader_filename = "gcryptapi.h", lower_case_cprefix = "gcrypt_api_packed_")] [Compact (opaque = true)]
+  [CCode (cheader_filename = "gcryptapi.h", lower_case_cprefix = "gcrypt_api_packed_")]
 
   namespace Packed
     {
+      [CCode (cname = "GCRYPT_API_PACKED_OVERHEAD")]
+      internal const uint OVERHEAD;
       [CCode (array_length_pos = 3.1, array_length_type = "guint")]
       internal static uint8[] compact (Scalar x, Scalar y, Scalar z, out void* xp, out uint xB, out void* yp, out uint yB, out void* zp, out uint zB);
       internal static bool extract ([CCode (array_length_pos = 1.1, array_length_type = "guint")] uint8[] buffer, out void* xp, out uint xB, out void* yp, out uint yB, out void* zp, out uint zB);

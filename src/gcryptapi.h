@@ -27,6 +27,8 @@ extern "C" {
   G_GNUC_INTERNAL GQuark _gcry_error_quark (void);
   G_GNUC_INTERNAL const gchar* _gcry_strerror (gcry_error_t code);
 
+  #define GCRYPT_API_PACKED_OVERHEAD (sizeof (guint16) * 3)
+
   static __inline gpointer gcrypt_api_packed_compact (gcry_mpi_t x, gcry_mpi_t y, gcry_mpi_t z, guint* buflen, gpointer* xp, guint* xB, gpointer* yp, guint* yB, gpointer* zp, guint* zB)
     {
       g_return_val_if_fail (x != NULL, NULL);

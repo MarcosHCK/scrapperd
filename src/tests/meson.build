@@ -17,8 +17,9 @@
 
 tests = \
   {
-    'Krypto BC implementation' : [ 'bcproto.vala' ],
-    'Krypto ECDHE implementation' : [ 'dhproto.vala' ],
+    'Krypt BC implementation' : [ 'bcproto.vala' ],
+    'Krypt ECDHE implementation' : [ 'dhproto.vala' ],
+    'Krypt stream implementation' : [ 'krypt.vala' ],
     'Kademlia buckets tests' : [ 'buckets.vala' ],
     'Kademlia DBus hub tests' : [ 'hub.vala', 'baseintegration.vala' ],
     'Kademlia integration tests' : [ 'integration.vala', 'baseintegration.vala' ],

@@ -78,7 +78,7 @@ namespace Krypt.Dh
       internal Curve curve { get; private owned set; }
       internal Scalar d { get; private owned set; }
 
-      private PrivateSecret (string? curve_name) throws Krypt.Error
+      private PrivateSecret (string curve_name) throws Krypt.Error
         {
           d = new Scalar ();
 
@@ -89,7 +89,7 @@ namespace Krypt.Dh
             }
         }
 
-      public PrivateSecret.generate (string? curve_name = "Curve25519") throws Krypt.Error
+      public PrivateSecret.generate (string curve_name = "Curve25519") throws Krypt.Error
         {
           this (curve_name);
 
@@ -157,63 +157,89 @@ namespace Krypt.Dh
 
   public abstract class IOStream : GLib.IOStream
     {
-      protected SharedSecret? shared_secret = null;
       public GLib.IOStream base_stream { get; construct; }
+      public bool close_base_stream { get; construct; default = true; }
+      public string curve_name { get; construct; }
+      protected SharedSecret? shared_secret = null;
 
-      public async override bool close_async (int io_priority, GLib.Cancellable? cancellable) throws GLib.IOError
+      construct
         {
-          return yield base_stream.close_async (io_priority, cancellable);
+          if (curve_name == null) curve_name = "Curve25519";
         }
 
-      public virtual async bool handshake_client (int io_priority, GLib.Cancellable? cancellable = null) throws GLib.Error
+      public override bool close (GLib.Cancellable? cancellable = null) throws GLib.IOError
         {
-          var private_secret = new PrivateSecret.generate ();
-          var public_secret = new PublicSecret.generate (private_secret);
-          var input_stream = new DataInputStream (this.base_stream.input_stream);
-          input_stream.close_base_stream = false;
-
-          yield share_public_secret (public_secret, io_priority, cancellable);
-          var foreign_secret = yield listen_public_secret (io_priority, cancellable);
-
-          shared_secret = new SharedSecret (private_secret, foreign_secret);
+          if (close_base_stream) return base_stream.close (cancellable);
           return true;
         }
 
-      public virtual async bool handshake_server (int io_priority, GLib.Cancellable? cancellable = null) throws GLib.Error
+      public async bool handshake_client (int io_priority, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
-          var private_secret = new PrivateSecret.generate ();
+          Scalar? p;
+          var private_secret = new PrivateSecret.generate (curve_name);
           var public_secret = new PublicSecret.generate (private_secret);
-          var input_stream = new DataInputStream (this.base_stream.input_stream);
-          input_stream.close_base_stream = false;
+          GLib.assert ((p = private_secret.curve.named_scalar ("p")) != null);
 
-          var foreign_secret = yield listen_public_secret (io_priority, cancellable);
           yield share_public_secret (public_secret, io_priority, cancellable);
+          var foreign_secret = yield listen_public_secret (p.nbits, io_priority, cancellable);
 
           shared_secret = new SharedSecret (private_secret, foreign_secret);
+          return handshake_done (cancellable);
+        }
+
+      public virtual bool handshake_done (GLib.Cancellable? cancellable = null) throws GLib.Error
+        {
           return true;
         }
 
-      private async PublicSecret listen_public_secret (int io_priority, GLib.Cancellable? cancellable) throws GLib.Error
+      public async bool handshake_server (int io_priority, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
-          var line = yield next_line (io_priority, cancellable);
+          Scalar? p;
+          var private_secret = new PrivateSecret.generate (curve_name);
+          var public_secret = new PublicSecret.generate (private_secret);
+          GLib.assert ((p = private_secret.curve.named_scalar ("p")) != null);
+
+          var foreign_secret = yield listen_public_secret (p.nbits, io_priority, cancellable);
+          yield share_public_secret (public_secret, io_priority, cancellable);
+
+          shared_secret = new SharedSecret (private_secret, foreign_secret);
+          return handshake_done (cancellable);
+        }
+
+      private async PublicSecret listen_public_secret (uint pbits, int io_priority, GLib.Cancellable? cancellable) throws GLib.Error
+        {
+          var line = yield next_line (pbits, io_priority, cancellable);
           var data = Base64.decode (line);
           var secret = new PublicSecret.from_buffer (data);
           return (owned) secret;
         }
 
-      private async string next_line (int io_priority, GLib.Cancellable? cancellable) throws GLib.Error
+      private async string next_line (uint pbits, int io_priority, GLib.Cancellable? cancellable) throws GLib.Error
         {
-          var input_stream = new DataInputStream (this.base_stream.input_stream);
-          input_stream.close_base_stream = false;
+          var expected_decodedsz = ((pbits + 7) / 8) * 3 + Packed.OVERHEAD;
+          var expected_encodedsz = (expected_decodedsz / 3 + 1) * 4;
+          var expected_sz = expected_encodedsz * 2;
+          var builder = new StringBuilder.sized (expected_sz);
+          uint8 byte [1];
 
-          size_t length = 0;
-          string? line;
+          unowned var input_stream = (GLib.InputStream) this.base_stream.input_stream;
 
-          if (unlikely ((line = yield input_stream.read_line_utf8_async (io_priority, cancellable, out length)) == null))
+          while (true)
+            {
+              if (0 == yield input_stream.read_async (byte, io_priority, cancellable))
 
-            throw new IOError.INVALID_DATA ("can not read next line");
-          else
-            return (owned) line;
+                throw new IOError.FAILED ("unexpected end of stream");
+
+              if (byte [0] == '\n') break; else
+
+                builder.append_c ((char) byte [0]);
+
+              if (builder.len > expected_sz)
+
+                throw new IOError.INVALID_DATA ("foreign public key too long");
+            }
+
+          return builder.free_and_steal ();
         }
 
       private async bool share_public_secret (PublicSecret public_secret, int io_priority, GLib.Cancellable? cancellable) throws GLib.Error
@@ -221,7 +247,7 @@ namespace Krypt.Dh
           var data = public_secret.get_data ();
           var line = Base64.encode (data);
 
-          unowned var output_stream = (OutputStream) this.base_stream.output_stream;
+          unowned var output_stream = (GLib.OutputStream) this.base_stream.output_stream;
 
           yield output_stream.write_all_async (line.data, io_priority, cancellable, null);
           yield output_stream.write_all_async ("\n".data, io_priority, cancellable, null);

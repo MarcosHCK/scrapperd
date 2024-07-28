@@ -28,7 +28,7 @@ namespace Krypt.Bc
     {
       uint8 hint = block [block.length - 1];
       for (unowned uint8 i = 0; i < hint; ++i) if (block [block.length - 1 - i] != hint) return 0;
-      return - (int) hint;
+      return (int) hint;
     }
 
   public abstract class BaseCipherConverter : GLib.Object, GLib.Initable
@@ -57,7 +57,7 @@ namespace Krypt.Bc
               throw new Error.FAILED ("unknown cipher mode %s", mode_name);
             }
 
-          blocksz = algo.get_blocksz ();
+          GLib.assert ((blocksz = algo.get_blocksz ()) <= uint8.MAX);
           keylen = algo.get_keylen ();
 
           try { cipher = Cipher.open (algo, mode, flags); } catch (GLib.Error e)
@@ -92,77 +92,53 @@ namespace Krypt.Bc
 
       public GLib.ConverterResult convert (uint8[] inbuf, uint8[] outbuf, GLib.ConverterFlags flags, out size_t read, out size_t written) throws GLib.Error
         {
-          size_t _read = 0;
-          size_t _written = 0;
-
-          try
+          if (finished)
             {
-              var result = convert6 (inbuf, outbuf, flags, out _read, out _written);
-              read = _read;
-              written = _written;
-              printerr ("decrypt (.., %i, .., %i, %s, %i, %i, <none>);\n", (int) inbuf.length, (int) outbuf.length, flags.to_string (), (int) _read, (int) _written);
-              return result;
+              read = written = 0;
+              return GLib.ConverterResult.FINISHED;
             }
-          catch (GLib.Error e)
-            {
-              var er = @"$(e.domain): $(e.code): $(e.message)";
-              read = _read;
-              written = _written;
-              printerr ("decrypt (.., %i, .., %i, %s, %i, %i, %s);\n", (int) inbuf.length, (int) outbuf.length, flags.to_string (), (int) _read, (int) _written, er);
-              throw (owned) e;
-            }
-        }
-
-      public GLib.ConverterResult convert6 (uint8[] inbuf, uint8[] outbuf, GLib.ConverterFlags flags, out size_t read, out size_t written) throws GLib.Error
-        {
-          size_t blocksz = this.blocksz;
-          size_t taken = (read = written = 0);
-          size_t lost = 0;
-
-          if (doreset)
+          else if (doreset)
             {
               cipher.reset ();
               doreset = false;
             }
 
-          while (true)
+          var blocksz = this.blocksz;
+          var flush = (flags & (GLib.ConverterFlags.FLUSH | GLib.ConverterFlags.INPUT_AT_END)) != 0;
+          var taking = alignfloor (inbuf.length, blocksz);
+          var needed = taking == 0 ? 0 : taking - blocksz;
+          var taken = (taking / blocksz) - (flush ? 0 : 1);
+
+          if (needed > outbuf.length)
+
+            throw new IOError.NO_SPACE ("bigger output buffer needed");
+          else if (flush == false && (taken < 2))
+
+            throw new IOError.PARTIAL_INPUT ("more input data needed");
+          else
             {
-              var taken_in = alignfloor (inbuf.length, blocksz) / blocksz;
-              var taken_out = alignfloor (outbuf.length, blocksz - 1) / (blocksz - 1);
-
-              if (inbuf.length > 0 && (taken = size_t.min (taken_in, taken_out)) == 0)
+              for (unowned size_t i = 0; i < taken; ++i)
                 {
-                  if (blocksz > outbuf.length)
+                  unowned var @in = (uint8[]) & inbuf [i * blocksz]; @in.length = (int) blocksz;
+                  unowned var @out = (uint8[]) & outbuf [i * blocksz]; @out.length = (int) blocksz;
 
-                    throw new IOError.NO_SPACE ("bigger output buffer needed");
-                  else if ((flags & GLib.ConverterFlags.INPUT_AT_END) == 0)
+                  if ((taken - 1) == i && (GLib.ConverterFlags.INPUT_AT_END) != 0)
 
-                    throw new IOError.PARTIAL_INPUT ("more input data needed");
-                  else
-
-                    throw new IOError.INVALID_DATA ("unaligned ciphered data (maybe lost data?)");
-                }
-              else if (inbuf.length > (lost = 0))
-                {
-                  for (int i = 0; i < taken; ++i)
-                    {
-                      unowned var @in = (uint8[]) & inbuf [i * (blocksz)]; @in.length = (int) blocksz;
-                      unowned var @out = (uint8[]) & outbuf [i * (blocksz - 1)]; @out.length = (int) (blocksz - 1);
-                      var pad = 0;
-
-                      cipher.decrypt (tmpblock, @in);
-
-                      lost -= (pad = parse_pkcs7 (tmpblock, blocksz));
-                      GLib.Memory.copy (& @out [0], & tmpblock [0], blocksz + pad);
-                    }
-
-                  written = (read = blocksz * taken) - lost;
+                    cipher.setfinal ();
+                    cipher.decrypt (@out, @in);
                 }
 
-              break;
+              read = (written = taken * blocksz);
+
+              if (flush && written > 0)
+                {
+                  unowned var last = (uint8[]) & outbuf [0]; last.length = (int) written;
+                  unowned var padd = parse_pkcs7 (last, blocksz);
+                  written -= (size_t) padd;
+                }
+
+              return result_from_flags (flags);
             }
-
-          return result_from_flags (flags);
         }
 
       public void reset () { doreset = true; finished = false; }
@@ -181,8 +157,6 @@ namespace Krypt.Bc
       bool doreset = false;
       bool finished = false;
 
-      public bool blocking { get; set; default = true; }
-
       public EncryptConverter (string algo_name, string mode_name) throws GLib.Error
         {
           Object (algo_name : algo_name, mode_name : mode_name);
@@ -191,91 +165,61 @@ namespace Krypt.Bc
 
       public GLib.ConverterResult convert (uint8[] inbuf, uint8[] outbuf, GLib.ConverterFlags flags, out size_t read, out size_t written) throws GLib.Error
         {
-          size_t _read = 0;
-          size_t _written = 0;
-
-          try
+          if (finished)
             {
-              var result = convert8 (inbuf, outbuf, flags, out _read, out _written);
-              read = _read;
-              written = _written;
-              printerr ("encrypt (.., %i, .., %i, %s, %i, %i, <none>);\n", (int) inbuf.length, (int) outbuf.length, flags.to_string (), (int) _read, (int) _written);
-              return result;
+              read = written = 0;
+              return GLib.ConverterResult.FINISHED;
             }
-          catch (GLib.Error e)
-            {
-              var er = @"$(e.domain): $(e.code): $(e.message)";
-              read = _read;
-              written = _written;
-              printerr ("encrypt (.., %i, .., %i, %s, %i, %i, %s);\n", (int) inbuf.length, (int) outbuf.length, flags.to_string (), (int) _read, (int) _written, er);
-              throw (owned) e;
-            }
-        }
-
-      public GLib.ConverterResult convert8 (uint8[] inbuf, uint8[] outbuf, GLib.ConverterFlags flags, out size_t read, out size_t written) throws GLib.Error
-        {
-          size_t blocksz = this.blocksz;
-          size_t taken = (read = written = 0);
-
-          if (doreset)
+          else if (doreset)
             {
               cipher.reset ();
               doreset = false;
             }
 
-          while (true)
+          var blocksz = this.blocksz;
+          var flush = (flags & (GLib.ConverterFlags.FLUSH | GLib.ConverterFlags.INPUT_AT_END)) != 0;
+          var taking = alignfloor (inbuf.length, blocksz);
+          var needed = flush == false ? taking : taking + blocksz;
+          var taken = taking / blocksz;
+
+          if (needed > outbuf.length)
+
+            throw new IOError.NO_SPACE ("bigger output buffer needed");
+          else if (flush == false && taken == 0)
+
+            throw new IOError.PARTIAL_INPUT ("more input data needed");
+          else
             {
-              var taken_in = alignfloor (inbuf.length, blocksz - 1) / (blocksz - 1);
-              var taken_out = alignfloor (outbuf.length, blocksz) / blocksz;
-
-              if (inbuf.length > 0 && (taken = size_t.min (taken_in, taken_out)) == 0)
+              for (unowned size_t i = 0; i < taken; ++i)
                 {
-                  if (blocksz > outbuf.length)
-
-                    throw new IOError.NO_SPACE ("bigger output buffer needed");
-                  else if (blocking == true && (flags & (ConverterFlags.FLUSH | ConverterFlags.INPUT_AT_END)) == 0)
-
-                    throw new IOError.PARTIAL_INPUT ("more input data needed");
-                  else
-                    {
-                      var padding = (int) (blocksz - inbuf.length % blocksz);
-
-                      GLib.Memory.copy (& tmpblock [0], & inbuf [0], inbuf.length);
-
-                      for (unowned var i = inbuf.length; i < tmpblock.length; ++i)
-
-                        tmpblock [i] = (uint8) padding;
-
-                        read = inbuf.length;
-                        written = tmpblock.length;
-
-                      if ((flags & ConverterFlags.INPUT_AT_END) != 0)
-
-                        cipher.setfinal ();
-                        cipher.encrypt (outbuf, tmpblock);
-
-                      if ((flags & ConverterFlags.FLUSH) != 0)
-
-                        cipher.reset ();
-                    }
+                  unowned var @in = (uint8[]) & inbuf [i * blocksz]; @in.length = (int) blocksz;
+                  unowned var @out = (uint8[]) & outbuf [i * blocksz]; @out.length = (int) blocksz;
+                  cipher.encrypt (@out, @in);
                 }
-              else if (inbuf.length > 0)
+
+              if (flush)
                 {
-                  for (int i = 0; i < taken; ++i)
+                  GLib.assert (inbuf.length >= taking);
+                  unowned var @in = (uint8[]) & inbuf [taken * blocksz]; @in.length = (int) blocksz;
+                  unowned var @out = (uint8[]) & outbuf [taken * blocksz]; @out.length = (int) blocksz;
+
+                  if (inbuf.length == taking)
                     {
-                      unowned var @in = (uint8[]) & inbuf [i * (blocksz - 1)]; @in.length = (int) (blocksz - 1);
-                      unowned var @out = (uint8[]) & outbuf [i * (blocksz)]; @out.length = (int) blocksz;
-
-                      GLib.Memory.copy (& tmpblock [0], & @in [0], @in.length);
-                      tmpblock [blocksz - 1] = 1;
-
+                      GLib.Memory.set (& tmpblock [0], (int) blocksz, blocksz);
                       cipher.encrypt (@out, tmpblock);
                     }
-
-                  read = (written = blocksz * taken) - taken;
+                  else if (inbuf.length > taking)
+                    {
+                      unowned var s = (int) (inbuf.length - taking);
+                      unowned var p = (int) (blocksz - s);
+                      GLib.Memory.set (& tmpblock [s], p, p);
+                      GLib.Memory.copy (& tmpblock [0], & @in [0], s);
+                      cipher.encrypt (@out, tmpblock);
+                    }
                 }
 
-              break;
+              read = flush == false ? taking : inbuf.length;
+              written = flush == false ? taking : taking + blocksz;
             }
 
           return result_from_flags (flags);
