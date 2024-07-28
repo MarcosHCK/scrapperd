@@ -16,22 +16,23 @@
 #
 
 tests = \
-  {
-    'Krypt BC implementation' : [ 'bcproto.vala' ],
-    'Krypt ECDHE implementation' : [ 'dhproto.vala' ],
-    'Krypt stream implementation' : [ 'krypt.vala' ],
-    'Kademlia buckets tests' : [ 'buckets.vala' ],
-    'Kademlia DBus hub tests' : [ 'hub.vala', 'baseintegration.vala' ],
-    'Kademlia integration tests' : [ 'integration.vala', 'baseintegration.vala' ],
-    'Kademlia key tests' : [ 'key.vala' ],
-    #'Kademlia stress tests' : [ 'stress.vala' ],
-  }
+  [
+    { 'description' : 'Krypt BC implementation', 'files' : [ 'bcproto.vala' ], 'libs' : [ libkrypt ] },
+    { 'description' : 'Krypt ECDHE implementation', 'files' : [ 'dhproto.vala' ], 'libs' : [ libkrypt ] },
+    { 'description' : 'Krypt stream implementation', 'files' : [ 'krypt.vala' ], 'libs' : [ libkrypt ] },
+    { 'description' : 'Kademlia buckets tests', 'files' : [ 'buckets.vala' ], 'libs' : [ libkademlia ] },
+    { 'description' : 'Kademlia DBus hub tests', 'files' : [ 'hub.vala', 'baseintegration.vala' ], 'libs' : [ libkademlia, libkademlia_dbus ] },
+    { 'description' : 'Kademlia integration tests', 'files' : [ 'integration.vala', 'baseintegration.vala' ], 'libs' : [ libkademlia, libkademlia_dbus ] },
+    { 'description' : 'Kademlia key tests', 'files' : [ 'key.vala' ], 'libs' : [ libkademlia ] },
+  ]
 
-foreach description, files : tests
+foreach test_ : tests
+
+  description = test_.get ('description')
+  files = test_.get ('files')
+  libs = test_.get ('libs')
 
   assert (files.length () > 0)
-
-  file = files.get (0)
 
   test \
     (
@@ -39,7 +40,7 @@ foreach description, files : tests
 
       executable \
         (
-          '@0@.test'.format (file),
+          '@0@.test'.format (files.get (0)),
 
           dependencies : [
               vala.find_library ('gio-2.0'), libgio_dep,
@@ -49,7 +50,7 @@ foreach description, files : tests
 
           include_directories : [ configdir, include_directories ('..') ],
 
-          link_with : [ libkademlia, libkademlia_dbus, libkrypt, libscrapperd ],
+          link_with : libs,
 
           sources : files + [ 'base.vala' ],
         ),
