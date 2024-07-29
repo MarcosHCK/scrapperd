@@ -15,30 +15,35 @@
 # along with ScrapperD. If not, see <http://www.gnu.org/licenses/>.
 #
 
-libsoup_dep = dependency ('libsoup-3.0', required : true)
-
-executable \
+libkademlia = library \
   (
-    'scrapperd-scrapper',
+    'kademlia',
 
     dependencies :
       [
         vala.find_library ('gio-2.0'), libgio_dep,
         vala.find_library ('glib-2.0'), libglib_dep,
         vala.find_library ('gobject-2.0'), libgobject_dep,
-        vala.find_library ('libsoup-3.0'), libsoup_dep,
-        cc.find_library ('m', required : false),
       ],
 
     include_directories : [ configdir ] + libdirs,
 
-    link_with : [ libkademlia, libkademlia_dbus, libscrapperd ],
-
     sources :
       [
-        'application.vala',
-        'linksearcher.vala',
-        'scrapper.vala',
-        'store.vala',
+        'bucket.h',
+        'bucket.vapi',
+        'buckets.vala',
+        'key.vala',
+        'keytypes.h',
+        'keyval.h',
+        'keyval.vapi',
+        'runner.h',
+        'runner.vapi',
+        'peer.vala',
+        'value.vala',
+        'valuepeer.vala',
+        'valuestore.vala',
       ],
   )
+
+libdirs += include_directories ('.')

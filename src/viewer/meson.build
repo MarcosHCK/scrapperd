@@ -29,7 +29,7 @@ scrapperd_viewer_support = library \
         vala.find_library ('gobject-2.0'), libgobject_dep,
       ],
 
-    include_directories : [ configdir, libsdir ],
+    include_directories : [ configdir ] + libdirs,
 
     link_with : [ libkademlia, libkademlia_dbus, libscrapperd ],
 
@@ -56,7 +56,7 @@ executable \
 
     c_args : [ '-DGETTEXT_PACKAGE=@0@'.format (default_defines ['G_LOG_DOMAIN']) ],
 
-    include_directories : [ configdir, libsdir ],
+    include_directories : [ configdir ] + libdirs,
 
     link_with : [ libkademlia, libkademlia_dbus, libscrapperd, scrapperd_viewer_support ],
 

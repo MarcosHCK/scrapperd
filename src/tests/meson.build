@@ -21,8 +21,8 @@ tests = \
     { 'description' : 'Krypt ECDHE implementation', 'files' : [ 'dhproto.vala' ], 'libs' : [ libkrypt ] },
     { 'description' : 'Krypt stream implementation', 'files' : [ 'krypt.vala' ], 'libs' : [ libkrypt ] },
     { 'description' : 'Kademlia buckets tests', 'files' : [ 'buckets.vala' ], 'libs' : [ libkademlia ] },
-    { 'description' : 'Kademlia DBus hub tests', 'files' : [ 'hub.vala', 'baseintegration.vala' ], 'libs' : [ libkademlia, libkademlia_dbus ] },
-    { 'description' : 'Kademlia integration tests', 'files' : [ 'integration.vala', 'baseintegration.vala' ], 'libs' : [ libkademlia, libkademlia_dbus ] },
+    { 'description' : 'Kademlia DBus hub tests', 'files' : [ 'hub.vala', 'baseintegration.vala' ], 'libs' : [ libgvalr, libkademlia, libkademlia_dbus ] },
+    { 'description' : 'Kademlia integration tests', 'files' : [ 'integration.vala', 'baseintegration.vala' ], 'libs' : [ libgvalr, libkademlia ] },
     { 'description' : 'Kademlia key tests', 'files' : [ 'key.vala' ], 'libs' : [ libkademlia ] },
   ]
 
@@ -48,7 +48,7 @@ foreach test_ : tests
               vala.find_library ('gobject-2.0'), libgobject_dep,
             ],
 
-          include_directories : [ configdir, include_directories ('..') ],
+          include_directories : [ configdir ] + libdirs,
 
           link_with : libs,
 

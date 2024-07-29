@@ -135,7 +135,7 @@ namespace Kademlia.DBus
           while (true) try
             {
               var role = yield hub.lookup_role (peer, cancellable);
-              var result = yield role.store (get_self (), KeyRef (key.bytes), ValueRef.nat2net (value), cancellable);
+              var result = yield role.store (get_self (), KeyRef (key.bytes), GValr.nat2net (value), cancellable);
               return result;
             }
           catch (GLib.Error e)

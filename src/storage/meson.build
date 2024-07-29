@@ -26,7 +26,7 @@ executable \
         vala.find_library ('gobject-2.0'), libgobject_dep,
       ],
 
-    include_directories : [ configdir, libsdir ],
+    include_directories : [ configdir ] + libdirs,
 
     link_with : [ libkademlia, libkademlia_dbus, libscrapperd ],
 

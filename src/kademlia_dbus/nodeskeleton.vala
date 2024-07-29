@@ -89,7 +89,7 @@ namespace Kademlia.DBus
         {
           var from = (Key?) from_.know (hub);
           var id = (Key) new Key.verbatim (key.value);
-          var go = (bool) yield value_peer.store_value_complete (from, id, ValueRef.net2nat (value), cancellable);
+          var go = (bool) yield value_peer.store_value_complete (from, id, GValr.net2nat (value), cancellable);
           return go;
         }
 

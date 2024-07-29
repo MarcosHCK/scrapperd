@@ -15,111 +15,14 @@
 # along with ScrapperD. If not, see <http://www.gnu.org/licenses/>.
 #
 
-libkademlia = library \
-  (
-    'kademlia',
+libdirs = []
 
-    dependencies :
-      [
-        vala.find_library ('gio-2.0'), libgio_dep,
-        vala.find_library ('glib-2.0'), libglib_dep,
-        vala.find_library ('gobject-2.0'), libgobject_dep,
-      ],
+subdir ('gvalr')
+subdir ('kademlia')
+subdir ('krypt')
+subdir ('kademlia_dbus')
 
-    include_directories : [ configdir ],
-
-    sources :
-      [
-        'bucket.h',
-        'bucket.vapi',
-        'buckets.vala',
-        'key.vala',
-        'keyval.h',
-        'keyval.vapi',
-        'runner.h',
-        'runner.vapi',
-        'peer.vala',
-        'value.vala',
-        'valuestore.vala',
-        'valuepeer.vala',
-      ],
-  )
-
-libkrypt = library \
-  (
-    'krypt',
-
-    dependencies :
-      [
-        cc.find_library ('libgcrypt'),
-        vala.find_library ('gio-2.0'), libgio_dep,
-        vala.find_library ('glib-2.0'), libglib_dep,
-        vala.find_library ('gobject-2.0'), libgobject_dep,
-      ],
-
-    include_directories : [ configdir ],
-
-    sources :
-      [
-        'bcproto.vala',
-        'dhproto.vala',
-        'gcrypt.vapi',
-        'gcryptapi.c',
-        'gcryptapi.h',
-        'gcrypterror.vala',
-        'krypt.vala',
-      ],
-  )
-
-libkademlia_dbus = library \
-  (
-    'kademlia_dbus',
-
-    dependencies :
-      [
-        vala.find_library ('gio-2.0'), libgio_dep,
-        vala.find_library ('glib-2.0'), libglib_dep,
-        vala.find_library ('gobject-2.0'), libgobject_dep,
-      ],
-
-    include_directories : [ configdir ],
-
-    link_with : [ libkademlia, libkrypt ],
-
-    sources :
-      [
-        'hub.vala',
-        'networkhub.vala',
-        'node.vala',
-        'nodeskeleton.vala',
-        'peerimpl.vala',
-        'peerimplproxy.vala',
-        'refs.vala',
-      ],
-  )
-
-libscrapperd = library \
-  (
-    'scrapperd',
-
-    dependencies :
-      [
-        vala.find_library ('gio-2.0'), libgio_dep,
-        vala.find_library ('glib-2.0'), libglib_dep,
-        vala.find_library ('gobject-2.0'), libgobject_dep,
-      ],
-
-    include_directories : [ configdir ],
-
-    link_with : [ libkademlia, libkademlia_dbus ],
-
-    sources :
-      [
-        'application.vala',
-      ],
-  )
-
-libsdir = include_directories ('.')
+subdir ('application')
 
 subdir ('scrapper')
 subdir ('storage')
