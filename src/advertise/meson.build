@@ -34,7 +34,10 @@ libadvertise = library \
     sources :
       [
         'channel.vala',
+        'clock.vala',
         'hub.vala',
+        'ipv4channel.h',
+        'ipv4channel.vala',
         'protocol.vala',
       ]
   )

@@ -21,7 +21,7 @@ namespace Advertise
 {
   public interface Channel : GLib.Object
     {
-      public abstract GLib.Source create_source ();
+      public abstract GLib.Source create_source (GLib.Cancellable? cancellable);
       public abstract async GLib.Bytes recv (GLib.Cancellable? cancellable) throws GLib.Error;
       public abstract async bool send (GLib.Bytes contents, GLib.Cancellable? cancellable) throws GLib.Error;
     }

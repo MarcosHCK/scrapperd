@@ -84,9 +84,11 @@ namespace Advertise
           stream2.close (cancellable);
           stream1.close (cancellable);
 
+          var contents = (Bytes) stream1.steal_as_bytes ();
+
           foreach (unowned var channel in channels)
 
-            yield channel.send (stream1.steal_as_bytes (), cancellable);
+            yield channel.send (contents, cancellable);
           return true;
         }
 

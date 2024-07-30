@@ -21,12 +21,18 @@ namespace ScrapperD
 {
   public abstract class Application : GLib.Application
     {
+      private Advertise.Clock? adv_clock = null;
+      private Advertise.Hub adv_hub;
       public Kademlia.DBus.NetworkHub hub { get; private construct; }
 
       construct
         {
+          adv_hub = new Advertise.Hub ();
           hub = new Kademlia.DBus.NetworkHub ();
+
           add_main_option ("address", 'a', 0, GLib.OptionArg.STRING_ARRAY, "Address of entry node", "ADDRESS");
+          add_main_option ("advertise-interval", 0, 0, GLib.OptionArg.INT, "Advertise interval", "MILLISECONDS");
+          add_main_option ("advertise-port", 0, 0, GLib.OptionArg.INT, "Advertise port", "PORT");
           add_main_option ("port", 'p', 0, GLib.OptionArg.INT, "Port where to listen for peer hails", "PORT");
           add_main_option ("public", 0, 0, GLib.OptionArg.STRING_ARRAY, "Public addresses to publish", "ADDRESS");
           add_main_option ("version", 'V', 0, GLib.OptionArg.NONE, "Print version", null);
@@ -61,13 +67,42 @@ namespace ScrapperD
               string option_s;
               GLib.VariantIter iter;
 
+              Advertise.Channel ipv4_channel;
+
               var addresses = new GLib.SList<string> ();
+              var advertise_interval = (int) 5000 /* 5 seconds */;
+              var advertise_port = (uint16) Advertise.Ipv4Channel.DEFAULT_PORT;
               var entries = new GLib.SList<string> ();
               var port = (uint16) Kademlia.DBus.NetworkHub.DEFAULT_PORT;
 
               if (options.lookup ("address", "as", out iter)) while (iter.next ("s", out option_s))
                 {
                   entries.prepend ((owned) option_s);
+                }
+
+              if (options.lookup ("advertise-port", "i", out option_i))
+                {
+                  if (option_i >= uint16.MIN && option_i < uint16.MAX)
+
+                    advertise_port = (uint16) option_i;
+                  else
+                    {
+                      good = false;
+                      cmdline.printerr ("invalid port %i\n", option_i);
+                      cmdline.set_exit_status (1);
+                      break;
+                    }
+                }
+
+              if (options.lookup ("advertise-interval", "i", out option_i)) if (option_i >= 200)
+
+                advertise_interval = option_i;
+              else
+                {
+                  good = false;
+                  cmdline.printerr ("interval too short: %i\n", option_i);
+                  cmdline.set_exit_status (1);
+                  break;
                 }
 
               if (options.lookup ("port", "i", out option_i))
@@ -107,6 +142,14 @@ namespace ScrapperD
 
               if (unlikely (good == false)) break;
 
+              try { ipv4_channel = new Advertise.Ipv4Channel (advertise_port); } catch (GLib.Error e)
+                {
+                  good = false;
+                  cmdline.printerr ("can not create advertising channel: %s: %u: %s\n", e.domain.to_string (), e.code, e.message);
+                  cmdline.set_exit_status (1);
+                  break;
+                }
+
               try { yield register_peers (); } catch (GLib.Error e)
                 {
                   good = false;
@@ -130,8 +173,21 @@ namespace ScrapperD
 
               if (unlikely (good == false)) break;
 
+              unowned Kademlia.Key? local_key;
+              unowned Kademlia.DBus.Hub.Local? local_var;
+              var iter2 = HashTableIter<Kademlia.Key, Kademlia.DBus.Hub.Local?> (hub.locals);
+
+              while (iter2.next (out local_key, out local_var))
+                {
+                  debug ("advertising node %s", local_key.to_string ());
+                  adv_hub.add_protocol (new KademliaProtocol (local_key));
+                }
+
               hold ();
               hub.start ();
+
+              adv_hub.add_channel (ipv4_channel);
+              adv_clock = new Advertise.Clock (adv_hub, advertise_interval);
               break;
             }
 
@@ -139,6 +195,11 @@ namespace ScrapperD
         }
 
       protected virtual async void register_peers () throws GLib.Error { }
+
+      public override void shutdown ()
+        {
+          adv_clock?.stop ();
+        }
 
       public override int handle_local_options (GLib.VariantDict options)
         {

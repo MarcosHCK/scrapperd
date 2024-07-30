@@ -36,7 +36,7 @@ namespace Testing
           ads = new GLib.AsyncQueue<Bytes> ();
         }
 
-      public GLib.Source create_source ()
+      public GLib.Source create_source (GLib.Cancellable? cancellable)
         {
           assert_not_reached ();
         }

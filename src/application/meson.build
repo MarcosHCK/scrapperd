@@ -24,15 +24,17 @@ libscrapperd = library \
         vala.find_library ('gio-2.0'), libgio_dep,
         vala.find_library ('glib-2.0'), libglib_dep,
         vala.find_library ('gobject-2.0'), libgobject_dep,
+        vala.find_library ('json-glib-1.0'), libjson_glib_dep,
       ],
 
     include_directories : [ configdir ] + libdirs,
 
-    link_with : [ libkademlia, libkademlia_dbus ],
+    link_with : [ libadvertise, libkademlia, libkademlia_dbus ],
 
     sources :
       [
         'application.vala',
+        'protocol.vala',
       ],
   )
 
