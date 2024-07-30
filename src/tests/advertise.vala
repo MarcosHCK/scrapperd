@@ -54,8 +54,6 @@ namespace Testing
 
       public async bool send (GLib.Bytes contents, GLib.Cancellable? cancellable) throws GLib.Error
         {
-          var value = (uint8[]) contents.get_data ();
-          GLib.Test.message ("advertise: %.*s", value.length, (string) value);
           ads.push (contents);
           return true;
         }

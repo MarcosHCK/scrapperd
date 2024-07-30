@@ -69,12 +69,24 @@ namespace Advertise
 
       public async bool advertise (GLib.Cancellable? cancellable = null) throws GLib.Error
         {
-          size_t length;
-          uint8[] data = Json.gobject_to_data (protocols, out length).data; data.length = (int) length;
+          Json.Generator generator;
+          Json.Node node = Json.gobject_serialize (protocols);
+          (generator = new Json.Generator ()).set_root (node);
+          var converter = new ZlibCompressor (GLib.ZlibCompressorFormat.RAW, 3);
+          var stream1 = new GLib.MemoryOutputStream.resizable ();
+          var stream2 = new GLib.ConverterOutputStream (stream1, converter);
+
+          generator.indent = 0;
+          generator.pretty = false;
+
+          generator.to_stream (stream2, cancellable);
+
+          stream2.close (cancellable);
+          stream1.close (cancellable);
 
           foreach (unowned var channel in channels)
-            
-            yield channel.send (new Bytes.take ((owned) data), cancellable);
+
+            yield channel.send (stream1.steal_as_bytes (), cancellable);
           return true;
         }
 
@@ -88,10 +100,15 @@ namespace Advertise
           foreach (unowned var channel in channels) try
             {
               var bytes = (Bytes) yield channel.recv (cancellable);
-              var data = (string) bytes.get_data ();
+              var converter = new GLib.ZlibDecompressor (GLib.ZlibCompressorFormat.RAW);
+              var stream1 = new GLib.MemoryInputStream.from_bytes (bytes);
+              var stream2 = new GLib.ConverterInputStream (stream1, converter);
+              var stream3 = new GLib.DataInputStream (stream2);
+
+              size_t length;
+              string data = yield stream3.read_line_async (GLib.Priority.LOW, cancellable, out length);
               var gtype = (Type) typeof (Protocols);
-              var length = (ssize_t) bytes.get_size ();
-              var protos = (Protocols) Json.gobject_from_data (gtype, data, length);
+              var protos = (Protocols) Json.gobject_from_data (gtype, data, (ssize_t) length);
 
               unowned var description = protos.description;
               unowned var name = protos.name;
