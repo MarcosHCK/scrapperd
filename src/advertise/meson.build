@@ -15,17 +15,28 @@
 # along with ScrapperD. If not, see <http://www.gnu.org/licenses/>.
 #
 
-libdirs = []
+libjson_glib_dep = dependency ('json-glib-1.0', required : true)
 
-subdir ('advertise')
-subdir ('gvalr')
-subdir ('kademlia')
-subdir ('krypt')
-subdir ('kademlia_dbus')
+libadvertise = library \
+  (
+    'advertise',
 
-subdir ('application')
+    dependencies :
+      [
+        vala.find_library ('gio-2.0'), libgio_dep,
+        vala.find_library ('glib-2.0'), libglib_dep,
+        vala.find_library ('gobject-2.0'), libgobject_dep,
+        vala.find_library ('json-glib-1.0'), libjson_glib_dep,
+      ],
 
-subdir ('scrapper')
-subdir ('storage')
-subdir ('tests')
-subdir ('viewer')
+    include_directories : [ configdir ] + libdirs,
+
+    sources :
+      [
+        'channel.vala',
+        'hub.vala',
+        'protocol.vala',
+      ]
+  )
+
+libdirs += include_directories ('.')

@@ -17,6 +17,8 @@
 
 tests = \
   [
+    { 'description' : 'Advertise library', 'files' : [ 'advertise.vala' ], 'libs' : [ libadvertise ],
+      'deps' : [ vala.find_library ('json-glib-1.0'), libjson_glib_dep ] },
     { 'description' : 'Krypt BC implementation', 'files' : [ 'bcproto.vala' ], 'libs' : [ libkrypt ] },
     { 'description' : 'Krypt ECDHE implementation', 'files' : [ 'dhproto.vala' ], 'libs' : [ libkrypt ] },
     { 'description' : 'Krypt stream implementation', 'files' : [ 'krypt.vala' ], 'libs' : [ libkrypt ] },
@@ -28,9 +30,10 @@ tests = \
 
 foreach test_ : tests
 
+  deps = test_.get ('deps', [ ])
   description = test_.get ('description')
   files = test_.get ('files')
-  libs = test_.get ('libs')
+  libs = test_.get ('libs', [ ])
 
   assert (files.length () > 0)
 
@@ -46,7 +49,7 @@ foreach test_ : tests
               vala.find_library ('gio-2.0'), libgio_dep,
               vala.find_library ('glib-2.0'), libglib_dep,
               vala.find_library ('gobject-2.0'), libgobject_dep,
-            ],
+            ] + deps,
 
           include_directories : [ configdir ] + libdirs,
 
