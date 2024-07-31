@@ -42,7 +42,7 @@ extern "C" {
 
   static void _recv_callback (GTask* task, gpointer channel, RecvFromData* data, GCancellable* cancellable)
     {
-      guint i, length = g_list_length (data->ifaces);
+      guint i, tries, length = g_list_length (data->ifaces);
       GError* tmperr = NULL;
       GInputMessage stat_messages [8], *dyn_messages = NULL, *messages;
       GInputVector stat_vectors [8], *dyn_vectors = NULL, *vectors;
@@ -50,6 +50,7 @@ extern "C" {
       GList* link;
 
       const guint BUFSZ = 1024;
+      const guint TRIES = 2;
 
       if (G_N_ELEMENTS (stat_messages) >= length)
 
@@ -79,23 +80,33 @@ extern "C" {
           vectors [i].size = BUFSZ;
         }
 
-      if ((i = g_datagram_based_receive_messages (G_DATAGRAM_BASED (data->socket), messages, length, 0, -1, cancellable, &tmperr)), G_UNLIKELY (tmperr != NULL))
-        {
-          g_task_return_error (task, tmperr);
-        }
-      else if (G_LIKELY (i > 0))
-        {
-          GBytes* bytes;
-          GPtrArray* ar = NULL;
+      for (tries = 0; TRUE; ++tries)
 
-          for (i = 0; i < length; ++i) if (messages [i].bytes_received > 0)
-            {
-              bytes = g_bytes_new (vectors [i].buffer, messages [i].bytes_received);
-              g_ptr_array_add ((ar = ar != NULL ? ar : g_ptr_array_new_with_free_func ((GDestroyNotify) g_bytes_unref)), bytes);
-            }
+        if ((i = g_datagram_based_receive_messages (G_DATAGRAM_BASED (data->socket), messages, length, 0, 0, cancellable, &tmperr)), G_UNLIKELY (tmperr != NULL))
+          {
+            if (g_error_matches (tmperr, G_IO_ERROR, G_IO_ERROR_WOULD_BLOCK) && tries < TRIES)
 
-          g_task_return_pointer (task, ar, ar == NULL ? NULL : (GDestroyNotify) g_ptr_array_unref);
-        }
+              g_clear_error (&tmperr);
+            else
+              {
+                g_task_return_error (task, tmperr);
+                break;
+              }
+          }
+        else if (G_LIKELY (i > 0))
+          {
+            GBytes* bytes;
+            GPtrArray* ar = NULL;
+
+            for (i = 0; i < length; ++i) if (messages [i].bytes_received > 0)
+              {
+                bytes = g_bytes_new (vectors [i].buffer, messages [i].bytes_received);
+                g_ptr_array_add ((ar = ar != NULL ? ar : g_ptr_array_new_with_free_func ((GDestroyNotify) g_bytes_unref)), bytes);
+              }
+
+            g_task_return_pointer (task, ar, ar == NULL ? NULL : (GDestroyNotify) g_ptr_array_unref);
+            break;
+          }
 
       g_clear_pointer (&dyn_messages, g_free);
       g_clear_pointer (&dyn_vectors, g_free);
@@ -110,11 +121,13 @@ extern "C" {
 
   static void _send_callback (GTask* task, gpointer channel, SendToData* data, GCancellable* cancellable)
     {
-      guint i, length = g_list_length (data->ifaces);
+      guint i, tries, length = g_list_length (data->ifaces);
       GError* tmperr = NULL;
       GOutputMessage stat_messages [8], *dyn_messages = NULL, *messages;
       GOutputVector stat_vectors [8], *dyn_vectors = NULL, *vectors;
       GList* link;
+
+      const guint TRIES = 2;
 
       if (G_N_ELEMENTS (stat_messages) >= length)
 
@@ -140,11 +153,24 @@ extern "C" {
           vectors [i].buffer = g_bytes_get_data (data->bytes, & vectors [i].size);
         }
 
-      if ((i = g_datagram_based_send_messages (G_DATAGRAM_BASED (data->socket), messages, length, 0, -1, cancellable, &tmperr)), G_UNLIKELY (tmperr != NULL))
+      for (tries = 0; TRUE; ++tries)
 
-        g_task_return_error (task, tmperr);
-      else
-        g_task_return_boolean (task, i > 0);
+        if ((i = g_datagram_based_send_messages (G_DATAGRAM_BASED (data->socket), messages, length, 0, 0, cancellable, &tmperr)), G_LIKELY (tmperr == NULL))
+          {
+            g_task_return_boolean (task, i > 0);
+            break;
+          }
+        else
+          {
+            if (g_error_matches (tmperr, G_IO_ERROR, G_IO_ERROR_WOULD_BLOCK) && tries < TRIES)
+
+              g_clear_error (&tmperr);
+            else
+              {
+                g_task_return_error (task, tmperr);
+                break;
+              }
+          }
 
       g_clear_pointer (&dyn_messages, g_free);
       g_clear_pointer (&dyn_vectors, g_free);

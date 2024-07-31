@@ -99,16 +99,21 @@ namespace Advertise
 
           try { ads = Hub.peek_channel.end (res); } catch (GLib.Error e)
             {
-              unowned var code = e.code;
-              unowned var domain = e.domain.to_string ();
-              unowned var message = e.message.to_string ();
+              if (e.matches (IOError.quark (), IOError.WOULD_BLOCK))
 
-              debug ("advertise peek failed: %s: %i: %s", domain, code, message);
-              return;
+                return;
+              else
+                {
+                  unowned var code = e.code;
+                  unowned var domain = e.domain.to_string ();
+                  unowned var message = e.message.to_string ();
+
+                  debug ("advertise peek failed: %s: %i: %s", domain, code, message);
+                  return;
+                }
             }
 
-          var io_priority = GLib.Priority.HIGH;
-          context.invoke (() => on_source_triggered_notify ((owned) ads), io_priority);
+          context.invoke (() => on_source_triggered_notify ((owned) ads), GLib.Priority.HIGH);
         }
 
       static async GenericArray<Ad> peek_channel (Channel channel, GLib.Cancellable? cancellable) throws GLib.Error
