@@ -43,11 +43,17 @@ namespace Advertise
 
   public class Hub : GLib.Object
     {
+      public List<unowned Channel> channels { owned get { return _channels.copy (); } }
       public string? description { get; set; }
       public string? name { get; set; }
 
-      private GLib.List<Channel> channels = new GLib.List<Channel> ();
+      private GLib.List<Channel> _channels = new GLib.List<Channel> ();
       private Protocols protocols = new Protocols ();
+
+      public signal void added_channel (Channel channel);
+      public signal void added_protocol (Protocol protocol);
+      public signal void removed_channel (Channel channel);
+      public signal void removed_protocol (Protocol protocol);
 
       construct
         {
@@ -57,14 +63,15 @@ namespace Advertise
 
       public void add_channel (Channel channel)
         {
-          if (channels.find (channel) == null)
+          if (_channels.find (channel) == null)
 
-            channels.append (channel);
+            _channels.append (channel);
         }
 
-      public void add_protocol (Protocol proto)
+      public void add_protocol (Protocol proto) requires (protocols.protocols.find (proto) == false)
         {
-          protocols.add_protocol (proto);
+          protocols.protocols.add (proto);
+          added_protocol (proto);
         }
 
       public async bool advertise (GLib.Cancellable? cancellable = null) throws GLib.Error
@@ -86,7 +93,7 @@ namespace Advertise
 
           var contents = (Bytes) stream1.steal_as_bytes ();
 
-          foreach (unowned var channel in channels)
+          foreach (unowned var channel in _channels)
 
             yield channel.send (contents, cancellable);
           return true;
@@ -97,11 +104,33 @@ namespace Advertise
           gtype.ensure ();
         }
 
-      public async Ad? peek (GLib.Cancellable? cancellable = null) throws GLib.Error
+      public async Ad[] peek (GLib.Cancellable? cancellable = null) throws GLib.Error
         {
-          foreach (unowned var channel in channels) try
+          var ads = new GenericArray<Ad> ();
+
+          foreach (unowned var channel in _channels) try
             {
-              var bytes = (Bytes) yield channel.recv (cancellable);
+              var ar = (GenericArray<Ad>) yield peek_channel (channel, cancellable);
+              ads.extend_and_steal ((owned) ar);
+            }
+          catch (GLib.IOError e)
+            {
+              if (e.code == GLib.IOError.WOULD_BLOCK)
+
+                continue;
+              else
+                throw (owned) e;
+            }
+
+          return ads.steal ();
+        }
+
+      internal static async GenericArray<Ad> peek_channel (Channel channel, GLib.Cancellable? cancellable = null) throws GLib.Error
+        {
+          var ads = new GenericArray<Ad> ();
+
+          foreach (unowned var bytes in yield channel.recv (cancellable))
+            {
               var converter = new GLib.ZlibDecompressor (GLib.ZlibCompressorFormat.RAW);
               var stream1 = new GLib.MemoryInputStream.from_bytes (bytes);
               var stream2 = new GLib.ConverterInputStream (stream1, converter);
@@ -116,33 +145,28 @@ namespace Advertise
               unowned var name = protos.name;
               unowned var ar = protos.protocols;
 
-              return new Ad.from_array (name, description, ar);
-            }
-          catch (GLib.IOError e)
-            {
-              if (e.code == GLib.IOError.WOULD_BLOCK)
-
-                continue;
-              else
-                throw (owned) e;
+              ads.add (new Ad.from_array (name, description, ar));
             }
 
-          return null;
+          return (owned) ads;
         }
 
       public void remove_channel (Channel channel)
         {
-          channels.remove (channel);
+          _channels.remove (channel);
         }
 
       public void remove_protocol (Protocol proto)
         {
-          protocols.remove_protocol (proto);
+          if (protocols.protocols.remove (proto)) removed_protocol (proto);
         }
 
       public void remove_protocol_by_name (string name)
         {
-          protocols.remove_protocol_by_name (name);
+          var list = new SList<uint?> ();
+          var protocols = (GenericArray<Protocol>) this.protocols.protocols;
+          for (int i = 0; i < protocols.length; ++i) if (name == protocols [i].name) list.append (i);
+          foreach (unowned var k in list) removed_protocol (protocols.steal_index (k));
         }
     }
 }

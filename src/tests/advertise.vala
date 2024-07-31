@@ -36,20 +36,24 @@ namespace Testing
           ads = new GLib.AsyncQueue<Bytes> ();
         }
 
-      public GLib.Source create_source (GLib.Cancellable? cancellable)
+      public ChannelSource create_source (GLib.Cancellable? cancellable)
         {
           assert_not_reached ();
         }
 
-      public async GLib.Bytes recv (GLib.Cancellable? cancellable) throws GLib.Error
+      public async GenericArray<GLib.Bytes> recv (GLib.Cancellable? cancellable) throws GLib.Error
         {
           GLib.Bytes bytes;
 
-          if ((bytes = ads.pop ()) != null)
+          if ((bytes = ads.pop ()) == null)
 
-            return (owned) bytes;
-          else
             throw new IOError.WOULD_BLOCK ("would block");
+          else
+            {
+              GenericArray<Bytes> ar;
+              (ar = new GenericArray<Bytes> (1)).add ((owned) bytes);
+              return (owned) ar;
+            }
         }
 
       public async bool send (GLib.Bytes contents, GLib.Cancellable? cancellable) throws GLib.Error
@@ -70,7 +74,7 @@ namespace Testing
 
       protected override async void test ()
         {
-          Ad? ad;
+          Ad[] ads;
           Channel channel;
           Protocol proto;
 
@@ -85,13 +89,15 @@ namespace Testing
               return;
             }
 
-          try { ad = yield hub.peek (); } catch (GLib.Error e)
+          try { ads = yield hub.peek (); } catch (GLib.Error e)
             {
               assert_no_error (e);
               return;
             }
 
-          assert_true (ad != null);
+          assert_cmpint (1, GLib.CompareOperator.EQ, ads.length);
+          unowned var ad = (Ad) ads [0];
+
           assert_cmpstr (ad.description, GLib.CompareOperator.EQ, hub.description);
           assert_cmpstr (ad.name, GLib.CompareOperator.EQ, hub.name);
           assert_cmpint (1, GLib.CompareOperator.EQ, ad.protocols.length);

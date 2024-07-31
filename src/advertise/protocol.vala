@@ -24,7 +24,7 @@ namespace Advertise
       public abstract string name { get; }
     }
 
-  internal class Protocols : GLib.Object, Json.Serializable
+  internal sealed class Protocols : GLib.Object, Json.Serializable
     {
       public string? description { get; set; }
       public string? name { get; set; }
@@ -37,20 +37,15 @@ namespace Advertise
           protocols = new GenericArray<Protocol> (0);
         }
 
-      public void add_protocol (Protocol proto) requires (protocols.find (proto) == false)
-        {
-          protocols.add (proto);
-        }
-
-      public override bool deserialize_property (string property_name, out GLib.Value property_value, GLib.ParamSpec pspec, Json.Node property_node)
+      public override bool deserialize_property (string property_name, out GLib.Value value, GLib.ParamSpec pspec, Json.Node property_node)
         {
           if (property_name != "protocols")
             {
-              return default_deserialize_property (property_name, out property_value, pspec, property_node);
+              return default_deserialize_property (property_name, out value, pspec, property_node);
             }
           else if (unlikely (property_node.get_value_type () != typeof (Json.Array)))
             {
-              property_value = GLib.Value (pspec.value_type);
+              value = GLib.Value (pspec.value_type);
               return false;
             }
           else
@@ -62,7 +57,7 @@ namespace Advertise
                 
                 if (unlikely (element.get_value_type () != typeof (Json.Object)))
                   {
-                    property_value = GLib.Value (pspec.value_type);
+                    value = GLib.Value (pspec.value_type);
                     return false;
                   }
                 else
@@ -70,11 +65,11 @@ namespace Advertise
                     GLib.Type gtype;
                     unowned var object = (Json.Object) element.get_object ();
                     unowned var type = (string) object.get_string_member_with_default ("gtype", default_gtype);
-                    unowned var value = (Json.Node?) object.get_member ("value");
+                    unowned var proto = (Json.Node?) object.get_member ("value");
 
-                    if (unlikely (type == default_gtype || value == null))
+                    if (unlikely (type == default_gtype || proto == null))
                       {
-                        property_value = GLib.Value (pspec.value_type);
+                        value = GLib.Value (pspec.value_type);
                         return false;
                       }
                     else if ((gtype = GLib.Type.from_name (type)) == GLib.Type.INVALID)
@@ -83,26 +78,12 @@ namespace Advertise
                         continue;
                       }
 
-                    list.add ((Protocol) Json.gobject_deserialize (gtype, value));
+                    list.add ((Protocol) Json.gobject_deserialize (gtype, proto));
                   }
 
-              GLib.Value value;
-              (value = GLib.Value (typeof (GenericArray))).set_boxed (list);
-              property_value = (owned) value;
+              (value = GLib.Value (typeof (GenericArray))).take_boxed ((owned) list);
             }
           return true;
-        }
-
-      public void remove_protocol (Protocol proto) requires (protocols.find (proto) == true)
-        {
-          protocols.remove (proto);
-        }
-
-      public void remove_protocol_by_name (string name)
-        {
-          var list = new SList<uint?> ();
-          for (int i = 0; i < protocols.length; ++i) if (name == protocols [i].name) list.append (i);
-          foreach (unowned var k in list) protocols.remove_index (k);
         }
 
       public override Json.Node serialize_property (string property_name, GLib.Value value, GLib.ParamSpec pspec)
@@ -112,20 +93,21 @@ namespace Advertise
             return default_serialize_property (property_name, value, pspec);
           else
             {
-              Json.Builder builder;
-              (builder = new Json.Builder ()).begin_array ();
+              var array = new Json.Array ();
+              var root = new Json.Node (Json.NodeType.ARRAY);
+
+              root.set_array (array);
 
               foreach (unowned var proto in protocols)
                 {
-                  builder.begin_object ();
-                  builder.set_member_name ("gtype");
-                  builder.add_string_value (proto.get_type ().name ());
-                  builder.set_member_name ("value");
-                  builder.add_value (Json.gobject_serialize (proto));
-                  builder.end_object ();
+                  var object = new Json.Object ();
+
+                  object.set_string_member ("gtype", proto.get_type ().name ());
+                  object.set_member ("value", Json.gobject_serialize (proto));
+                  array.add_object_element ((owned) object);
                 }
 
-              return builder.end_array ().get_root ();
+              return (owned) root;
             }
         }
     }

@@ -19,10 +19,57 @@
 
 namespace Advertise
 {
+  [CCode (scope = "notified")]
+
+  public delegate bool ChannelSourceFunc (Channel channel);
+
   public interface Channel : GLib.Object
     {
-      public abstract GLib.Source create_source (GLib.Cancellable? cancellable);
-      public abstract async GLib.Bytes recv (GLib.Cancellable? cancellable) throws GLib.Error;
+      public abstract ChannelSource create_source (GLib.Cancellable? cancellable);
+      public abstract async GenericArray<GLib.Bytes> recv (GLib.Cancellable? cancellable) throws GLib.Error;
       public abstract async bool send (GLib.Bytes contents, GLib.Cancellable? cancellable) throws GLib.Error;
+    }
+
+  [Compact (opaque = true)]
+
+  public class ChannelSource : GLib.Source
+    {
+      public Channel channel { get; private set; }
+
+      public ChannelSource (Channel channel)
+        {
+          this.channel = channel;
+        }
+
+      public ChannelSource.with_child (Channel channel, GLib.Source child_source)
+        {
+          this.channel = channel;
+          add_child_source (child_source);
+        }
+
+      protected override bool check ()
+        {
+          return false;
+        }
+
+      protected override bool dispatch (GLib.SourceFunc? callback)
+        {
+          if (callback == null)
+
+            return GLib.Source.CONTINUE;
+          else
+            return ((ChannelSourceFunc) callback) (channel);
+        }
+
+      protected override bool prepare (out int timeout)
+        {
+          timeout = 0;
+          return false;
+        }
+
+      public new void set_callback ([CCode (type = "GSourceFunc")] owned ChannelSourceFunc func)
+        {
+          base.set_callback ((GLib.SourceFunc) (owned) func);
+        }
     }
 }

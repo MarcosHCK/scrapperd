@@ -33,28 +33,43 @@ namespace Advertise
           init ();
         }
 
-      public GLib.Source create_source (GLib.Cancellable? cancellable)
+      public ChannelSource create_source (GLib.Cancellable? cancellable)
         {
-          return socket.datagram_create_source (GLib.IOCondition.IN, cancellable);
+          var condition = (int) GLib.IOCondition.IN;
+          var child_source = (Source) socket.datagram_create_source (condition, cancellable);
+          child_source.set_callback (dummy_callback);
+          return new ChannelSource.with_child (this, child_source);
+        }
+
+      static bool dummy_callback ()
+        {
+          return GLib.Source.CONTINUE;
         }
 
       public bool init (GLib.Cancellable? cancellable = null) throws GLib.Error
         {
           var family = (SocketFamily) GLib.SocketFamily.IPV4;
-          var protocol = (SocketProtocol) GLib.SocketProtocol.DEFAULT;
+          var protocol = (SocketProtocol) GLib.SocketProtocol.UDP;
           var type = (SocketType) GLib.SocketType.DATAGRAM;
 
           ifaces = new GLib.List<GLib.SocketAddress> ();
           socket = new GLib.Socket (family, type, protocol);
+
           socket.broadcast = true;
 
-          ifaces.append (new InetSocketAddress (new InetAddress.from_string ("192.168.1.255"), port));
+          ifaces.append (new InetSocketAddress (new InetAddress.from_string ("127.255.255.255"), port));
+
+          foreach (unowned var address in ifaces) socket.bind (address, true);
           return true;
         }
 
-      public async GLib.Bytes recv (GLib.Cancellable? cancellable) throws GLib.Error
+      [CCode (cheader_filename = "ipv4channel.h")]
+
+      extern async GenericArray<Bytes> recv_from (Socket socket, List<SocketAddress> ifaces, Cancellable? cancellable) throws Error; 
+
+      public async GenericArray<GLib.Bytes> recv (GLib.Cancellable? cancellable) throws GLib.Error
         {
-          throw new IOError.FAILED ("unimplemented");
+          return yield recv_from (socket, ifaces, cancellable);
         }
 
       [CCode (cheader_filename = "ipv4channel.h")]

@@ -38,6 +38,7 @@ libadvertise = library \
         'hub.vala',
         'ipv4channel.h',
         'ipv4channel.vala',
+        'peeker.vala',
         'protocol.vala',
       ]
   )

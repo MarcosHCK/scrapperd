@@ -22,6 +22,7 @@ namespace ScrapperD
   public abstract class Application : GLib.Application
     {
       private Advertise.Clock? adv_clock = null;
+      private Advertise.Peeker? adv_peeker = null;
       private Advertise.Hub adv_hub;
       public Kademlia.DBus.NetworkHub hub { get; private construct; }
 
@@ -29,6 +30,8 @@ namespace ScrapperD
         {
           adv_hub = new Advertise.Hub ();
           hub = new Kademlia.DBus.NetworkHub ();
+
+          adv_hub.ensure_protocol (typeof (KademliaProtocol));
 
           add_main_option ("address", 'a', 0, GLib.OptionArg.STRING_ARRAY, "Address of entry node", "ADDRESS");
           add_main_option ("advertise-interval", 0, 0, GLib.OptionArg.INT, "Advertise interval", "MILLISECONDS");
@@ -188,6 +191,7 @@ namespace ScrapperD
 
               adv_hub.add_channel (ipv4_channel);
               adv_clock = new Advertise.Clock (adv_hub, advertise_interval);
+              adv_peeker = new Advertise.Peeker (adv_hub);
               break;
             }
 
@@ -199,6 +203,8 @@ namespace ScrapperD
       public override void shutdown ()
         {
           adv_clock?.stop ();
+          adv_peeker?.stop ();
+          base.shutdown ();
         }
 
       public override int handle_local_options (GLib.VariantDict options)

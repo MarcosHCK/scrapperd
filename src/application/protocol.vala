@@ -22,7 +22,8 @@ namespace ScrapperD
 {
   internal class KademliaProtocol : Advertise.Protocol, Json.Serializable
     {
-      public Key id { get; owned construct; }
+      private Key _id;
+      public Key id { get { return _id; } set { _id = value.copy (); } }
       public override string name { get { return "kademlia"; } }
 
       public KademliaProtocol (Key id)
@@ -47,14 +48,18 @@ namespace ScrapperD
 
               try { key = new Key.parse (str, -1); } catch (GLib.Error e)
                 {
-                  warning ("%s: %u: %s", e.domain.to_string (), e.code, e.message);
+                  unowned var code = e.code;
+                  unowned var domain = e.domain.to_string ();
+                  unowned var message = e.message.to_string ();
                   value = GLib.Value (pspec.value_type);
+
+                  warning ("failed key deserialization: %s: %u: %s", domain, code, message);
                   return false;
                 }
 
               (value = GLib.Value (typeof (Key))).take_boxed ((owned) key);
-              return true;
             }
+          return true;
         }
 
       public Json.Node serialize_property (string property_name, GLib.Value value, GLib.ParamSpec pspec)
