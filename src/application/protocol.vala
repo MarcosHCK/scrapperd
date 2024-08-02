@@ -27,10 +27,11 @@ namespace ScrapperD
       private Key _id;
       public Key id { get { return _id; } set { _id = value.copy (); } }
       public override string name { get { return "kademlia"; } }
+      public string role { get; set; }
 
-      public KademliaProtocol (Key id, GenericArray<Address?>? addresses = null)
+      public KademliaProtocol (Key id, string role, GenericArray<Address?>? addresses = null)
         {
-          Object (addresses : addresses, id : id);
+          Object (addresses : addresses, id : id, role : role);
         }
 
       public bool deserialize_property (string property_name, out GLib.Value value, GLib.ParamSpec pspec, Json.Node property_node)

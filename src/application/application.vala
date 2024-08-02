@@ -188,8 +188,11 @@ namespace ScrapperD
 
               while (iter2.next (out local_key, out local_var))
                 {
-                  debug ("advertising node %s", local_key.to_string ());
-                  adv_hub.add_protocol (new KademliaProtocol (local_key, ar));
+                  unowned var id = local_key;
+                  unowned var role = local_var.role;
+
+                  debug ("advertising node %s", id.to_string ());
+                  adv_hub.add_protocol (new KademliaProtocol (id, role, ar));
                 }
 
               hold ();
