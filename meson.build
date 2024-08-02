@@ -20,7 +20,7 @@ project \
     'scrapperd', 'c', 'vala',
 
     default_options : [ 'c_std=gnu99', 'warning_level=3' ],
-    meson_version : '>= 1.2.3',
+    meson_version : '>= 1.3.0',
 
     version : '@0@.@1@.@2@'.format \
       (

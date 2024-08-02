@@ -37,7 +37,7 @@ namespace Advertise
         {
           var condition = (int) GLib.IOCondition.IN;
           var child_source = (Source) socket.datagram_create_source (condition, cancellable);
-          child_source.set_callback (dummy_callback);
+            child_source.set_callback (dummy_callback);
           return new ChannelSource.with_child (this, child_source);
         }
 
@@ -57,7 +57,14 @@ namespace Advertise
 
           socket.broadcast = true;
 
-          ifaces.append (new InetSocketAddress (new InetAddress.from_string ("127.255.255.255"), port));
+          foreach (unowned var info in NetIfaces.enumerate (family)) if (info.broadcast != null)
+            {
+              assert (info.broadcast is InetSocketAddress);
+              var socket_address = (SocketAddress) info.broadcast;
+              var inet_address = (InetAddress) ((GLib.InetSocketAddress) socket_address).address;
+
+              ifaces.append (new GLib.InetSocketAddress (inet_address, port));
+            }
 
           foreach (unowned var address in ifaces) socket.bind (address, true);
           return true;
