@@ -85,11 +85,7 @@ namespace Advertise
 
       private bool on_source_triggered_notify (owned GenericArray<Ad> ads)
         {
-          foreach (unowned var ad in ads)
-            {
-              got_ad (ad);
-              debug ("got ad: (%s, %s)", ad.description ?? "<no description>", ad.name ?? "<no name>");
-            }
+          foreach (unowned var ad in ads) got_ad (ad);
           return GLib.Source.REMOVE;
         }
 
