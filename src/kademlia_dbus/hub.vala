@@ -170,9 +170,12 @@ namespace Kademlia.DBus
 
       public async bool join (Key id, string role, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
+          List<unowned Local?> locals_;
           var any = 0;
 
-          lock (locals) foreach (unowned var local in locals.get_values ()) if (local.role == role)
+          lock (locals) locals_ = this.locals.get_values ();
+
+          foreach (unowned var local in locals_) if (local.role == role)
             {
               any += (yield local.peer.join (id, cancellable)) ? 1 : 0;
             }

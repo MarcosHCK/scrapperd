@@ -98,7 +98,6 @@ namespace Kademlia
 
           while ((left = (int) peers.length ()) > 0)
             {
-
               for (unowned uint i = 0; i < dones.length; ++i)
                 {
                   dones [i] = 1;
@@ -137,6 +136,7 @@ namespace Kademlia
 
                   task.return_error ((owned) f);
                   errors.unlock ();
+                  return;
                 }
             }
 

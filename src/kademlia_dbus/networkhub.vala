@@ -175,6 +175,7 @@ namespace Kademlia.DBus
 
       private void on_incoming_pooled (owned GLib.SocketConnection socket_connection)
         {
+
           on_incoming_async.begin (socket_connection, null, (o, res) =>
             {
 

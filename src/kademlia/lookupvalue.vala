@@ -135,6 +135,7 @@ namespace Kademlia
 
                   task.return_error ((owned) f);
                   errors.unlock ();
+                  return;
                 }
             }
 
