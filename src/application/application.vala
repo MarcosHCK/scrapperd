@@ -179,11 +179,17 @@ namespace ScrapperD
               unowned Kademlia.Key? local_key;
               unowned Kademlia.DBus.Hub.Local? local_var;
               var iter2 = HashTableIter<Kademlia.Key, Kademlia.DBus.Hub.Local?> (hub.locals);
+              var ar = new GenericArray<Kademlia.DBus.Address?> ();
+
+              foreach (unowned var address in hub.list_local_addresses ())
+                {
+                  ar.add (address);
+                }
 
               while (iter2.next (out local_key, out local_var))
                 {
                   debug ("advertising node %s", local_key.to_string ());
-                  adv_hub.add_protocol (new KademliaProtocol (local_key));
+                  adv_hub.add_protocol (new KademliaProtocol (local_key, ar));
                 }
 
               hold ();
