@@ -25,6 +25,7 @@ namespace Krypt.Dh
 
       public SharedSecret (PrivateSecret private_secret, PublicSecret public_secret)
         {
+          Krypt._gcry_init ();
           this.x = new Scalar ();
           unowned var curve = private_secret.curve;
           unowned var d = private_secret.d;
@@ -80,6 +81,8 @@ namespace Krypt.Dh
 
       private PrivateSecret (string curve_name) throws Krypt.Error
         {
+          Krypt._gcry_init ();
+
           d = new Scalar ();
 
           try { curve = Curve.named (curve_name); } catch (GLib.Error e)
@@ -112,6 +115,8 @@ namespace Krypt.Dh
 
       private PublicSecret ()
         {
+          Krypt._gcry_init ();
+
           this.q = new Point ();
         }
 
@@ -165,6 +170,11 @@ namespace Krypt.Dh
       construct
         {
           if (curve_name == null) curve_name = "Curve25519";
+        }
+
+      class construct
+        {
+          Krypt._gcry_init ();
         }
 
       public override bool close (GLib.Cancellable? cancellable = null) throws GLib.IOError

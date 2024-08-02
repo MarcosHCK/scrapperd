@@ -41,6 +41,11 @@ namespace Krypt.Bc
       public uint keylen { get; private set; }
       public string mode_name { get; construct; }
 
+      class construct
+        {
+          Krypt._gcry_init ();
+        }
+
       public bool init (GLib.Cancellable? cancellable) throws Krypt.Error
         {
           var algo = CipherAlgo.NONE;
