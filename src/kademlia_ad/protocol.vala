@@ -17,11 +17,11 @@
 using Kademlia;
 using Kademlia.DBus;
 
-[CCode (cprefix = "Scrapperd", lower_case_cprefix = "scrapperd_")]
+[CCode (cprefix = "KAd", lower_case_cprefix = "k_ad_")]
 
-namespace ScrapperD
+namespace Kademlia.Ad
 {
-  internal class KademliaProtocol : Advertise.Protocol, Json.Serializable
+  public class Protocol : Advertise.Protocol, Json.Serializable
     {
       public const string PROTO_NAME = "kademlia";
       public GenericArray<Address?>? addresses { get; set; }
@@ -30,7 +30,7 @@ namespace ScrapperD
       public override string name { get { return PROTO_NAME; } }
       public string role { get; set; }
 
-      public KademliaProtocol (Key id, string role, GenericArray<Address?>? addresses = null)
+      public Protocol (Key id, string role, GenericArray<Address?>? addresses = null)
         {
           Object (addresses : addresses, id : id, role : role);
         }

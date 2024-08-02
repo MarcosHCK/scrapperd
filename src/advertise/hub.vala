@@ -64,8 +64,10 @@ namespace Advertise
       public void add_channel (Channel channel)
         {
           if (_channels.find (channel) == null)
-
-            _channels.append (channel);
+            {
+              _channels.append (channel);
+              added_channel (channel);
+            }
         }
 
       public void add_protocol (Protocol proto) requires (protocols.protocols.find (proto) == false)
@@ -153,7 +155,11 @@ namespace Advertise
 
       public void remove_channel (Channel channel)
         {
-          _channels.remove (channel);
+          if (_channels.find (channel) != null)
+            {
+              _channels.remove (channel);
+              remove_channel (channel);
+            }
         }
 
       public void remove_protocol (Protocol proto)

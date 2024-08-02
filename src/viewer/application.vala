@@ -23,6 +23,13 @@ namespace ScrapperD.Viewer
 
   public class Application : Gtk.Application
     {
+      const string joinproto_vaddr = "sq";
+      const string joinproto_vtuple = "(" + joinproto_vaddr + ")";
+      const string joinproto_varray = "a" + joinproto_vtuple;
+      const string joinproto_vtype = "(s" + joinproto_varray + ")";
+      private Advertise.Hub adv_hub;
+      private Advertise.Peeker adv_peeker;
+      private GenericSet<unowned Kademlia.Key> adv_peers;
       private Kademlia.DBus.NetworkHub hub;
 
       struct JoinToProxy
@@ -41,13 +48,22 @@ namespace ScrapperD.Viewer
         {
           add_action ("about", null, () => about_dialog ());
           add_action ("jointo", null, () => jointo_dialog ());
+          add_action ("jointos", GLib.VariantType.STRING_ARRAY, (a, p) => jointos_action (p.dup_strv ()));
           add_action ("jointo_p", GLib.VariantType.STRING, (a, p) => jointo_action (p.get_string (null)));
+          add_action ("joinproto", new GLib.VariantType (joinproto_vtype), (a, p) => joinproto (p));
           add_action ("quit", null, () => quit ());
 
           add_main_option ("address", 'a', 0, GLib.OptionArg.STRING_ARRAY, "Network entry point", "ADDRESS");
+          add_main_option ("advertise-port", 0, 0, GLib.OptionArg.INT, "Advertise port", "PORT");
           add_main_option ("port", 'p', 0, GLib.OptionArg.INT, "Network public port", "PORT");
 
+          adv_hub = new Advertise.Hub ();
+          adv_peeker = new Advertise.Peeker (adv_hub);
+          adv_peers = new GenericSet<unowned Kademlia.Key> (Kademlia.Key.hash, Kademlia.Key.equal);
           hub = new Kademlia.DBus.NetworkHub ();
+
+          adv_hub.ensure_protocol (typeof (Kademlia.Ad.Protocol));
+          adv_peeker.got_ad.connect (on_got_ad);
         }
 
       public Application ()
@@ -73,6 +89,78 @@ namespace ScrapperD.Viewer
           base.add_action (action);
         }
 
+      private void added_ad (Kademlia.Ad.Protocol proto)
+        {
+          ApplicationWindow window;
+          if ((window = active_window as ApplicationWindow) != null) added_ad_for (proto, window);
+        }
+
+      static void added_ad_for (Kademlia.Ad.Protocol proto, ApplicationWindow window)
+        {
+          var ad_row = new AdRow (proto);
+          var self = (Application) window.application;
+          var weak1 = WeakRef (window);
+          var weak2 = WeakRef (self);
+
+          self.adv_peers.add (proto.id);
+
+          ad_row.close.connect (row =>
+            {
+              ((Application?) weak2.get ())?.adv_peers?.remove (proto.id);
+              ((ApplicationWindow?) weak1.get ())?.remove_row (row);
+            });
+
+          ad_row.externalize.connect (row =>
+            {
+              Application application;
+              ApplicationWindow window2;
+              (application = ((Application) GLib.Application.get_default ()));
+              (window2 = new ApplicationWindow (application)).present ();
+              added_ad_for (proto, window2);
+              ((ApplicationWindow?) weak1.get ())?.remove_row (row);
+            });
+
+          ad_row.join.connect (row =>
+            {
+              ((Application?) weak2.get ())?.adv_peers?.remove (proto.id);
+              ((ApplicationWindow?) weak1.get ())?.remove_row (row);
+
+              var window2 = (ApplicationWindow?) weak1.get ();
+              var application = (Application?) window2?.application;
+              var varray = new GLib.VariantType (joinproto_varray);
+              var vtuple = new GLib.VariantType (joinproto_vtuple);
+              var vtype = new GLib.VariantType (joinproto_vtype);
+              var builder = new GLib.VariantBuilder (vtype);
+
+              builder.add ("s", proto.role);
+              builder.open (varray);
+
+              if (proto.addresses == null)
+                {
+                  var error = new IOError.NETWORK_UNREACHABLE ("can not join to advertised node");
+                  ((Application) weak2.get ()).notify_recoverable_error (error);
+                }
+              else
+                {
+                  foreach (unowned var address in proto.addresses)
+                    {
+                      builder.open (vtuple);
+                      builder.add ("s", address.address);
+                      builder.add ("q", address.port);
+                      builder.close ();
+                    }
+
+                  builder.close ();
+                  var action = application.lookup_action ("joinproto");
+                  var parameter = builder.end ();
+
+                  action?.activate (parameter);
+                }
+            });
+
+          window.append_row (ad_row);
+        }
+
       private void added_role (Kademlia.ValuePeer role_proxy, string role)
         {
           ApplicationWindow window;
@@ -84,6 +172,7 @@ namespace ScrapperD.Viewer
           var role_dto = (Role) new Role ();
           var role_row = (RoleRow) new RoleRow (role_dto);
           var weak1 = WeakRef (window);
+          var weak2 = WeakRef (window.application);
 
           role_dto.on_get.connect ((key, target) =>
             {
@@ -91,7 +180,7 @@ namespace ScrapperD.Viewer
                 {
                   try { on_role_dto_get.end (res); } catch (GLib.Error e)
                     {
-                      ((Application) GLib.Application.get_default ()).notify_recoverable_error (e);
+                      ((Application) weak2.get ()).notify_recoverable_error (e);
                     }
                 });
             });
@@ -102,7 +191,7 @@ namespace ScrapperD.Viewer
                 {
                   try { on_role_dto_set.end (res); } catch (GLib.Error e)
                     {
-                      ((Application) GLib.Application.get_default ()).notify_recoverable_error (e);
+                      ((Application) weak2.get ()).notify_recoverable_error (e);
                     }
                 });
             });
@@ -230,18 +319,49 @@ namespace ScrapperD.Viewer
           unowned var good = true;
           unowned var options = cmdline.get_options_dict ();
 
+          var addresses = new GLib.List<string> ();
+          var advertise_port = (uint16) Advertise.Ipv4Channel.DEFAULT_PORT;
+
           while (true)
             {
               GLib.VariantIter iter;
               GLib.List<JoinToProxy?> proxies;
+              int option_i;
               string option_s;
-
-              activate ();
 
               if (options.lookup ("address", "as", out iter)) while (iter.next ("s", out option_s))
                 {
+                  addresses.append ((owned) option_s);
+                }
 
-                  try { proxies = yield jointo_async (option_s, cancellable); } catch (GLib.Error e)
+              if (options.lookup ("advertise-port", "i", out option_i))
+                {
+                  if (option_i >= uint16.MIN && option_i < uint16.MAX)
+
+                    advertise_port = (uint16) option_i;
+                  else
+                    {
+                      good = false;
+                      cmdline.printerr ("invalid port %i\n", option_i);
+                      cmdline.set_exit_status (1);
+                      break;
+                    }
+                }
+
+              try { adv_hub.add_channel (new Advertise.Ipv4Channel (advertise_port)); } catch (GLib.Error e)
+                {
+                  good = false;
+                  cmdline.printerr ("%s: %u: %s\n", e.domain.to_string (), e.code, e.message);
+                  cmdline.set_exit_status (1);
+                  break;
+                }
+
+              activate ();
+
+              foreach (unowned var address in addresses)
+                {
+
+                  try { proxies = yield jointo_async (address, cancellable); } catch (GLib.Error e)
                     {
                       good = false;
                       cmdline.printerr ("%s: %u: %s\n", e.domain.to_string (), e.code, e.message);
@@ -258,15 +378,16 @@ namespace ScrapperD.Viewer
                     }
                 }
 
-              if (unlikely (good == false))
-                {
-                  active_window.close ();
-                  active_window.destroy ();
-                  break;
-                }
-
-              active_window.present ();
               break;
+            }
+
+          if (likely (good == true))
+
+            active_window.present ();
+          else
+            {
+              active_window.close ();
+              active_window.destroy ();
             }
 
           return good;
@@ -288,26 +409,7 @@ namespace ScrapperD.Viewer
       private void jointo_action (string address)
         {
           hold ();
-
-          jointo_async.begin (address, null, (o, res) =>
-            {
-              GLib.List<JoinToProxy?>? proxies = null;
-
-              try { proxies = jointo_async.end (res); } catch (GLib.Error e)
-                {
-                  notify_recoverable_error (e);
-                }
-
-              if (likely (proxies != null)) foreach (unowned var proxy in proxies)
-                {
-                  unowned var role = proxy.role;
-                  unowned var role_proxy = proxy.role_proxy;
-
-                  added_role (role_proxy, role);
-                }
-
-              release ();
-            });
+          jointo_async.begin (address, null, jointo_notify);
         }
 
       private async GLib.List<JoinToProxy?> jointo_async (string address, GLib.Cancellable? cancellable = null) throws GLib.Error
@@ -333,6 +435,130 @@ namespace ScrapperD.Viewer
             }
 
           return (owned) proxies;
+        }
+
+      static void jointo_notify (GLib.Object? o, GLib.AsyncResult res)
+        {
+          Application self = (Application) o;
+          GLib.List<JoinToProxy?> proxies;
+
+          try { proxies = self.jointo_async.end (res); } catch (GLib.Error e)
+            {
+              self.notify_recoverable_error (e);
+              return;
+            }
+
+          self.jointo_notify_a (proxies);
+        }
+
+      private void jointo_notify_a (GLib.List<JoinToProxy?> proxies)
+        {
+          if (likely (proxies != null)) foreach (unowned var proxy in proxies)
+            {
+              unowned var role = proxy.role;
+              unowned var role_proxy = proxy.role_proxy;
+
+              added_role (role_proxy, role);
+            }
+
+          release ();
+        }
+
+      private void jointos_action (owned string[] addresses)
+        {
+          hold ();
+          jointos_async.begin ((owned) addresses, null, jointos_notify);
+        }
+
+      private async GLib.List<JoinToProxy?> jointos_async (owned string[] addresses, GLib.Cancellable? cancellable) throws GLib.Error
+        {
+          foreach (unowned var address in addresses) try
+            {
+              return yield jointo_async (address, cancellable);
+            }
+          catch (GLib.IOError e)
+            {
+              switch (e.code)
+                {
+                  case GLib.IOError.CONNECTION_CLOSED:
+                  case GLib.IOError.CONNECTION_REFUSED:
+                  case GLib.IOError.NETWORK_UNREACHABLE:
+
+                    continue;
+                  default:
+                    throw (owned) e;
+                }
+            }
+
+          throw new GLib.IOError.NETWORK_UNREACHABLE ("can not join to advertised node");
+        }
+
+      static void jointos_notify (GLib.Object? o, GLib.AsyncResult res)
+        {
+          Application self = (Application) o;
+          GLib.List<JoinToProxy?> proxies;
+
+          try { proxies = self.jointos_async.end (res); } catch (GLib.Error e)
+            {
+              self.notify_recoverable_error (e);
+              return;
+            }
+
+          self.jointo_notify_a (proxies);
+        }
+
+      private void joinproto (GLib.Variant p)
+        {
+          hold ();
+          joinproto_async.begin (p, null, joinproto_notify);
+        }
+
+      private async GLib.List<JoinToProxy?> joinproto_async (GLib.Variant p, GLib.Cancellable? cancellable = null) throws GLib.Error
+        {
+          uint16 port;
+          string address, role;
+          GLib.SocketAddress? addr;
+          GLib.VariantIter iter;
+
+          p.get_child (0, "s", out role);
+          p.get_child (1, joinproto_varray, out iter);
+
+          while (iter.next (joinproto_vtuple, out address, out port))
+            {
+              var network = GLib.NetworkAddress.parse (address, port);
+              var enumeartor = network?.enumerate ();
+              var addresses = new GenericArray<string> ();
+
+              if (enumeartor != null) while ((addr = yield enumeartor.next_async (cancellable)) != null)
+                {
+                  if (addr is GLib.InetSocketAddress)
+
+                    addresses.add (@"$(addr.to_string ())#$role");
+                }
+
+              try { return yield jointos_async (addresses.steal (), cancellable); } catch (GLib.IOError e)
+                {
+                  if (e.code != GLib.IOError.NETWORK_UNREACHABLE)
+
+                    throw (owned) e;
+                }
+            }
+
+          throw new GLib.IOError.NETWORK_UNREACHABLE ("can not join to advertised node");
+        }
+
+      static void joinproto_notify (GLib.Object? o, GLib.AsyncResult res)
+        {
+          Application self = (Application) o;
+          GLib.List<JoinToProxy?> proxies;
+
+          try { proxies = self.joinproto_async.end (res); } catch (GLib.Error e)
+            {
+              self.notify_recoverable_error (e);
+              return;
+            }
+
+          self.jointo_notify_a (proxies);
         }
 
       public void notify_desktop_error (GLib.Error error)
@@ -370,6 +596,19 @@ namespace ScrapperD.Viewer
             notify_desktop_error (error);
           else
             window.infobar.push_unrecoverable_error (error);
+        }
+
+      private void on_got_ad (Advertise.Ad ad)
+        {
+          foreach (unowned var proto_ in ad.protocols) if (proto_.name == Kademlia.Ad.Protocol.PROTO_NAME)
+            {
+              unowned var proto = (Kademlia.Ad.Protocol) proto_;
+              unowned bool added;
+                added = adv_peers.contains (proto.id);
+                added = added || hub.has_contact (proto.id);
+                added = added || hub.has_local (proto.id);
+              if (added == false) added_ad (proto);
+            }
         }
 
       static async void on_role_dto_get (Kademlia.ValuePeer peer, owned RoleSource key_source, owned RoleTarget target_source, GLib.Cancellable? cancellable = null) throws GLib.Error

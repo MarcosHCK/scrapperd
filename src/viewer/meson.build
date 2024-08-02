@@ -26,12 +26,12 @@ scrapperd_viewer_support = library \
 
     dependencies : libglib_vapis + \
       [
-        libgio_dep, libglib_dep, libgobject_dep
+        libgio_dep, libglib_dep, libgobject_dep,
       ],
 
     include_directories : [ configdir ] + libdirs,
 
-    link_with : [ libkademlia, libkademlia_dbus, libscrapperd ],
+    link_with : [ libkademlia, libkademlia_dbus ],
 
     sources :
       [
@@ -50,16 +50,18 @@ executable \
       [
         libgio_dep, libglib_dep, libgobject_dep,
         libgtk_dep, libgtk_vapi,
+        libjson_glib_dep, libjson_glib_vapi,
       ],
 
     c_args : [ '-DGETTEXT_PACKAGE=@0@'.format (default_defines ['G_LOG_DOMAIN']) ],
 
     include_directories : [ configdir ] + libdirs,
 
-    link_with : [ libkademlia, libkademlia_dbus, libscrapperd, scrapperd_viewer_support ],
+    link_with : [ libadvertise, libkademlia, libkademlia_ad, libkademlia_dbus, scrapperd_viewer_support ],
 
     sources :
       [
+        'adrow.vala',
         'application.vala',
         'applicationwindow.vala',
         'infobar.vala',

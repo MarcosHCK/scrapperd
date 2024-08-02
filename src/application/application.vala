@@ -31,7 +31,7 @@ namespace ScrapperD
           adv_hub = new Advertise.Hub ();
           hub = new Kademlia.DBus.NetworkHub ();
 
-          adv_hub.ensure_protocol (typeof (KademliaProtocol));
+          adv_hub.ensure_protocol (typeof (Kademlia.Ad.Protocol));
 
           add_main_option ("address", 'a', 0, GLib.OptionArg.STRING_ARRAY, "Address of entry node", "ADDRESS");
           add_main_option ("advertise-interval", 0, 0, GLib.OptionArg.INT, "Advertise interval", "MILLISECONDS");
@@ -192,7 +192,7 @@ namespace ScrapperD
                   unowned var role = local_var.role;
 
                   debug ("advertising node %s:%s", role, id.to_string ());
-                  adv_hub.add_protocol (new KademliaProtocol (id, role, ar));
+                  adv_hub.add_protocol (new Kademlia.Ad.Protocol (id, role, ar));
                 }
 
               hold ();
@@ -211,20 +211,20 @@ namespace ScrapperD
 
       private void on_got_ad (Advertise.Ad ad)
         {
-          foreach (unowned var proto in ad.protocols) if (proto.name == KademliaProtocol.PROTO_NAME)
+          foreach (unowned var proto in ad.protocols) if (proto.name == Kademlia.Ad.Protocol.PROTO_NAME)
             {
-              on_got_kademlia_ad (ad, (KademliaProtocol) proto);
+              on_got_kademlia_ad (ad, (Kademlia.Ad.Protocol) proto);
             }
         }
 
-      private void on_got_kademlia_ad (Advertise.Ad ad, KademliaProtocol proto)
+      private void on_got_kademlia_ad (Advertise.Ad ad, Kademlia.Ad.Protocol proto)
 
           requires (proto.addresses != null)
           requires (proto.role != null)
         {
-          on_got_kademlia_ad_async.begin (proto, (o, res) =>
+          Kademlia.Ad.join.begin (hub, proto, null, (o, res) =>
             {
-              try { ((Application) o).on_got_kademlia_ad_async.end (res); } catch (GLib.Error e)
+              try { Kademlia.Ad.join.end (res); } catch (GLib.Error e)
                 {
                   unowned var code = e.code;
                   unowned var domain = e.domain.to_string ();
@@ -233,24 +233,6 @@ namespace ScrapperD
                   warning ("failed to handle ad: %s: %u: %s", domain, code, message);
                 }
             });
-        }
-
-      private async void on_got_kademlia_ad_async (KademliaProtocol proto) throws GLib.Error
-        {
-          unowned var id = proto.id;
-
-          if (hub.has_local (id) == false && hub.has_contact (id) == false)
-            {
-              debug ("reaching advertised node %s:%s", proto.role, id.to_string ());
-
-              var addresses = new Kademlia.DBus.Address [proto.addresses.length];
-              int i = 0;
-
-              foreach (unowned var address in proto.addresses) addresses [i++] = address;
-
-              hub.add_contact_addresses (id, addresses);
-              yield hub.join (id, proto.role, null);
-            }
         }
 
       protected virtual async void register_peers () throws GLib.Error { }

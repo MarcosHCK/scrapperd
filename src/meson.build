@@ -23,15 +23,19 @@ libgobject_vapi = vala.find_library ('gobject-2.0')
 
 libglib_vapis = [ libgio_vapi, libglib_vapi, libgobject_vapi ]
 
-subdir ('advertise')
-subdir ('gvalr')
 subdir ('kademlia')
+
+subdir ('gvalr')
 subdir ('krypt')
 subdir ('kademlia_dbus')
+
+subdir ('advertise')
+subdir ('kademlia_ad')
 
 subdir ('application')
 
 subdir ('scrapper')
 subdir ('storage')
-subdir ('tests')
 subdir ('viewer')
+
+subdir ('tests')
