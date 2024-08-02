@@ -54,16 +54,12 @@ namespace GValr
 
               case GLib.Type.BOXED:
 
-                if (is_a_or_equal (value.type (), typeof (GLib.Bytes)))
+                if ((good = is_a_or_equal (value.type (), typeof (GLib.Bytes))) == true)
                   {
                     var bytes_ = (Bytes) value.dup_boxed (); 
                     var vtype_ = new VariantType ("ay");
 
                     builder.add_value (new Variant.variant (new Variant.from_bytes (vtype_, bytes_, false)));
-                  }
-                else
-                  {
-                    good = false;
                   }
 
                 break;

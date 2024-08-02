@@ -19,7 +19,7 @@
 
 namespace GValr
 {
-  [CCode (array_length_pos = 1.1, array_length_type = "gsize", cheader_filename = "glib.h", cname = "g_variant_get_fixed_array", simple_generics = true)]
+  [CCode (array_length_pos = 1.1, array_length_type = "gsize", cheader_filename = "glib.h", cname = "g_variant_get_fixed_array", simple_generics = true, type = "gconstpointer")]
 
   static extern unowned T[] _g_variant_get_fixed_array<T> (GLib.Variant variant, size_t element_size = sizeof (T));
 
@@ -64,14 +64,12 @@ namespace GValr
 
           case GLib.Type.BOXED:
 
-            if (is_a_or_equal (gtype, typeof (GLib.Bytes)))
+            if ((good = is_a_or_equal (gtype, typeof (GLib.Bytes))) == true)
               {
-                (value = GLib.Value (gtype)).set_boxed (new GLib.Bytes (_g_variant_get_fixed_array (packed)));
+                var bytes = new GLib.Bytes (_g_variant_get_fixed_array (packed));
+                (value = GLib.Value (gtype)).take_boxed ((owned) bytes);
               }
-            else
-              {
-                good = false;
-              }
+
             break;
 
           default: good = false; break;
