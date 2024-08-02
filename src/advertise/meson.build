@@ -16,8 +16,8 @@
 #
 
 libjson_glib_dep = dependency ('json-glib-1.0', required : true)
+libjson_glib_vapi = vala.find_library ('json-glib-1.0')
 
-win32 = cc.has_define ('G_OS_WIN32', dependencies : libglib_dep, prefix : '#include <glib.h>')
 netconf = configuration_data ()
 
 if true
@@ -125,12 +125,10 @@ libadvertise = library \
   (
     'advertise',
 
-    dependencies :
+    dependencies : libglib_vapis + \
       [
-        vala.find_library ('gio-2.0'), libgio_dep,
-        vala.find_library ('glib-2.0'), libglib_dep,
-        vala.find_library ('gobject-2.0'), libgobject_dep,
-        vala.find_library ('json-glib-1.0'), libjson_glib_dep,
+        libgio_dep, libglib_dep, libgobject_dep, libjson_glib_dep,
+        libjson_glib_vapi,
       ],
 
     include_directories : [ configdir ] + libdirs,
@@ -143,7 +141,6 @@ libadvertise = library \
         'ipv4channel.h',
         'ipv4channel.vala',
         'netifaces.c',
-        'netifaces-@0@.c'.format (win32 == false ? 'unix' : 'win32'),
         'netifaces.h',
         'netifaces.vapi',
         'peeker.vala',

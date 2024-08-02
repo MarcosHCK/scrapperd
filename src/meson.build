@@ -17,6 +17,12 @@
 
 libdirs = []
 
+libgio_vapi = vala.find_library ('gio-2.0')
+libglib_vapi = vala.find_library ('glib-2.0')
+libgobject_vapi = vala.find_library ('gobject-2.0')
+
+libglib_vapis = [ libgio_vapi, libglib_vapi, libgobject_vapi ]
+
 subdir ('advertise')
 subdir ('gvalr')
 subdir ('kademlia')

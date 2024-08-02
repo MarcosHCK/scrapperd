@@ -16,18 +16,16 @@
 #
 
 libsoup_dep = dependency ('libsoup-3.0', required : true)
+libsoup_vapi = vala.find_library ('libsoup-3.0')
 
 executable \
   (
     'scrapperd-scrapper',
 
-    dependencies :
+    dependencies : libglib_vapis + \
       [
-        vala.find_library ('gio-2.0'), libgio_dep,
-        vala.find_library ('glib-2.0'), libglib_dep,
-        vala.find_library ('gobject-2.0'), libgobject_dep,
-        vala.find_library ('libsoup-3.0'), libsoup_dep,
-        cc.find_library ('m', required : false),
+        libgio_dep, libglib_dep, libgobject_dep,
+        libsoup_dep, libsoup_vapi,
       ],
 
     include_directories : [ configdir ] + libdirs,

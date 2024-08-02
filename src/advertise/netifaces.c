@@ -17,6 +17,12 @@
 #include <config.h>
 #include <netifaces.h>
 
+#if defined(G_OS_WIN32)
+# include <netifaces-win32.c>
+#elif defined(G_OS_UNIX)
+# include <netifaces-unix.c>
+#endif
+
 void adv_net_ifaces_info_free (AdvNetIfacesInfo* info)
 {
   g_clear_pointer (&info->address, g_object_unref);

@@ -19,11 +19,9 @@ libkademlia_dbus = library \
   (
     'kademlia_dbus',
 
-    dependencies :
+    dependencies : libglib_vapis + \
       [
-        vala.find_library ('gio-2.0'), libgio_dep,
-        vala.find_library ('glib-2.0'), libglib_dep,
-        vala.find_library ('gobject-2.0'), libgobject_dep,
+        libgio_dep, libglib_dep, libgobject_dep
       ],
 
     include_directories : [ configdir ] + libdirs,

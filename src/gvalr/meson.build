@@ -21,8 +21,8 @@ libgvalr = library \
 
     dependencies :
       [
-        vala.find_library ('glib-2.0'), libglib_dep,
-        vala.find_library ('gobject-2.0'), libgobject_dep,
+        libglib_dep, libglib_vapi,
+        libgobject_dep, libgobject_vapi,
       ],
 
     include_directories : [ configdir ] + libdirs,

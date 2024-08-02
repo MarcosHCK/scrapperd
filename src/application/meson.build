@@ -19,12 +19,10 @@ libscrapperd = library \
   (
     'scrapperd',
 
-    dependencies :
+    dependencies : libglib_vapis + \
       [
-        vala.find_library ('gio-2.0'), libgio_dep,
-        vala.find_library ('glib-2.0'), libglib_dep,
-        vala.find_library ('gobject-2.0'), libgobject_dep,
-        vala.find_library ('json-glib-1.0'), libjson_glib_dep,
+        libgio_dep, libglib_dep, libgobject_dep, libjson_glib_dep,
+        libjson_glib_vapi,
       ],
 
     include_directories : [ configdir ] + libdirs,
