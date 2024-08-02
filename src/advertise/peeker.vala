@@ -24,7 +24,7 @@ namespace Advertise
       public GLib.MainContext context { get; owned construct; }
       public Hub hub { get; construct; }
 
-      public signal void got_ad (Ad? ad);
+      public signal void got_ad (Ad ad);
 
       private GLib.HashTable<unowned Channel, GLib.Cancellable> cancellables;
       private GLib.HashTable<unowned Channel, GLib.Source> sources;

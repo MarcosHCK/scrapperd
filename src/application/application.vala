@@ -191,7 +191,7 @@ namespace ScrapperD
                   unowned var id = local_key;
                   unowned var role = local_var.role;
 
-                  debug ("advertising node %s", id.to_string ());
+                  debug ("advertising node %s:%s", role, id.to_string ());
                   adv_hub.add_protocol (new KademliaProtocol (id, role, ar));
                 }
 
@@ -201,10 +201,56 @@ namespace ScrapperD
               adv_hub.add_channel (ipv4_channel);
               adv_clock = new Advertise.Clock (adv_hub, advertise_interval);
               adv_peeker = new Advertise.Peeker (adv_hub);
+
+              adv_peeker.got_ad.connect (on_got_ad);
               break;
             }
 
           return good;
+        }
+
+      private void on_got_ad (Advertise.Ad ad)
+        {
+          foreach (unowned var proto in ad.protocols) if (proto.name == KademliaProtocol.PROTO_NAME)
+            {
+              on_got_kademlia_ad (ad, (KademliaProtocol) proto);
+            }
+        }
+
+      private void on_got_kademlia_ad (Advertise.Ad ad, KademliaProtocol proto)
+
+          requires (proto.addresses != null)
+          requires (proto.role != null)
+        {
+          on_got_kademlia_ad_async.begin (proto, (o, res) =>
+            {
+              try { ((Application) o).on_got_kademlia_ad_async.end (res); } catch (GLib.Error e)
+                {
+                  unowned var code = e.code;
+                  unowned var domain = e.domain.to_string ();
+                  unowned var message = e.message.to_string ();
+
+                  warning ("failed to handle ad: %s: %u: %s", domain, code, message);
+                }
+            });
+        }
+
+      private async void on_got_kademlia_ad_async (KademliaProtocol proto) throws GLib.Error
+        {
+          unowned var id = proto.id;
+
+          if (hub.has_local (id) == false && hub.has_contact (id) == false)
+            {
+              debug ("reaching advertised node %s:%s", proto.role, id.to_string ());
+
+              var addresses = new Kademlia.DBus.Address [proto.addresses.length];
+              int i = 0;
+
+              foreach (unowned var address in proto.addresses) addresses [i++] = address;
+
+              hub.add_contact_addresses (id, addresses);
+              yield hub.join (id, proto.role, null);
+            }
         }
 
       protected virtual async void register_peers () throws GLib.Error { }

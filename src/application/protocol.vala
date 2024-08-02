@@ -23,10 +23,11 @@ namespace ScrapperD
 {
   internal class KademliaProtocol : Advertise.Protocol, Json.Serializable
     {
+      public const string PROTO_NAME = "kademlia";
       public GenericArray<Address?>? addresses { get; set; }
       private Key _id;
       public Key id { get { return _id; } set { _id = value.copy (); } }
-      public override string name { get { return "kademlia"; } }
+      public override string name { get { return PROTO_NAME; } }
       public string role { get; set; }
 
       public KademliaProtocol (Key id, string role, GenericArray<Address?>? addresses = null)
@@ -119,16 +120,6 @@ namespace ScrapperD
 
               default: return default_deserialize_property (property_name, out value, pspec, property_node);
             }
-        }
-
-      [CCode (array_length_pos = 0.1, array_length_type = "guint")]
-      public override (unowned GLib.ParamSpec)[] list_properties ()
-        {
-          var de = base.list_properties ();
-          var ar = new (unowned GLib.ParamSpec) [de.length - 1];
-
-          for (unowned uint i = 0, j = 0; i < de.length; ++i) if (de [i].name != "hub") ar [j++] = de [i];
-          return (owned) ar;
         }
 
       public Json.Node serialize_property (string property_name, GLib.Value value, GLib.ParamSpec pspec)

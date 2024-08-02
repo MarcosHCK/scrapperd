@@ -158,6 +158,16 @@ namespace Kademlia.DBus
             }
         }
 
+      public bool has_contact (Key id)
+        {
+          lock (contacts) return contacts.contains (id);
+        }
+
+      public bool has_local (Key id)
+        {
+          lock (locals) return locals.contains (id);
+        }
+
       public async bool join (Key id, string role, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
           var any = 0;
