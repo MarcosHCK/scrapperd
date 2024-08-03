@@ -27,7 +27,12 @@ namespace Testing
           store = new HashTable<Key, GLib.Value?> (Key.hash, Key.equal);
         }
 
-      public async override bool insert_value (Key id, GLib.Value? value, GLib.Cancellable? cancellable)
+      public override async Kademlia.Key[] enumerate_staled_values (GLib.Cancellable? cancellable)
+        {
+          return new Key [0];
+        }
+
+      public async bool insert_value (Key id, GLib.Value? value, GLib.Cancellable? cancellable)
         {
           var val = GLib.Value (value.type ());
 
@@ -36,7 +41,7 @@ namespace Testing
           return true;
         }
 
-      public async override GLib.Value? lookup_value (Key id, GLib.Cancellable? cancellable)
+      public async GLib.Value? lookup_value (Key id, GLib.Cancellable? cancellable)
         {
           unowned GLib.Value? value;
 

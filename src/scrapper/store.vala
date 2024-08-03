@@ -33,6 +33,11 @@ namespace ScrapperD.Scrapper
           Object (scrapper : scrapper);
         }
 
+      public override async Key[] enumerate_staled_values (GLib.Cancellable? cancellable = null) throws GLib.Error
+        {
+          return new Key [0];
+        }
+
       private async void scrap_and_save (owned Key id, GLib.Uri uri, owned GLib.Value? otherv) throws GLib.Error
 
           requires (otherv == null || otherv.holds (typeof (GLib.Bytes)))
@@ -89,7 +94,7 @@ namespace ScrapperD.Scrapper
             }
         }
 
-      public async override bool insert_value (Kademlia.Key id, GLib.Value? value, GLib.Cancellable? cancellable) throws GLib.Error
+      public async bool insert_value (Kademlia.Key id, GLib.Value? value, GLib.Cancellable? cancellable) throws GLib.Error
         {
           if (value.holds (typeof (string)) == false)
 
@@ -123,7 +128,7 @@ namespace ScrapperD.Scrapper
             }
         }
 
-      public async override GLib.Value? lookup_value (Kademlia.Key id, GLib.Cancellable? cancellable) throws GLib.Error
+      public async GLib.Value? lookup_value (Kademlia.Key id, GLib.Cancellable? cancellable) throws GLib.Error
         {
           return yield store_peer.lookup (id, cancellable);
         }

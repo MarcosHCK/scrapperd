@@ -27,7 +27,8 @@ namespace Kademlia.DBus
       public Hub hub { owned get { return (Hub) _hub.get (); } set { _hub.set (value); } }
       public GLib.Source source { get; construct; }
 
-      private Mutex mutex = Mutex ();
+      private Mutex peer_mutex = Mutex ();
+      private Mutex value_mutex = Mutex ();
       private WeakRef _hub;
 
       construct
@@ -56,9 +57,9 @@ namespace Kademlia.DBus
           context.iteration (false);
         }
 
-      private async void step (Hub hub, Cancellable? cancellable = null) throws GLib.Error
+      private async void peer_step (Hub hub, Cancellable? cancellable = null) throws GLib.Error
         {
-          var locals = new GLib.List<Kademlia.Peer> ();
+          var locals = new GLib.List<PeerImpl> ();
           hub.foreach_local ((a, b, peer) => locals.append (peer));
 
           foreach (unowned var peer in locals)
@@ -68,26 +69,58 @@ namespace Kademlia.DBus
             }
         }
 
+      private async void value_step (Hub hub, GLib.Cancellable? cancellable = null) throws GLib.Error
+        {
+          var locals = new GLib.List<PeerImpl> ();
+          hub.foreach_local ((a, b, peer) => locals.append (peer));
+
+          foreach (unowned var peer in locals) foreach (unowned var key in yield peer.value_store.enumerate_staled_values (cancellable))
+            {
+              GLib.Value? value;
+
+              if ((value = yield peer.value_store.lookup_value (key, cancellable)) != null)
+
+                yield peer.insert (key, (owned) value, cancellable);
+            }
+        }
+
       private bool watch ()
         {
           Hub hub;
 
-          if ((hub = _hub.get () as Hub) != null && mutex.trylock ())
+          if ((hub = _hub.get () as Hub) != null)
             {
-              step.begin (hub, cancellable, (o, res) =>
-                {
-                  try { ((Clock) o).step.end (res); } catch (GLib.Error e)
-                    {
-                      unowned var code = e.code;
-                      unowned var domain = e.domain.to_string ();
-                      unowned var message = e.message.to_string ();
-                      e = null;
+              if (peer_mutex.trylock ())
 
-                      warning ("hub clock error: %s: %u: %s", domain, code, message);
-                    }
+                peer_step.begin (hub, cancellable, (o, res) =>
+                  {
+                    try { ((Clock) o).peer_step.end (res); } catch (GLib.Error e)
+                      {
+                        unowned var code = e.code;
+                        unowned var domain = e.domain.to_string ();
+                        unowned var message = e.message.to_string ();
 
-                  mutex.unlock ();
-                });
+                        warning ("hub clock error: %s: %u: %s", domain, code, message);
+                      }
+
+                    peer_mutex.unlock ();
+                  });
+
+              if (value_mutex.trylock ())
+
+                value_step.begin (hub, cancellable, (o, res) =>
+                  {
+                    try { ((Clock) o).value_step.end (res); } catch (GLib.Error e)
+                      {
+                        unowned var code = e.code;
+                        unowned var domain = e.domain.to_string ();
+                        unowned var message = e.message.to_string ();
+
+                        warning ("hub clock error: %s: %u: %s", domain, code, message);
+                      }
+
+                    value_mutex.unlock ();
+                  });
             }
           return GLib.Source.CONTINUE;
         }

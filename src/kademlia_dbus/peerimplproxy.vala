@@ -21,12 +21,12 @@ namespace Kademlia.DBus
 {
   private class DummyValueStore : GLib.Object, ValueStore
     {
-      public override async bool insert_value (Key id, GLib.Value? value = null, GLib.Cancellable? cancellable = null) throws GLib.Error
+      public async bool insert_value (Key id, GLib.Value? value = null, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
           throw new PeerError.UNREACHABLE ("anonymous node");
         }
 
-      public override async GLib.Value? lookup_value (Key id, GLib.Cancellable? cancellable = null) throws GLib.Error
+      public async GLib.Value? lookup_value (Key id, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
           throw new PeerError.UNREACHABLE ("anonymous node");
         }

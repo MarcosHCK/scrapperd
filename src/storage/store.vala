@@ -20,46 +20,80 @@ using Kademlia;
 
 namespace ScrapperD.Storage
 {
+  struct Entry
+    {
+      public int64 in_time;
+      public GLib.Value value;
+
+      public Entry (owned GLib.Value value)
+        {
+          this.in_time = GLib.get_monotonic_time ();
+          this.value = value;
+        }
+    }
+
   public class Store : GLib.Object, ValueStore
     {
-      private GLib.HashTable<Key, GLib.Value?> values;
+      public const int64 VALUE_TIMESPAN = 3 * Buckets.USEC_PER_SEC;
+      private GLib.HashTable<Key, Entry?> values;
 
       construct
         {
-          values = new HashTable<Key, GLib.Value?> (Key.hash, Key.equal);
+          values = new HashTable<Key, Entry?> (Key.hash, Key.equal);
         }
 
-      public async override bool insert_value (Kademlia.Key id, GLib.Value? value, GLib.Cancellable? cancellable) throws GLib.Error
+      public override async Kademlia.Key[] enumerate_staled_values (GLib.Cancellable? cancellable) throws GLib.Error
+        {
+          unowned Key key;
+          unowned Entry? entry;
+          var array = new GenericArray<Key> ();
+          var iter = HashTableIter<Key, Entry?> (values);
+          var now = (int64) GLib.get_monotonic_time ();
+
+          while (iter.next (out key, out entry))
+            {
+              if (now - entry.in_time > VALUE_TIMESPAN)
+
+                array.add (key.copy ());
+            }
+          return array.steal ();
+        }
+
+      public async bool insert_value (Kademlia.Key id, GLib.Value? value, GLib.Cancellable? cancellable) throws GLib.Error
         {
           debug ("insert value %s", id.to_string ());
 
-          if (value == null)
+          lock (values)
 
-            values.remove (id);
-          else
-            {
-              var copy = GLib.Value (value.type ());
+            if (value == null)
 
-              value.copy (ref copy);
-              values.insert (id.copy (), (owned) copy);
-            }
+              values.remove (id);
+            else
+              {
+                var copy = GLib.Value (value.type ());
+
+                value.copy (ref copy);
+                values.insert (id.copy (), Entry ((owned) copy));
+              }
           return true;
         }
 
-      public async override GLib.Value? lookup_value (Kademlia.Key id, GLib.Cancellable? cancellable) throws GLib.Error
+      public async GLib.Value? lookup_value (Kademlia.Key id, GLib.Cancellable? cancellable) throws GLib.Error
         {
           debug ("lookup value %s", id.to_string ());
           unowned GLib.Value? value;
 
-          if ((value = values.lookup (id)) == null)
+          lock (values)
 
-            return null;
-          else
-            {
-              var copy = GLib.Value (value.type ());
-                value.copy (ref copy);
-              return (owned) copy;
-            }
+            if ((value = values.lookup (id).value) == null)
+
+              return null;
+            else
+              {
+                var copy = GLib.Value (value.type ());
+                  value.copy (ref copy);
+                return (owned) copy;
+              }
         }
     }
 }

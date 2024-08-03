@@ -22,14 +22,12 @@ namespace Kademlia
   public interface ValueStore : GLib.Object
     {
 
-      public virtual async bool insert_value (Key id, GLib.Value? value = null, GLib.Cancellable? cancellable = null) throws GLib.Error
+      public virtual async Key[] enumerate_staled_values (GLib.Cancellable? cancellable = null) throws GLib.Error
         {
           throw new IOError.FAILED ("unimplemented");
         }
 
-      public virtual async GLib.Value? lookup_value (Key id, GLib.Cancellable? cancellable = null) throws GLib.Error
-        {
-          throw new IOError.FAILED ("unimplemented");
-        }
+      public abstract async bool insert_value (Key key, GLib.Value? value = null, GLib.Cancellable? cancellable = null) throws GLib.Error;
+      public abstract async GLib.Value? lookup_value (Key key, GLib.Cancellable? cancellable = null) throws GLib.Error;
     }
 }
