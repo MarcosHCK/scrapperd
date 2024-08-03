@@ -24,7 +24,13 @@ namespace Kademlia
       public Key self { get; private owned set; }
       private GLib.List<Bucket?> buckets;
 
-      public const uint MAXBACKOFF = 5;
+      [CCode (cheader_filename = "glib.h", cname = "G_USEC_PER_SEC")]
+
+      public extern const int64 USEC_PER_SEC;
+
+      public const int64 FIRSTSTALETIME = 3 * USEC_PER_SEC;
+      public const uint MAXBACKOFF = 3;
+      public const int64 MAXSLEEPTIME = 3 * USEC_PER_SEC;
       public const uint MAXSPAN = 20;
 
       public signal void added_contact (Key peer);
@@ -35,6 +41,13 @@ namespace Kademlia
         {
           this.buckets = new GLib.List<Bucket?> ();
           this.self = (owned) self;
+        }
+
+      public void awake_range (Key key)
+        {
+          unowned var bucket = (Bucket?) search (key, false)?.data;
+          unowned var now = (int64) GLib.get_monotonic_time ();
+          if (bucket != null) bucket.lastlookup = now;
         }
 
       static int compare_index (Bucket? a, Bucket? b) { return (int) b.index - (int) a.index; }
@@ -79,6 +92,40 @@ namespace Kademlia
                   bucket.replacements.delete_link (link);
                 }
             }
+        }
+
+      public GLib.List<Key> enumerate_dormant_ranges ()
+        {
+          var list = new GLib.List<Key> ();
+          var now = (int64) GLib.get_monotonic_time ();
+
+          foreach (unowned var bucket in buckets) if (now - bucket.lastlookup > MAXSLEEPTIME)
+            {
+              if (bucket.nodes.length > 0)
+                {
+                  var l = (int32) bucket.nodes.length;
+                  var n = (uint) GLib.Random.int_range (0, l);
+
+                  list.append (bucket.nodes.head.nth (n).data.copy ());
+                }
+            }
+          return (owned) list;
+        }
+
+      public GLib.List<Key> enumerate_stale_contacts ()
+        {
+          var list = new GLib.List<Key> ();
+          var now = (int64) GLib.get_monotonic_time ();
+
+          foreach (unowned var bucket in buckets) foreach (unowned var stale in bucket.stale.head)
+            {
+              if (now - stale.lastping > (FIRSTSTALETIME * (1 << stale.drop_count)))
+                {
+                  list.append (stale.key.copy ());
+                  stale.lastping = now;
+                }
+            }
+          return (owned) list;
         }
 
       public bool insert (Key key) requires (Key.equal (key, self) == false)

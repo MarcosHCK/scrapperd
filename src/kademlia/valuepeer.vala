@@ -110,23 +110,27 @@ namespace Kademlia
 
       internal async Value? lookup_in_node (owned Key peer, Key id, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
+          Value? result;
           bool same;
 
           try
             {
               if ((same = Key.equal (peer, this.id)) == false)
 
-                return yield find_value (peer, id, cancellable);
+                result = yield find_value (peer, id, cancellable);
               else
                 {
                   GLib.Value? value;
 
                   if ((value = yield value_store.lookup_value (id, cancellable)) == null)
 
-                    return null;
+                    result = null;
                   else
-                    return new Value.inmediate ((owned) value);
+                    result = new Value.inmediate ((owned) value);
                 }
+
+              if (!same) awake_range (peer);
+              return (owned) result;
             }
           catch (PeerError e)
             {

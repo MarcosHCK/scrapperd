@@ -24,6 +24,7 @@ namespace Kademlia
   internal struct Bucket
     {
       public uint index;
+      public int64 lastlookup;
       public unowned GLib.Queue<Key> nodes { get; }
       public unowned GLib.Queue<Key> replacements { get; }
       public unowned GLib.Queue<StaleContact?> stale { get; }
@@ -40,6 +41,7 @@ namespace Kademlia
     {
       public uint drop_count;
       public Key key;
+      public int64 lastping;
       public StaleContact (Key key);
     }
 }

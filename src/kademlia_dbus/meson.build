@@ -30,6 +30,7 @@ libkademlia_dbus = library \
 
     sources :
       [
+        'clock.vala',
         'hub.vala',
         'networkhub.vala',
         'node.vala',

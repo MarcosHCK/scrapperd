@@ -29,6 +29,7 @@ extern "C" {
   struct _KBucket
     {
       guint index;
+      gint64 lastlookup;
       GQueue nodes;
       GQueue replacements;
       GQueue stale;
@@ -38,6 +39,7 @@ extern "C" {
     {
       guint drop_count;
       KKey* key;
+      gint64 lastping;
     };
 
   KKey* k_key_copy (KKey * self);
@@ -101,6 +103,7 @@ extern "C" {
 
       contact->drop_count = 0;
       contact->key = k_key_copy (key);
+      contact->lastping = 0;
     }
 
 #if __cplusplus

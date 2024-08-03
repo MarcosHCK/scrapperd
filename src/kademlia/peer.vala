@@ -53,34 +53,6 @@ namespace Kademlia
       public signal void dropped_contact (Key peer);
       public signal void staled_contact (Key peer);
 
-      protected async virtual Key[] find_peer (Key peer, Key id, GLib.Cancellable? cancellable = null) throws GLib.Error
-        {
-          throw new IOError.FAILED ("unimplemented");
-        }
-
-      public async Key[] find_peer_complete (Key? from, Key id, GLib.Cancellable? cancellable = null) throws GLib.Error
-        {
-          if (from != null) add_contact (from);
-
-          var ni = (SList<Key>) nearest (id);
-          var ar = (Key[]) new Key [ni.length ()];
-          int i = 0;
-
-          for (unowned var l = (SList<Key>) ni; l != null; l = l.next) ar [i++] = (owned) l.data;
-          return (owned) ar;
-        }
-
-      protected async virtual bool ping_peer (Key peer, GLib.Cancellable? cancellable = null) throws GLib.Error
-        {
-          throw new IOError.FAILED ("unimplemented");
-        }
-
-      public async bool ping_peer_complete (Key? from, GLib.Cancellable? cancellable = null) throws GLib.Error
-        {
-          if (from != null) add_contact (from);
-          return true;
-        }
-
       construct
         {
           buckets.added_contact.connect ((peer) => this.added_contact (peer));
@@ -98,9 +70,57 @@ namespace Kademlia
           lock (buckets) buckets.insert (peer);
         }
 
+      protected void awake_range (Key peer)
+        {
+          lock (buckets) buckets.awake_range (peer);
+        }
+
       public void drop_contact (Key peer)
         {
           lock (buckets) buckets.drop (peer);
+        }
+
+      public async bool check_dormat_ranges (GLib.Cancellable? cancellable = null) throws GLib.Error
+        {
+          GLib.List<Key> list;
+          lock (buckets) list = buckets.enumerate_dormant_ranges ();
+
+          foreach (unowned var range in list)
+
+            yield lookup_node (range);
+
+          return true;
+        }
+
+      public async bool check_stale_contacts (GLib.Cancellable? cancellable = null) throws GLib.Error
+        {
+          GLib.List<Key> list;
+          lock (buckets) list = buckets.enumerate_stale_contacts ();
+
+          foreach (unowned var contact in list)
+
+            if (true == yield ping (contact))
+            
+              lock (buckets) buckets.insert (contact);
+
+          return true;
+        }
+
+      protected async virtual Key[] find_peer (Key peer, Key id, GLib.Cancellable? cancellable = null) throws GLib.Error
+        {
+          throw new IOError.FAILED ("unimplemented");
+        }
+
+      public async Key[] find_peer_complete (Key? from, Key id, GLib.Cancellable? cancellable = null) throws GLib.Error
+        {
+          if (from != null) add_contact (from);
+
+          var ni = (SList<Key>) nearest (id);
+          var ar = (Key[]) new Key [ni.length ()];
+          int i = 0;
+
+          for (unowned var l = (SList<Key>) ni; l != null; l = l.next) ar [i++] = (owned) l.data;
+          return (owned) ar;
         }
 
       public async bool join (Key to, GLib.Cancellable? cancellable = null) throws GLib.Error
@@ -117,15 +137,19 @@ namespace Kademlia
 
       internal async Key[]? lookup_node_a (owned Key peer, Key id, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
+          Key[] result;
           bool same;
 
           try
             {
               if ((same = Key.equal (peer, this.id)) == false)
 
-                return yield find_peer (peer, id, cancellable);
+                result = yield find_peer (peer, id, cancellable);
               else
-                return yield find_peer_complete (null, id, cancellable);
+                result = yield find_peer_complete (null, id, cancellable);
+
+              if (!same) awake_range (peer);
+              return (owned) result;
             }
           catch (PeerError e)
             {
@@ -146,6 +170,42 @@ namespace Kademlia
 
           lock (buckets) list = buckets.nearest (to);
           return (owned) list;
+        }
+
+      public async bool ping (Key peer, GLib.Cancellable? cancellable = null) throws GLib.Error
+        {
+          bool same;
+
+          try
+            {
+              if ((same = Key.equal (peer, this.id)) == false)
+
+                return yield ping_peer (peer, cancellable);
+              else
+                return yield ping_peer_complete (null, cancellable);
+            }
+          catch (PeerError e)
+            {
+              if (unlikely (e.code != PeerError.UNREACHABLE))
+
+                throw (owned) e;
+              else
+                {
+                  if (!same) drop_contact (peer);
+                  return false;
+                }
+            }
+        }
+
+      protected async virtual bool ping_peer (Key peer, GLib.Cancellable? cancellable = null) throws GLib.Error
+        {
+          throw new IOError.FAILED ("unimplemented");
+        }
+
+      public async bool ping_peer_complete (Key? from, GLib.Cancellable? cancellable = null) throws GLib.Error
+        {
+          if (from != null) add_contact (from);
+          return true;
         }
     }
 }
