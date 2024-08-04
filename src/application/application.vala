@@ -29,11 +29,13 @@ namespace ScrapperD
       construct
         {
           adv_hub = new Advertise.Hub ();
+          adv_peeker = new Advertise.Peeker (adv_hub);
           hub = new Kademlia.DBus.NetworkHub ();
 
           adv_hub.ensure_protocol (typeof (Kademlia.Ad.Protocol));
 
           add_main_option ("address", 'a', 0, GLib.OptionArg.STRING_ARRAY, "Address of entry node", "ADDRESS");
+          add_main_option ("advertise", 0, 0, GLib.OptionArg.STRING, "Controls advertising (default: y)", "Y/N");
           add_main_option ("advertise-interval", 0, 0, GLib.OptionArg.INT, "Advertise interval", "MILLISECONDS");
           add_main_option ("advertise-port", 0, 0, GLib.OptionArg.INT, "Advertise port", "PORT");
           add_main_option ("port", 'p', 0, GLib.OptionArg.INT, "Port where to listen for peer hails", "PORT");
@@ -70,9 +72,10 @@ namespace ScrapperD
               string option_s;
               GLib.VariantIter iter;
 
-              Advertise.Channel ipv4_channel;
+              Advertise.Channel? ipv4_channel = null;
 
               var addresses = new GLib.SList<string> ();
+              var advertise = true;
               var advertise_interval = (int) 5000 /* 5 seconds */;
               var advertise_port = (uint16) Advertise.Ipv4Channel.DEFAULT_PORT;
               var entries = new GLib.SList<string> ();
@@ -82,6 +85,26 @@ namespace ScrapperD
                 {
                   entries.prepend ((owned) option_s);
                 }
+
+              if (options.lookup ("advertise", "s", out option_s))
+                {
+                  var val = option_s.ascii_down (-1);
+
+                  switch (val)
+                    {
+                      case "y": case "yes": advertise = true; break;
+                      case "n": case "no": advertise = false; break;
+
+                      default:
+
+                        good = false;
+                        cmdline.printerr ("expected Y/N, got '%s'\n", option_s);
+                        cmdline.set_exit_status (1);
+                        break;
+                    }
+                }
+
+              if (unlikely (good == false)) break;
 
               if (options.lookup ("advertise-port", "i", out option_i))
                 {
@@ -145,7 +168,7 @@ namespace ScrapperD
 
               if (unlikely (good == false)) break;
 
-              try { ipv4_channel = new Advertise.Ipv4Channel (advertise_port); } catch (GLib.Error e)
+              if (advertise) try { ipv4_channel = new Advertise.Ipv4Channel (advertise_port); } catch (GLib.Error e)
                 {
                   good = false;
                   cmdline.printerr ("can not create advertising channel: %s: %u: %s\n", e.domain.to_string (), e.code, e.message);
@@ -198,11 +221,13 @@ namespace ScrapperD
               hold ();
               hub.start ();
 
-              adv_hub.add_channel (ipv4_channel);
-              adv_clock = new Advertise.Clock (adv_hub, advertise_interval);
-              adv_peeker = new Advertise.Peeker (adv_hub);
+              if (advertise)
+                {
+                  adv_hub.add_channel (ipv4_channel);
+                  adv_clock = new Advertise.Clock (adv_hub, advertise_interval);
 
-              adv_peeker.got_ad.connect (on_got_ad);
+                  adv_peeker.got_ad.connect (on_got_ad);
+                }
               break;
             }
 
