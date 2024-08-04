@@ -65,7 +65,7 @@ namespace Scrapping
           if (! GLib.ContentType.equals ("text/html", response_headers.get_content_type (null)))
             {
               yield stream.close_async (GLib.Priority.LOW, cancellable);
-              builder.open_entry ().add_html (null).close ();
+              builder.open_entry ().add_html (null);
             }
           else
             {
