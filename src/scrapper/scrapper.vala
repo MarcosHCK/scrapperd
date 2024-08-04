@@ -15,29 +15,25 @@
  * along with ScrapperD. If not, see <http://www.gnu.org/licenses/>.
  */
 
-[CCode (cprefix = "ScrapperdScrapper", lower_case_cprefix = "scrapperd_scrapper_")]
+[CCode (cprefix = "Scrapping", lower_case_cprefix = "scrapping_")]
 
-namespace ScrapperD.Scrapper
+namespace Scrapping
 {
+  [Compact] public class Result
+    {
+      public GLib.Variant content;
+      public GLib.SList<GLib.Uri> links;
+
+      public Result (GLib.Variant content, owned SList<Uri> links)
+        {
+          this.content = content;
+          this.links = (owned) links;
+        }
+    }
+
   public class Scrapper : GLib.Object
     {
       public Soup.Session session { get; construct; }
-
-      public static GLib.VariantType scrap_variant_type = new GLib.VariantType ("(maysa{ss})");
-      private static GLib.VariantType scrap_variant_bytestring_type = new GLib.VariantType ("ay");
-      private static GLib.VariantType scrap_variant_dictionary_type = new GLib.VariantType ("a{ss}");
-
-      [Compact] public class Result
-        {
-          public GLib.Variant content;
-          public GLib.SList<GLib.Uri> links;
-
-          public Result (GLib.Variant content, owned SList<Uri> links)
-            {
-              this.content = content;
-              this.links = (owned) links;
-            }
-        }
 
       construct
         {
@@ -47,41 +43,13 @@ namespace ScrapperD.Scrapper
           session.set_user_agent (Config.PACKAGE_STRING);
         }
 
-      static void annotate (GLib.VariantBuilder builder, Soup.MessageHeaders headers, string name, string? @as = null)
+      static void annotate (ContentsBuilder builder, Soup.MessageHeaders headers, string name, string? @as = null)
         {
           string? value;
 
           if ((value = headers.get_one (name)) != null)
-            {
-              builder.add ("{ss}", @as ?? name, value);
-            }
-        }
 
-      [CCode (cheader_filename = "validuri.h", cname = "_g_uri_is_valid")]
-
-      internal static extern bool uri_is_valid (GLib.Uri uri);
-
-      public static GLib.Uri normal_uri (string uri_string) throws GLib.UriError
-        {
-          var flags1 = GLib.UriFlags.ENCODED;
-          var flags2 = GLib.UriFlags.SCHEME_NORMALIZE;
-          var flags = flags1 | flags2;
-          return Uri.parse (uri_string, flags);
-        }
-
-      public static GLib.Uri normalize_uri (GLib.Uri uri)
-        {
-          var flags1 = GLib.UriHideFlags.AUTH_PARAMS;
-          var flags2 = GLib.UriHideFlags.FRAGMENT;
-          var flags3 = GLib.UriHideFlags.PASSWORD;
-          var flags4 = GLib.UriHideFlags.USERINFO;
-          var flags = flags1 | flags2 | flags3 | flags4;
-          var uri_string = uri.to_string_partial (flags);
-
-          try { return Uri.parse (uri_string, GLib.UriFlags.ENCODED); } catch (GLib.Error e)
-            {
-              error (@"$(e.domain): $(e.code): $(e.message)");
-            }
+            builder.add_header (@as ?? name, value);
         }
 
       public async Result? scrap_uri (owned GLib.Uri uri, GLib.Cancellable? cancellable = null) throws GLib.Error
@@ -89,15 +57,15 @@ namespace ScrapperD.Scrapper
           var message = new Soup.Message.from_uri ("GET", uri);
           var stream = yield session.send_async (message, GLib.Priority.LOW, cancellable);
 
-          var builder = new VariantBuilder (scrap_variant_type);
+          var builder = new ContentsBuilder ();
           var links = new GLib.SList<GLib.Uri> ();
           var ratio = (double) (-1.0);
-          var response_headers = message.get_response_headers ();
+          var response_headers = (Soup.MessageHeaders) message.get_response_headers ();
 
           if (! GLib.ContentType.equals ("text/html", response_headers.get_content_type (null)))
             {
               yield stream.close_async (GLib.Priority.LOW, cancellable);
-              builder.add_value (new GLib.Variant.maybe (scrap_variant_bytestring_type, null));
+              builder.open_entry ().add_html (null).close ();
             }
           else
             {
@@ -135,24 +103,21 @@ namespace ScrapperD.Scrapper
                   warning ("can not parse uri '%s': %s: %u: %s", href, e.domain.to_string (), e.code, e.message);
                 }
 
-              var child = new GLib.Variant.from_bytes (scrap_variant_bytestring_type, bytes, false);
-              var container = new GLib.Variant.maybe (scrap_variant_bytestring_type, child);
-              builder.add_value (container);
+              builder.open_entry ().add_html (bytes);
             }
 
-          builder.add_value (new GLib.Variant.string (uri.to_string ()));
-          builder.open (scrap_variant_dictionary_type);
+          builder.add_link (uri).open_headers ();
 
           if (ratio >= 0)
             {
               char buffer [double.DTOSTR_BUF_SIZE];
-              builder.add ("{ss}", "ratio", ratio.to_str (buffer));
+              builder.add_header ("ratio", ratio.to_str (buffer));
             }
 
           annotate (builder, response_headers, "Content-Type", "content-type");
           annotate (builder, response_headers, "Date", "date");
           annotate (builder, response_headers, "Server", "server");
-          builder.close ();
+          builder.close ().close ();
 
           return new Result (builder.end (), (owned) links);
         }

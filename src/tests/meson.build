@@ -27,6 +27,8 @@ tests = \
       'timeout' : 60 },
     { 'description' : 'Kademlia integration tests', 'files' : [ 'integration.vala', 'baseintegration.vala' ], 'libs' : [ libgvalr, libkademlia ] },
     { 'description' : 'Kademlia key tests', 'files' : [ 'key.vala' ], 'libs' : [ libkademlia ] },
+    { 'description' : 'Scrapper library', 'files' : [ 'scrapper.vala' ], 'libs' : [ libscrapping ],
+      'deps' : [ libsoup_dep, libsoup_vapi ] },
   ]
 
 foreach test_ : tests

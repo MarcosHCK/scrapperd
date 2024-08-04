@@ -85,7 +85,7 @@ namespace ScrapperD.Storage
 
           lock (values)
 
-            if ((value = values.lookup (id).value) == null)
+            if ((value = values.lookup (id)?.value) == null)
 
               return null;
             else

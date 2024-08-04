@@ -18,6 +18,31 @@
 libsoup_dep = dependency ('libsoup-3.0', required : true)
 libsoup_vapi = vala.find_library ('libsoup-3.0')
 
+libscrapping = library \
+  (
+    'scrapping',
+
+    dependencies : libglib_vapis + \
+      [
+        libgio_dep, libglib_dep, libgobject_dep,
+        libsoup_dep, libsoup_vapi,
+      ],
+
+    include_directories : [ configdir ] + libdirs,
+
+    install : true,
+    install_dir : private_libdir,
+
+    sources :
+      [
+        'contents.vala',
+        'linksearcher.vala',
+        'scrapper.vala',
+        'uri.vala',
+        'validuri.h',
+      ]
+  )
+
 executable \
   (
     'scrapper',
@@ -33,13 +58,13 @@ executable \
     install : true,
     install_dir : private_bindir,
 
-    link_with : [ libkademlia, libkademlia_dbus, libscrapperd ],
+    link_with : [ libkademlia, libkademlia_dbus, libscrapperd, libscrapping ],
 
     sources :
       [
         'application.vala',
-        'linksearcher.vala',
-        'scrapper.vala',
         'store.vala',
       ],
   )
+
+libdirs += include_directories ('.')
