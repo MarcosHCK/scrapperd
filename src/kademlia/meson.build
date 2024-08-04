@@ -25,6 +25,7 @@ libkademlia = library \
       ],
 
     include_directories : [ configdir ] + libdirs,
+    install : true,
 
     sources :
       [

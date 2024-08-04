@@ -17,7 +17,7 @@
 
 executable \
   (
-    'scrapperd-storage',
+    'storage',
 
     dependencies : libglib_vapis + \
       [
@@ -25,6 +25,9 @@ executable \
       ],
 
     include_directories : [ configdir ] + libdirs,
+
+    install : true,
+    install_dir : private_bindir,
 
     link_with : [ libkademlia, libkademlia_dbus, libscrapperd ],
 

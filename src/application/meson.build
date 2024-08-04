@@ -27,6 +27,9 @@ libscrapperd = library \
 
     include_directories : [ configdir ] + libdirs,
 
+    install : true,
+    install_dir : private_libdir,
+
     link_with : [ libadvertise, libkademlia, libkademlia_ad, libkademlia_dbus ],
 
     sources :

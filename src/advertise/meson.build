@@ -133,6 +133,9 @@ libadvertise = library \
 
     include_directories : [ configdir ] + libdirs,
 
+    install : true,
+    install_dir : private_libdir,
+
     sources :
       [
         'channel.vala',

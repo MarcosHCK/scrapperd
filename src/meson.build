@@ -23,6 +23,9 @@ libgobject_vapi = vala.find_library ('gobject-2.0')
 
 libglib_vapis = [ libgio_vapi, libglib_vapi, libgobject_vapi ]
 
+private_bindir = get_option ('libexecdir') / 'scrapperd'
+private_libdir = get_option ('libdir') / 'scrapperd'
+
 subdir ('kademlia')
 
 subdir ('gvalr')

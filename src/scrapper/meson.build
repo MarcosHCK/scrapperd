@@ -20,7 +20,7 @@ libsoup_vapi = vala.find_library ('libsoup-3.0')
 
 executable \
   (
-    'scrapperd-scrapper',
+    'scrapper',
 
     dependencies : libglib_vapis + \
       [
@@ -29,6 +29,9 @@ executable \
       ],
 
     include_directories : [ configdir ] + libdirs,
+
+    install : true,
+    install_dir : private_bindir,
 
     link_with : [ libkademlia, libkademlia_dbus, libscrapperd ],
 

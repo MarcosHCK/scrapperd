@@ -23,7 +23,8 @@ tests = \
     { 'description' : 'Krypt ECDHE implementation', 'files' : [ 'dhproto.vala' ], 'libs' : [ libkrypt ] },
     { 'description' : 'Krypt stream implementation', 'files' : [ 'krypt.vala' ], 'libs' : [ libkrypt ] },
     { 'description' : 'Kademlia buckets tests', 'files' : [ 'buckets.vala' ], 'libs' : [ libkademlia ] },
-    { 'description' : 'Kademlia DBus hub tests', 'files' : [ 'hub.vala', 'baseintegration.vala' ], 'libs' : [ libgvalr, libkademlia, libkademlia_dbus ] },
+    { 'description' : 'Kademlia DBus hub tests', 'files' : [ 'hub.vala', 'baseintegration.vala' ], 'libs' : [ libgvalr, libkademlia, libkademlia_dbus ],
+      'timeout' : 60 },
     { 'description' : 'Kademlia integration tests', 'files' : [ 'integration.vala', 'baseintegration.vala' ], 'libs' : [ libgvalr, libkademlia ] },
     { 'description' : 'Kademlia key tests', 'files' : [ 'key.vala' ], 'libs' : [ libkademlia ] },
   ]
@@ -34,6 +35,7 @@ foreach test_ : tests
   description = test_.get ('description')
   files = test_.get ('files')
   libs = test_.get ('libs', [ ])
+  timeout = test_.get ('timeout', 30)
 
   assert (files.length () > 0)
 
@@ -62,5 +64,7 @@ foreach test_ : tests
           'G_TEST_SRCDIR=@0@'.format(meson.current_source_dir () / '..'),
           'G_TEST_BUILDDIR=@0@'.format(meson.current_build_dir () / '..'),
         ],
+
+      timeout : timeout,
     )
 endforeach

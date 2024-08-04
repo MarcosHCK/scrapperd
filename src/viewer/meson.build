@@ -31,6 +31,9 @@ scrapperd_viewer_support = library \
 
     include_directories : [ configdir ] + libdirs,
 
+    install : true,
+    install_dir : private_libdir,
+
     link_with : [ libkademlia, libkademlia_dbus ],
 
     sources :
@@ -57,6 +60,9 @@ executable \
 
     include_directories : [ configdir ] + libdirs,
 
+    install : true,
+    install_dir : private_bindir,
+
     link_with : [ libadvertise, libkademlia, libkademlia_ad, libkademlia_dbus, scrapperd_viewer_support ],
 
     sources :
@@ -71,4 +77,6 @@ executable \
 
         gnome.compile_resources ('resources', 'resources.xml'),
       ],
+
+    win_subsystem : 'windows',
   )
