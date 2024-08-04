@@ -16,3 +16,6 @@
 #
 
 option ('developer', type : 'boolean', value : false, description : 'build with developer infrastructure')
+option ('scrapper', type : 'feature', value : 'enabled', description : 'build scarpper application too')
+option ('storage', type : 'feature', value : 'enabled', description : 'build storage application too')
+option ('viewer', type : 'feature', value : 'enabled', description : 'build viewer application too')

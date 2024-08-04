@@ -22,7 +22,7 @@ libgtk_vapi = vala.find_library ('gtk4')
 
 scrapperd_viewer_support = library \
   (
-    'scrapperd-viewer',
+    'viewer',
 
     dependencies : libglib_vapis + \
       [
@@ -47,7 +47,7 @@ scrapperd_viewer_support = library \
 
 executable \
   (
-    'scrapperd-viewer',
+    'viewer',
 
     dependencies : libglib_vapis + \
       [

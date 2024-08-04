@@ -37,8 +37,14 @@ subdir ('kademlia_ad')
 
 subdir ('application')
 
-subdir ('scrapper')
-subdir ('storage')
-subdir ('viewer')
+if get_option ('scrapper').enabled ()
+  subdir ('scrapper')
+endif
+if get_option ('storage').enabled ()
+  subdir ('storage')
+endif
+if get_option ('viewer').enabled ()
+  subdir ('viewer')
+endif
 
 subdir ('tests')
