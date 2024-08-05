@@ -104,10 +104,10 @@ namespace Testing
               indices [i] = i + 1;
             }
 
-          for (i = 0; i < GLib.Random.int_range (100, 1000); ++i)
+          for (i = 0; i < GLib.Test.rand_int_range (100, 1000); ++i)
             {
-              var a = (int) GLib.Random.int_range (0, indices.length);
-              var b = (int) GLib.Random.int_range (0, indices.length);
+              var a = (int) GLib.Test.rand_int_range (0, indices.length);
+              var b = (int) GLib.Test.rand_int_range (0, indices.length);
               var t = indices [a];
 
               indices [a] = indices [b];
@@ -146,14 +146,14 @@ namespace Testing
         {
           yield base.test ();
           var peer = yield net.pick_any ();
-          var ns = GLib.Random.int_range (100, 1000);
+          var ns = GLib.Test.rand_int_range (100, 1000);
 
           var average = (double) 0;
           var timer = new GLib.Timer ();
 
           for (unowned var i = 0; i < ns; ++i)
             {
-              var n = GLib.Random.next_int ();
+              var n = GLib.Test.rand_int ();
               var v = GLib.Value (typeof (uint));
 
               v.set_uint (n);
@@ -228,7 +228,7 @@ namespace Testing
       protected override async void test ()
         {
           yield base.test ();
-          var ns = GLib.Random.int_range (100, 1000);
+          var ns = GLib.Test.rand_int_range (100, 1000);
           var peer = yield net.pick_any ();
 
           var values = new HashTable<Key, uint> (Key.hash, Key.equal);
@@ -239,7 +239,7 @@ namespace Testing
 
           for (unowned var i = 0; i < ns; ++i)
             {
-              values.insert (new Key.random (), GLib.Random.next_int ());
+              values.insert (new Key.random (), GLib.Test.rand_int ());
             }
 
           ns = (int32) values.length;
@@ -316,7 +316,7 @@ namespace Testing
         {
           yield base.test ();
           var peer = yield net.pick_any ();
-          var ns = GLib.Random.int_range (100, 1000);
+          var ns = GLib.Test.rand_int_range (100, 1000);
 
           var average = (double) 0;
           var timer = new GLib.Timer ();

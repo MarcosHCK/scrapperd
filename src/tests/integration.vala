@@ -40,7 +40,7 @@ namespace Testing
 
       public TestHub (int min_nodes = 100, int max_nodes = 1000)
         {
-          for (unowned var i = 0; i < GLib.Random.int_range (min_nodes, max_nodes); ++i)
+          for (unowned var i = 0; i < GLib.Test.rand_int_range (min_nodes, max_nodes); ++i)
             {
               var id = new Key.random ();
               var peer = new TestValuePeer (new DummyValueStore (), id, this);

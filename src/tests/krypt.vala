@@ -38,17 +38,17 @@ namespace Testing
 
       protected static GLib.Bytes random_bytes_vector (uint minsize, uint maxsize)
         {
-          var size = GLib.Random.int_range ((int32) minsize, (int32) maxsize);
+          var size = GLib.Test.rand_int_range ((int32) minsize, (int32) maxsize);
           var data = new uint8 [size];
 
-          for (int i = 0; i < size; ++i) data [i] = (uint8) GLib.Random.int_range (0, uint8.MAX);
+          for (int i = 0; i < size; ++i) data [i] = (uint8) GLib.Test.rand_int_range (0, uint8.MAX);
           return new GLib.Bytes.take ((owned) data);
         }
 
       protected override async void test ()
         {
           var tt = (size_t) 0;
-          var ns = (int) GLib.Random.int_range ((int) ns_minsize, (int) ns_maxsize);
+          var ns = (int) GLib.Test.rand_int_range ((int) ns_minsize, (int) ns_maxsize);
 
           var average = (double) 0;
           var timer = new GLib.Timer ();
@@ -121,7 +121,7 @@ namespace Testing
       public override async void test ()
         {
           var tt = (size_t) 0;
-          var ns = (int) GLib.Random.int_range ((int) ns_minsize, (int) ns_maxsize);
+          var ns = (int) GLib.Test.rand_int_range ((int) ns_minsize, (int) ns_maxsize);
 
           var average = (double) 0;
           var timer = new GLib.Timer ();
