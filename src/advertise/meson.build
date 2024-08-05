@@ -135,6 +135,7 @@ libadvertise = library \
 
     install : true,
     install_dir : private_libdir,
+    install_rpath : private_libdir,
 
     sources :
       [

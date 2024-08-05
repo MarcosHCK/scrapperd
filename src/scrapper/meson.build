@@ -32,6 +32,7 @@ libscrapping = library \
 
     install : true,
     install_dir : private_libdir,
+    install_rpath : private_libdir,
 
     sources :
       [
@@ -57,6 +58,7 @@ executable \
 
     install : true,
     install_dir : private_bindir,
+    install_rpath : private_libdir,
 
     link_with : [ libkademlia, libkademlia_dbus, libscrapperd, libscrapping ],
 

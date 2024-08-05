@@ -25,9 +25,7 @@ libkademlia_dbus = library \
       ],
 
     include_directories : [ configdir ] + libdirs,
-
     install : true,
-    install_dir : private_libdir,
 
     link_with : [ libgvalr, libkademlia, libkrypt ],
 

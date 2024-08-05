@@ -28,6 +28,7 @@ executable \
 
     install : true,
     install_dir : private_bindir,
+    install_rpath : private_libdir,
 
     link_with : [ libkademlia, libkademlia_dbus, libscrapperd ],
 
