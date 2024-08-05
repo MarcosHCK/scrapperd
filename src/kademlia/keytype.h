@@ -19,7 +19,6 @@
 #include <glib-object.h>
 
 typedef struct _KKey KKey;
-typedef struct _KKeyList KKeyList;
 
 #if __cplusplus
 extern "C" {
@@ -27,11 +26,6 @@ extern "C" {
 
   KKey* k_key_copy (KKey* key);
   void k_key_free (KKey* key);
-  KKeyList* k_key_list_copy (KKeyList* key);
-  void k_key_list_free (KKeyList* key);
-
-  static __inline GType _k_key_get_type (void) G_GNUC_CONST;
-  static __inline GType _k_key_list_get_type (void) G_GNUC_CONST;
 
   static __inline GType _k_key_get_type (void)
     {

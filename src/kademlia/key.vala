@@ -158,7 +158,7 @@ namespace Kademlia
           return Key._get_type ();
         }
 
-      [CCode (cheader_filename = "keytypes.h", cname = "_k_key_get_type")]
+      [CCode (cheader_filename = "keytype.h", cname = "_k_key_get_type")]
       public static extern GLib.Type _get_type ();
 
       public static uint hash (Key a)
@@ -166,7 +166,7 @@ namespace Kademlia
           return a.value.hash ();
         }
 
-      public int nth_bit (uint nth) requires (nth >= 0 && nth < KeyVal.BITLEN) ensures (result == 0 || result == 1)
+      public int nth_bit (uint nth) requires (nth < KeyVal.BITLEN) ensures (result == 0 || result == 1)
         {
           return value.nth_bit (nth);
         }

@@ -35,7 +35,7 @@ libkademlia = library \
         'crawler.vala',
         'insertvalue.vala',
         'key.vala',
-        'keytypes.h',
+        'keytype.h',
         'keyval.h',
         'keyval.vapi',
         'lookupnode.vala',

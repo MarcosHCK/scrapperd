@@ -63,7 +63,7 @@ namespace Kademlia
           Key[] peers = yield peer.lookup_node (this.target_id, cancellable);
           uint reserve = (peers.length + dones.length - 1) / dones.length;
 
-          for (int i = 0; i < dones.length; ++i)
+          for (uint i = 0; i < dones.length; ++i)
             {
               dones [i] = 0;
               lists [i] = new GenericArray<Key> (reserve);

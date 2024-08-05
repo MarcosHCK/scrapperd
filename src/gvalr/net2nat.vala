@@ -49,7 +49,7 @@ namespace GValr
           case GLib.Type.CHAR: (value = GLib.Value (gtype)).set_schar ((int8) packed.get_byte ()); break;
           case GLib.Type.DOUBLE: (value = GLib.Value (gtype)).set_double (packed.get_double ()); break;
           case GLib.Type.ENUM: (value = GLib.Value (gtype)).set_enum (packed.get_int32 ()); break;
-          case GLib.Type.FLAGS: (value = GLib.Value (gtype)).set_flags (packed.get_int32 ()); break;
+          case GLib.Type.FLAGS: (value = GLib.Value (gtype)).set_flags (packed.get_uint32 ()); break;
           case GLib.Type.FLOAT: (value = GLib.Value (gtype)).set_float ((float) packed.get_double ()); break;
           case GLib.Type.INT: (value = GLib.Value (gtype)).set_int ((int) packed.get_int32 ()); break;
           case GLib.Type.INT64: (value = GLib.Value (gtype)).set_int64 (packed.get_int64 ()); break;

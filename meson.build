@@ -84,7 +84,6 @@ if cc.get_id () == 'gcc' or cc.get_id () == 'clang'
 
   warning_c_args = \
     [
-
       '-Waggregate-return',
       '-Warray-bounds',
       '-Wduplicated-branches',
@@ -103,24 +102,40 @@ if cc.get_id () == 'gcc' or cc.get_id () == 'clang'
       # building with -Wbad-function-cast.
       '-Wno-bad-function-cast',
       # Due to pervasive use of things like GPOINTER_TO_UINT(), we do not support
-      # building with -Wbad-function-cast.
+      # building with -Wcast-function-type.
       '-Wno-cast-function-type',
+      # Vala compiler is a mess right now
+      '-Wno-discarded-qualifiers',
+      # Vala compiler is a mess right now
+      '-Wno-incompatible-pointer-types',
       # A zero-length format string shouldn't be considered an issue.
       '-Wno-format-zero-length',
+      # Vala compiler is a mess right now
+      '-Wno-missing-field-initializers',
       # Due to function casts through (void*) we cannot support -Wpedantic:
       # ./docs/toolchain-requirements.md#Function_pointer_conversions.
       '-Wno-pedantic',
       '-Wno-string-plus-int',
+      # Vala compiler is a mess right now, and it leaves a lot of temporary
+      # variables hanging loose
+      '-Wno-unused-but-set-variable',
+      # Vala compiler is a mess right now, and it leaves a lot of temporary
+      # variables hanging loose
+      '-Wno-unused-function',
+      # Vala compiler is a mess right now, and it leaves a lot of temporary
+      # variables hanging loose
+      '-Wno-unused-label',
       # Due to maintained deprecated code, we do not want to see unused parameters
       '-Wno-unused-parameter',
+      # Vala compiler is a mess right now, and it leaves a lot of temporary
+      # variables hanging loose
+      '-Wno-unused-variable',
       # We explicitly require variadic macros
       '-Wno-variadic-macros',
       '-Wnonnull',
       '-Wshadow',
       '-Wstrict-prototypes',
       '-Wunused',
-      '-Wunused-function',
-      '-Wunused-label',
       '-Wunused-value',
     ]
 

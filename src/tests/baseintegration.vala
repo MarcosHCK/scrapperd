@@ -174,6 +174,48 @@ namespace Testing
   public class TestIntegrationInsertExotic : TestIntegrationConnect
     {
 
+      static GLib.Bytes rand_bytes (size_t sz)
+        {
+          var ar = new uint8 [sz];
+          var begin = (int32) uint8.MIN;
+          var end = (int32) uint8.MAX;
+
+          for (size_t i = 0; i < sz; ++i) ar [i] = (uint8) GLib.Test.rand_int_range (begin, end);
+          return new GLib.Bytes.take ((owned) ar);
+        }
+
+      static int rand_enum<T> (GLib.Type gtype = typeof (T)) requires (gtype.is_enum ())
+        {
+          int32 begin = 0, end = 0;
+          var klass = (EnumClass) gtype.class_ref ();
+
+          foreach (unowned var value in klass.values) if (value.value > end) end = value.value;
+          return GLib.Test.rand_int_range (begin, end + 1);
+        }
+
+      static uint rand_flags<T> (GLib.Type gtype = typeof (T)) requires (gtype.is_flags ())
+        {
+          var acc = (uint) 0;
+          var mask = (uint) 0;
+          var klass = (FlagsClass) gtype.class_ref ();
+          var used = (int) 0;
+
+          foreach (unowned var value in klass.values)
+            {
+              if (used % (sizeof (uint) << 3) == 0) mask = (uint) GLib.Test.rand_int ();
+              if (1 == (mask & 1)) acc |= value.value;
+              mask >>= 1; ++used;
+            }
+          return acc;
+        }
+
+      static GLib.Bytes rand_vector (size_t minsz = 1, size_t maxsz = int.MAX)
+        {
+          var sz = (size_t) GLib.Test.rand_int_range ((int32) minsz, (int32) maxsz);
+          var bytes = (Bytes) rand_bytes (sz);
+          return (owned) bytes;
+        }
+
       public TestIntegrationInsertExotic (PeerProvider hub)
         {
           base (hub);
@@ -184,21 +226,23 @@ namespace Testing
           yield base.test ();
           var peer = yield net.pick_any ();
 
-          var values = new GLib.Value []
-            {
-              (int8) 8,
-              (uint8) 8,
-              (int16) 8,
-              (uint16) 8,
-              (int32) 8,
-              (uint32) 8,
-              (int64) 8,
-              (uint64) 8,
-              (char) 'a',
-              (string) "testing",
-              new GLib.Bytes ("testing".data),
-            };
+          var _bool = GLib.Value (typeof (bool)); _bool.set_boolean (GLib.Test.rand_bit ());
+          var _bytes = GLib.Value (typeof (GLib.Bytes)); _bytes.set_boxed (rand_vector (10, 100));
+          var _double = GLib.Value (typeof (double)); _double.set_double ((double) GLib.Test.rand_double ());
+          var _enum = GLib.Value (typeof (GLib.FileMonitorEvent)); _enum.set_enum (rand_enum<GLib.FileMonitorEvent> ());
+          var _flags = GLib.Value (typeof (GLib.SubprocessFlags)); _flags.set_flags (rand_flags<GLib.SubprocessFlags> ());
+          var _float = GLib.Value (typeof (float)); _float.set_float ((float) GLib.Test.rand_double ());
+          var _int = GLib.Value (typeof (int)); _int.set_int ((int) GLib.Test.rand_int_range (int.MIN, int.MAX));
+          var _int64 = GLib.Value (typeof (int64)); _int64.set_int64 ((int) GLib.Test.rand_int_range (int.MIN, int.MAX));
+          var _int8 = GLib.Value (typeof (int8)); _int8.set_schar ((int8) GLib.Test.rand_int_range (int8.MIN, int8.MAX));
+          var _long = GLib.Value (typeof (long)); _long.set_long ((long) GLib.Test.rand_int_range (int32.MIN, int32.MAX));
+          var _string = GLib.Value (typeof (string)); _string.set_string (Base64.encode (rand_vector (10, 20).get_data ()));
+          var _uint = GLib.Value (typeof (uint)); _uint.set_uint ((uint) GLib.Test.rand_int_range (int.MIN, int.MAX));
+          var _uint64 = GLib.Value (typeof (uint64)); _uint64.set_uint64 ((uint) GLib.Test.rand_int_range (int.MIN, int.MAX));
+          var _uint8 = GLib.Value (typeof (uint8)); _uint8.set_uchar ((uint8) GLib.Test.rand_int_range (uint8.MIN, uint8.MAX));
+          var _ulong = GLib.Value (typeof (ulong)); _ulong.set_ulong ((ulong) GLib.Test.rand_int_range (int32.MIN, int32.MAX));
 
+          var values = new GLib.Value [] { _bool, _bytes, _double, _enum, _flags, _float, _int, _int64, _int8, _long, _string, _uint, _uint64, _uint8, _ulong };
           var ids = new Key [values.length];
 
           for (unowned int i = 0; i < ids.length; ++i)

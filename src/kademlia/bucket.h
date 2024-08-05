@@ -94,7 +94,7 @@ extern "C" {
 
   static __inline void k_stale_contact_destroy (KStaleContact* contact)
     {
-      g_clear_pointer (& contact->key, (GDestroyNotify) k_key_free);
+      g_clear_pointer (& contact->key, k_key_free);
     }
 
   static __inline void k_stale_contact_init (KStaleContact* contact, KKey* key)

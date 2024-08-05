@@ -39,8 +39,8 @@ namespace GValr
               case GLib.Type.BOOLEAN: builder.add_value (new Variant.variant (new Variant.boolean (value.get_boolean ()))); break;
               case GLib.Type.CHAR: builder.add_value (new Variant.variant (new Variant.byte (value.get_schar ()))); break;
               case GLib.Type.DOUBLE: builder.add_value (new Variant.variant (new Variant.double (value.get_double ()))); break;
-              case GLib.Type.ENUM: builder.add_value (new Variant.variant (new Variant.int32 (value.get_int ()))); break;
-              case GLib.Type.FLAGS: builder.add_value (new Variant.variant (new Variant.int32 (value.get_int ()))); break;
+              case GLib.Type.ENUM: builder.add_value (new Variant.variant (new Variant.int32 (value.get_enum ()))); break;
+              case GLib.Type.FLAGS: builder.add_value (new Variant.variant (new Variant.uint32 (value.get_flags ()))); break;
               case GLib.Type.FLOAT: builder.add_value (new Variant.variant (new Variant.double (value.get_float ()))); break;
               case GLib.Type.INT: builder.add_value (new Variant.variant (new Variant.int32 (value.get_int ()))); break;
               case GLib.Type.INT64: builder.add_value (new Variant.variant (new Variant.int64 (value.get_int64 ()))); break;
