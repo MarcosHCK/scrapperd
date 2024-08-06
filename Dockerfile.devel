@@ -1,0 +1,58 @@
+# Copyright 2024-2029
+# This file is part of ScrapperD.
+#
+# ScrapperD is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# ScrapperD is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with ScrapperD. If not, see <http://www.gnu.org/licenses/>.
+#
+
+# Create build image
+#
+
+FROM glib-ubuntu-devel:latest AS builder
+
+# Install dependencies
+RUN apt-get install -y libgcrypt-dev libglib2.0-dev libjson-glib-dev meson tar valac
+
+# Install maybe needed dependencies
+RUN apt-get install -y ca-certificates
+
+# Copy dist source package
+COPY builddir/meson-dist/ /dist/
+
+# Extract source
+WORKDIR /dist/
+RUN cat *.tar.xz | tar -xJ
+
+# Build
+WORKDIR /build/
+RUN meson setup -Dprefix=/app/ -Dscrapper=disabled -Dviewer=disabled $(ls -d /dist/*/ | head -n 1)
+RUN meson compile
+RUN meson install
+
+# Create production image
+#
+
+FROM glib-ubuntu-release:latest
+
+# Install dependencies
+RUN apt-get install -y libgcrypt20 libglib2.0-0 libjson-glib-1.0-0
+
+COPY --from=builder /app/ /
+
+# Expose kademlia_dbus default port
+EXPOSE 33334/tcp
+# Export kademlia_ad default port
+EXPOSE 33332/udp
+
+# Setup node entrypoint
+ENTRYPOINT [ "/libexec/scrapperd/storage" ]

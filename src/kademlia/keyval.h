@@ -34,6 +34,8 @@ extern "C" {
       guint64 quads [K_KEY_VAL_BITLEN >> 6];
     };
 
+  const gchar* k_key_val_charset = "0123456789abcdef";
+
   #define k_key_val_destroy(val)
 
   #define k_key_val_nth_bit(val,nth) (G_GNUC_EXTENSION ({ \
@@ -64,6 +66,23 @@ extern "C" {
       guint __i, __hash = 5381; \
       for (__i = 0; __i < (K_KEY_VAL_BITLEN >> 3); ++__i) __hash = (__hash << 5) + __hash + __a->bytes [__i]; \
       __hash; \
+    }))
+
+  #define k_key_val_to_string(val) (G_GNUC_EXTENSION ({ \
+ ; \
+      KKeyVal* __val = (val); \
+      guint __bytes, __i; \
+      guint __bufsz = 1 + ((__bytes = G_N_ELEMENTS (__val->bytes)) << 1); \
+      gchar* __buf = g_new (gchar, __bufsz); \
+ ; \
+      for (__i = 0; __i < __bytes; ++__i) \
+        { \
+          guint8 __c = __val->bytes [__i]; \
+          __buf [0 + (__i << 1)] = k_key_val_charset [__c >> 4]; \
+          __buf [1 + (__i << 1)] = k_key_val_charset [__c & 0xf]; \
+        } \
+ ; \
+      (__buf [__bufsz - 1] = 0, __buf); \
     }))
 
   static __inline void k_key_val_xor (KKeyVal* d, const KKeyVal* a, const KKeyVal* b)

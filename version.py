@@ -54,7 +54,7 @@ def program ():
 
   parser = ArgumentParser ()
 
-  parser.add_argument ('type', choices = [ 'get-version', 'set-dist' ], type = str)
+  parser.add_argument ('type', choices = [ 'get-version', 'get-version-bits', 'set-dist' ], type = str)
   parser.add_argument ('arguments', nargs = '*', type = str)
 
   args = parser.parse_args ()
@@ -68,6 +68,13 @@ def program ():
         ver = ver [1:]
 
       print (ver)
+
+    case 'get-version-bits':
+
+      if (ver := git_describe (pre_args = [ '-C', root ])).startswith ('v'):
+        ver = ver [1:]
+
+      print (ver.split ('-') [0])
 
     case 'set-dist':
 

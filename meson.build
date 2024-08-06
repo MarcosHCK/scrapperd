@@ -22,7 +22,7 @@ project \
     default_options : [ 'c_std=gnu99', 'warning_level=3' ],
     license : 'GPL-3.0-or-later',
     license_files : [ 'COPYING' ],
-    meson_version : '>= 1.4.0',
+    meson_version : '>= 1.3.2',
 
     version : run_command ('version.py', 'get-version', check : true).stdout ().strip (),
   )
@@ -158,9 +158,9 @@ configure_file (output : 'config.h', configuration : configh)
 # Dependencies         #
 ########################
 
-libgio_dep = dependency ('gio-2.0', required : true)
-libglib_dep = dependency ('glib-2.0', required : true)
-libgobject_dep = dependency ('gobject-2.0', required : true)
+libgio_dep = dependency ('gio-2.0', required : true, version : '>= 2.76')
+libglib_dep = dependency ('glib-2.0', required : true, version : '>= 2.76')
+libgobject_dep = dependency ('gobject-2.0', required : true, version : '>= 2.76')
 
 subdir ('src')
 

@@ -33,6 +33,7 @@ namespace Kademlia
       public uint hash ();
       public static int log ([CCode (type = "const KKeyVal*")] KeyVal? a, [CCode (type = "const KKeyVal*")] KeyVal? b);
       public int nth_bit (uint nth);
+      public string to_string ();
       public static void xor (out KeyVal dst, [CCode (type = "const KKeyVal*")] KeyVal? a, [CCode (type = "const KKeyVal*")] KeyVal? b);
     }
 }

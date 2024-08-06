@@ -38,11 +38,18 @@ subdir ('kademlia_ad')
 subdir ('application')
 
 if get_option ('scrapper').enabled ()
+
   subdir ('scrapper')
+else
+  libsoup_dep = disabler ()
+  libsoup_vapi = disabler ()
+  libscrapping = disabler ()
 endif
+
 if get_option ('storage').enabled ()
   subdir ('storage')
 endif
+
 if get_option ('viewer').enabled ()
   subdir ('viewer')
 endif
