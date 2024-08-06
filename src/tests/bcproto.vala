@@ -30,7 +30,7 @@ namespace Testing
     {
       protected override void test ()
         {
-          var ni = GLib.Random.int_range (100, 1000);
+          var ni = GLib.Test.rand_int_range (100, 1000);
 
           var average = (double) 0;
           var timer = new GLib.Timer ();
@@ -50,7 +50,7 @@ namespace Testing
 
               for (unowned var j = 0; j < key.length; ++j)
                 {
-                  key [j] = (uint8) GLib.Random.int_range (0, uint8.MAX);
+                  key [j] = (uint8) GLib.Test.rand_int_range (0, uint8.MAX);
                 }
 
               try { converter.set_key (key); } catch (GLib.Error e)
@@ -69,7 +69,7 @@ namespace Testing
     {
       protected override async void test ()
         {
-          var ni = GLib.Random.int_range (100, 1000);
+          var ni = GLib.Test.rand_int_range (100, 1000);
 
           var average = (double) 0;
           var timer = new GLib.Timer ();
@@ -93,16 +93,16 @@ namespace Testing
                   break;
                 }
 
-              var alpha = GLib.Random.int_range (0, (int32) (1 + d_converter.blocksz * 2));
-              var delta = GLib.Random.int_range (100, 1000);
+              var alpha = GLib.Test.rand_int_range (0, (int32) (1 + d_converter.blocksz * 2));
+              var delta = GLib.Test.rand_int_range (100, 1000);
 
               if ((alpha = alpha > d_converter.blocksz ? 0 : alpha) > 0) ++unaligned;
 
               var data = new uint8 [d_converter.blocksz * delta + alpha];
               var key = new uint8 [d_converter.keylen];
 
-              for (unowned var j = 0; j < data.length; ++j) data [j] = (uint8) GLib.Random.int_range (0, uint8.MAX);
-              for (unowned var j = 0; j < key.length; ++j) key [j] = (uint8) GLib.Random.int_range (0, uint8.MAX);
+              for (unowned var j = 0; j < data.length; ++j) data [j] = (uint8) GLib.Test.rand_int_range (0, uint8.MAX);
+              for (unowned var j = 0; j < key.length; ++j) key [j] = (uint8) GLib.Test.rand_int_range (0, uint8.MAX);
 
               try { d_converter.set_key (key); e_converter.set_key (key); } catch (GLib.Error e)
                 {

@@ -20,30 +20,37 @@ project \
     'scrapperd', 'c', 'vala',
 
     default_options : [ 'c_std=gnu99', 'warning_level=3' ],
-    meson_version : '>= 1.2.3',
+    license : 'GPL-3.0-or-later',
+    license_files : [ 'COPYING' ],
+    meson_version : '>= 1.4.0',
 
-    version : '@0@.@1@.@2@'.format \
-      (
-        run_command ('git', 'describe', check : true).stdout ().strip ().split ('-').get (0).split ('.').get (0).substring (1),
-        run_command ('git', 'describe', check : true).stdout ().strip ().split ('-').get (0).split ('.').get (1),
-        run_command ('git', 'describe', check : true).stdout ().strip ().split ('-').get (0).split ('.').get (2),
-      ),
+    version : run_command ('version.py', 'get-version', check : true).stdout ().strip (),
   )
 
 cc = meson.get_compiler ('c')
 vala = meson.get_compiler ('vala')
 
+meson.add_dist_script ('version.py', 'set-dist', meson.project_version ())
+
 ########################
 # Extract version info #
 ########################
 
-git_version = run_command ('git', 'describe', check : true).stdout ().strip ()
+git_version = meson.project_version ()
 git_version_list = git_version.split ('-')
 git_version_list2 = git_version_list.get (0).split ('.')
-git_version_stage = git_version_list.get (1)
-git_version_major = git_version_list2.get (0).substring (1)
+git_version_major = git_version_list2.get (0)
 git_version_minor = git_version_list2.get (1)
 git_version_micro = git_version_list2.get (2)
+git_version_stage = git_version_list.get (1)
+git_string = []
+
+foreach i : range (2, git_version_list.length ())
+
+  git_string += git_version_list.get (i)
+endforeach
+
+git_string = '-'.join (git_string)
 
 ########################
 # Configuration begins #
@@ -56,7 +63,7 @@ configh.set ('DEBUG', get_option ('debug').to_int ())
 configh.set ('DEVELOPER', get_option ('developer').to_int ())
 configh.set_quoted ('PACKAGE_BUGREPORT', 'nouser@nohost.com')
 configh.set_quoted ('PACKAGE_NAME', meson.project_name ())
-configh.set_quoted ('PACKAGE_STRING', '@0@ @1@'.format (meson.project_name (), git_version))
+configh.set_quoted ('PACKAGE_STRING', '@0@ @1@'.format (meson.project_name (), meson.project_version ()))
 configh.set_quoted ('PACKAGE_TARNAME', meson.project_name ())
 configh.set_quoted ('PACKAGE_URL', 'https://github.com/MarcosHCK/ScrapperD')
 configh.set_quoted ('PACKAGE_VERSION', git_version)
@@ -77,7 +84,6 @@ if cc.get_id () == 'gcc' or cc.get_id () == 'clang'
 
   warning_c_args = \
     [
-
       '-Waggregate-return',
       '-Warray-bounds',
       '-Wduplicated-branches',
@@ -96,24 +102,40 @@ if cc.get_id () == 'gcc' or cc.get_id () == 'clang'
       # building with -Wbad-function-cast.
       '-Wno-bad-function-cast',
       # Due to pervasive use of things like GPOINTER_TO_UINT(), we do not support
-      # building with -Wbad-function-cast.
+      # building with -Wcast-function-type.
       '-Wno-cast-function-type',
+      # Vala compiler is a mess right now
+      '-Wno-discarded-qualifiers',
+      # Vala compiler is a mess right now
+      '-Wno-incompatible-pointer-types',
       # A zero-length format string shouldn't be considered an issue.
       '-Wno-format-zero-length',
+      # Vala compiler is a mess right now
+      '-Wno-missing-field-initializers',
       # Due to function casts through (void*) we cannot support -Wpedantic:
       # ./docs/toolchain-requirements.md#Function_pointer_conversions.
       '-Wno-pedantic',
       '-Wno-string-plus-int',
+      # Vala compiler is a mess right now, and it leaves a lot of temporary
+      # variables hanging loose
+      '-Wno-unused-but-set-variable',
+      # Vala compiler is a mess right now, and it leaves a lot of temporary
+      # variables hanging loose
+      '-Wno-unused-function',
+      # Vala compiler is a mess right now, and it leaves a lot of temporary
+      # variables hanging loose
+      '-Wno-unused-label',
       # Due to maintained deprecated code, we do not want to see unused parameters
       '-Wno-unused-parameter',
+      # Vala compiler is a mess right now, and it leaves a lot of temporary
+      # variables hanging loose
+      '-Wno-unused-variable',
       # We explicitly require variadic macros
       '-Wno-variadic-macros',
       '-Wnonnull',
       '-Wshadow',
       '-Wstrict-prototypes',
       '-Wunused',
-      '-Wunused-function',
-      '-Wunused-label',
       '-Wunused-value',
     ]
 

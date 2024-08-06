@@ -16,29 +16,57 @@
 #
 
 libsoup_dep = dependency ('libsoup-3.0', required : true)
+libsoup_vapi = vala.find_library ('libsoup-3.0')
+
+libscrapping = library \
+  (
+    'scrapping',
+
+    dependencies : libglib_vapis + \
+      [
+        libgio_dep, libglib_dep, libgobject_dep,
+        libsoup_dep, libsoup_vapi,
+      ],
+
+    include_directories : [ configdir ] + libdirs,
+
+    install : true,
+    install_dir : private_libdir,
+    install_rpath : private_libdir,
+
+    sources :
+      [
+        'contents.vala',
+        'linksearcher.vala',
+        'scrapper.vala',
+        'uri.vala',
+        'validuri.h',
+      ]
+  )
 
 executable \
   (
-    'scrapperd-scrapper',
+    'scrapper',
 
-    dependencies :
+    dependencies : libglib_vapis + \
       [
-        vala.find_library ('gio-2.0'), libgio_dep,
-        vala.find_library ('glib-2.0'), libglib_dep,
-        vala.find_library ('gobject-2.0'), libgobject_dep,
-        vala.find_library ('libsoup-3.0'), libsoup_dep,
-        cc.find_library ('m', required : false),
+        libgio_dep, libglib_dep, libgobject_dep,
+        libsoup_dep, libsoup_vapi,
       ],
 
-    include_directories : [ configdir, libsdir ],
+    include_directories : [ configdir ] + libdirs,
 
-    link_with : [ libkademlia, libkademlia_dbus, libscrapperd ],
+    install : true,
+    install_dir : private_bindir,
+    install_rpath : private_libdir,
+
+    link_with : [ libkademlia, libkademlia_dbus, libscrapperd, libscrapping ],
 
     sources :
       [
         'application.vala',
-        'linksearcher.vala',
-        'scrapper.vala',
         'store.vala',
       ],
   )
+
+libdirs += include_directories ('.')

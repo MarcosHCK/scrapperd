@@ -56,7 +56,7 @@ namespace ScrapperD.Viewer
               else
                 {
                   source = bits [1];
-                  type = (T) enum_value.value;
+                  type = (T) enum_value.value.to_pointer ();
                 }
             }
         }

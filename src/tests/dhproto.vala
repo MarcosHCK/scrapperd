@@ -33,7 +33,7 @@ namespace Testing
     {
       protected override void test ()
         {
-          var ni = GLib.Random.int_range (100, 1000);
+          var ni = GLib.Test.rand_int_range (100, 1000);
           var average = (double) 0;
           var timer = new GLib.Timer ();
 
@@ -129,7 +129,7 @@ namespace Testing
 
       protected override void test ()
         {
-          var ni = GLib.Random.int_range (100, 1000);
+          var ni = GLib.Test.rand_int_range (100, 1000);
 
           var average = (double) 0;
           var timer = new GLib.Timer ();
@@ -162,7 +162,7 @@ namespace Testing
     {
       protected override async void test ()
         {
-          var ni = GLib.Random.int_range (100, 1000);
+          var ni = GLib.Test.rand_int_range (100, 1000);
           var average = (double) 0;
           var timer = new GLib.Timer ();
 

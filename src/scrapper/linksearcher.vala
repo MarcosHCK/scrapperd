@@ -15,9 +15,9 @@
  * along with ScrapperD. If not, see <http://www.gnu.org/licenses/>.
  */
 
-[CCode (cprefix = "ScrapperdScrapper", lower_case_cprefix = "scrapperd_scrapper_")]
+[CCode (cprefix = "Scrapping", lower_case_cprefix = "scrapping_")]
 
-namespace ScrapperD.Scrapper
+namespace Scrapping
 {
   public class LinkSearcherConverter : GLib.Object, GLib.Converter
     {

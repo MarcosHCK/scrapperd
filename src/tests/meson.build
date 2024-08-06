@@ -16,21 +16,30 @@
 #
 
 tests = \
-  {
-    'Krypto BC implementation' : [ 'bcproto.vala' ],
-    'Krypto ECDHE implementation' : [ 'dhproto.vala' ],
-    'Kademlia buckets tests' : [ 'buckets.vala' ],
-    'Kademlia DBus hub tests' : [ 'hub.vala', 'baseintegration.vala' ],
-    'Kademlia integration tests' : [ 'integration.vala', 'baseintegration.vala' ],
-    'Kademlia key tests' : [ 'key.vala' ],
-    #'Kademlia stress tests' : [ 'stress.vala' ],
-  }
+  [
+    { 'description' : 'Advertise library', 'files' : [ 'advertise.vala' ], 'libs' : [ libadvertise ],
+      'deps' : [ libjson_glib_dep, libjson_glib_vapi ] },
+    { 'description' : 'Krypt BC implementation', 'files' : [ 'bcproto.vala' ], 'libs' : [ libkrypt ] },
+    { 'description' : 'Krypt ECDHE implementation', 'files' : [ 'dhproto.vala' ], 'libs' : [ libkrypt ] },
+    { 'description' : 'Krypt stream implementation', 'files' : [ 'krypt.vala' ], 'libs' : [ libkrypt ] },
+    { 'description' : 'Kademlia buckets tests', 'files' : [ 'buckets.vala' ], 'libs' : [ libkademlia ] },
+    { 'description' : 'Kademlia DBus hub tests', 'files' : [ 'hub.vala', 'baseintegration.vala' ], 'libs' : [ libgvalr, libkademlia, libkademlia_dbus ],
+      'timeout' : 60 },
+    { 'description' : 'Kademlia integration tests', 'files' : [ 'integration.vala', 'baseintegration.vala' ], 'libs' : [ libgvalr, libkademlia ] },
+    { 'description' : 'Kademlia key tests', 'files' : [ 'key.vala' ], 'libs' : [ libkademlia ] },
+    { 'description' : 'Scrapper library', 'files' : [ 'scrapper.vala' ], 'libs' : [ libscrapping ],
+      'deps' : [ libsoup_dep, libsoup_vapi ] },
+  ]
 
-foreach description, files : tests
+foreach test_ : tests
+
+  deps = test_.get ('deps', [ ])
+  description = test_.get ('description')
+  files = test_.get ('files')
+  libs = test_.get ('libs', [ ])
+  timeout = test_.get ('timeout', 30)
 
   assert (files.length () > 0)
-
-  file = files.get (0)
 
   test \
     (
@@ -38,17 +47,16 @@ foreach description, files : tests
 
       executable \
         (
-          '@0@.test'.format (file),
+          '@0@.test'.format (files.get (0)),
 
-          dependencies : [
-              vala.find_library ('gio-2.0'), libgio_dep,
-              vala.find_library ('glib-2.0'), libglib_dep,
-              vala.find_library ('gobject-2.0'), libgobject_dep,
-            ],
+          dependencies : libglib_vapis + \
+            [
+              libgio_dep, libglib_dep, libgobject_dep
+            ] + deps,
 
-          include_directories : [ configdir, include_directories ('..') ],
+          include_directories : [ configdir ] + libdirs,
 
-          link_with : [ libkademlia, libkademlia_dbus, libkrypt, libscrapperd ],
+          link_with : libs,
 
           sources : files + [ 'base.vala' ],
         ),
@@ -58,5 +66,7 @@ foreach description, files : tests
           'G_TEST_SRCDIR=@0@'.format(meson.current_source_dir () / '..'),
           'G_TEST_BUILDDIR=@0@'.format(meson.current_build_dir () / '..'),
         ],
+
+      timeout : timeout,
     )
 endforeach

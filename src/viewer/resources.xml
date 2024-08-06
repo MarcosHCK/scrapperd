@@ -34,6 +34,7 @@
 
   <gresource prefix="/org/hck/ScrapperD/Viewer/gtk">
 
+    <file preprocess="xml-stripblanks">adrow.ui</file>
     <file alias="menus.ui" preprocess="xml-stripblanks">applicationmenus.ui</file>
     <file preprocess="xml-stripblanks">applicationwindow.ui</file>
     <file preprocess="xml-stripblanks">infobar.ui</file>

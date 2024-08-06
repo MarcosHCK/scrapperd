@@ -23,13 +23,13 @@ namespace ScrapperD.Scrapper
 
   public sealed class Application : ScrapperD.Application
     {
-      private Scrapper? scrapper = null;
-      private Store? store = null;
-      private Object? store_proxy = null;
+      private Scrapping.Scrapper? scrapper = null;
+      private Scrapper.Store? store = null;
+      private GLib.Object? store_proxy = null;
 
       construct
         {
-          scrapper = new Scrapper ();
+          scrapper = new Scrapping.Scrapper ();
         }
 
       public Application ()
@@ -64,7 +64,7 @@ namespace ScrapperD.Scrapper
               foreach (unowned var uri_string in cmdline.get_arguments ()) if (first) first = false; else try
                 {
                   var value = (string?) null;
-                  var uri = (Uri) Scrapper.normal_uri (uri_string);
+                  var uri = (Uri) Scrapping.normal_uri (uri_string);
                   var id = new Kademlia.Key.from_data ((value = uri.to_string ()).data);
 
                   try { yield store.insert_value (id, value, cancellable); } catch (GLib.Error e)
