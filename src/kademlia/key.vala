@@ -173,18 +173,7 @@ namespace Kademlia
 
       public string to_string ()
         {
-          var builder = new StringBuilder.sized (2 * bytelen);
-
-          unowned var bytes = (uint8*) & value.bytes [0];
-
-          for (unowned var i = 0; i < bytelen; ++i)
-            {
-              uint8 b = bytes [i];
-              builder.append_c (charset [b >> 4]);
-              builder.append_c (charset [b & 0xf]);
-            }
-
-          return builder.free_and_steal ();
+          return value.to_string ();
         }
 
       public static Key xor (Key a, Key b)

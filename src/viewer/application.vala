@@ -350,10 +350,11 @@ namespace ScrapperD.Viewer
 
               try { adv_hub.add_channel (new Advertise.Ipv4Channel (advertise_port)); } catch (GLib.Error e)
                 {
-                  good = false;
-                  cmdline.printerr ("%s: %u: %s\n", e.domain.to_string (), e.code, e.message);
-                  cmdline.set_exit_status (1);
-                  break;
+                  unowned var code = e.code;
+                  unowned var domain = e.domain.to_string ();
+                  unowned var message = e.message.to_string ();
+
+                  warning ("%s: %i: %s", domain, code, message);
                 }
 
               activate ();
@@ -383,11 +384,11 @@ namespace ScrapperD.Viewer
 
           if (likely (good == true))
 
-            active_window.present ();
+            get_active_window ()?.present ();
           else
             {
-              active_window.close ();
-              active_window.destroy ();
+              get_active_window ()?.close ();
+              get_active_window ()?.destroy ();
             }
 
           return good;

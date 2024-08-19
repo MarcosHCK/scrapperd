@@ -431,7 +431,7 @@ namespace Krypt
           return (owned) n;
         }
 
-      public static Scalar random_prime (uint nbits, uint factor_bits, [CCode (array_length = false, array_null_terminated = true)] out Scalar[] factors, PrimeCheckFunc? check_func, RandomnessLevel level, PrimeGeneratorFlags flags) throws GLib.Error
+      public static Scalar random_prime (uint nbits, uint factor_bits, out Scalar[] factors, PrimeCheckFunc? check_func, RandomnessLevel level, PrimeGeneratorFlags flags) throws GLib.Error
         {
           Scalar scalar;
           ErrorCode code = prime_generate (out scalar, nbits, factor_bits, out factors, check_func, level, flags);
