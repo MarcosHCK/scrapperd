@@ -25,7 +25,6 @@ namespace Kademlia.DBus
       public GLib.HashTable<Key, GenericSet<Address?>> contacts { get; construct; }
       public GLib.HashTable<Key, Local?> locals { get; construct; }
       public GLib.HashTable<Key, Role> roles { get; construct; }
-      private Clock clock;
 
       public struct Local
         {
@@ -39,16 +38,10 @@ namespace Kademlia.DBus
             }
         }
 
-      ~Hub ()
-        {
-          clock.destroy ();
-        }
-
       construct
         {
           addresses = new GenericSet<Address?> (Address.hash, Address.equal);
           contacts = new HashTable<Key, GenericSet<Address?>> (Key.hash, Key.equal);
-          clock = new Clock (this);
           locals = new HashTable<Key, Local?> (Key.hash, Key.equal);
           roles = new HashTable<Key, Role> (Key.hash, Key.equal);
         }

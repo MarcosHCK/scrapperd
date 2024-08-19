@@ -36,7 +36,7 @@ namespace ScrapperD.Storage
 
       protected override async void register_peers () throws GLib.Error
         {
-          hub.add_local_peer ("storage", new Kademlia.DBus.PeerImpl (new Store ()));
+          peer_hub.add_local_peer ("storage", new Kademlia.DBus.PeerImpl (new Store ()));
         }
     } 
 }

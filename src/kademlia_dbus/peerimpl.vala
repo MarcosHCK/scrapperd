@@ -38,39 +38,31 @@ namespace Kademlia.DBus
 
       private void @catch (Key peer, owned GLib.Error? e) throws GLib.Error
         {
-          if (e.domain == IOError.quark ()) catch_io (peer, (IOError?) (owned) e);
-          else if (e.domain == NetworkError.quark ()) catch_network (peer, (NetworkError?) (owned) e);
-          else throw (owned) e;
-        }
+          if (e.domain == IOError.quark ())
 
-      private void catch_io (Key peer, owned GLib.IOError? e) throws GLib.Error
-        {
-          switch (e.code)
-            {
-              case GLib.IOError.CLOSED:
-              case GLib.IOError.CONNECTION_CLOSED:
-              case GLib.IOError.TIMED_OUT:
+            switch (e.code)
+              {
+                case GLib.IOError.CLOSED:
+                case GLib.IOError.CONNECTION_CLOSED:
+                case GLib.IOError.TIMED_OUT:
 
-                debug ("contact lost %s:(%s)", peer.to_string (), id.to_string ());
-                hub.drop_role (peer);
-                break;
+                  debug ("contact lost %s (I/O layer error)", peer.to_string ());
+                  hub.drop_role (peer);
+                  return;
+              }
 
-              default: throw (owned) e;
-            }
-        }
+          else if (e.domain == NetworkError.quark ())
 
-      private void catch_network (Key peer, owned NetworkError? e) throws GLib.Error
-        {
-          switch (e.code)
-            {
-              case NetworkError.RESETTED_PEER:
+            switch (e.code)
+              {
+                case NetworkError.RESETTED_PEER:
 
-                debug ("contact lost %s:(%s)", peer.to_string (), id.to_string ());
-                hub.drop_role (peer);
-                break;
+                  debug ("contact lost %s (network layer error)", peer.to_string ());
+                  hub.drop_role (peer);
+                  return;
+              }
 
-              default: throw (owned) e;
-            }
+          throw (owned) e;
         }
 
       private void know (Hub hub, Key peer, PeerRef? @ref)

@@ -31,6 +31,7 @@ namespace Kademlia.DBus
     {
       public const uint16 DEFAULT_PORT = 33334;
 
+      private GenericSet<GLib.DBusConnection> connections;
       private GLib.ThreadPool<GLib.SocketConnection> incomming_pool;
       private GLib.SocketService socket_service;
 
@@ -48,11 +49,11 @@ namespace Kademlia.DBus
 
       construct
         {
-          int max_threads;
+          var max_threads = (int) GLib.get_num_processors ();
 
           try
             {
-              max_threads = (int) GLib.get_num_processors ();
+              connections = new GenericSet<GLib.DBusConnection> (GLib.direct_hash, GLib.direct_equal);
               incomming_pool = new GLib.ThreadPool<GLib.SocketConnection>.with_owned_data (on_incoming_pooled, max_threads, false);
               socket_service = new GLib.SocketService ();
 
@@ -63,6 +64,12 @@ namespace Kademlia.DBus
             {
               error (@"$(e.domain): $(e.code): $(e.message)");
             }
+        }
+
+      ~NetworkHub ()
+        {
+          connections.foreach (e => e.close.begin ());
+          connections.remove_all ();
         }
 
       public new async void add_local_address (string host_and_port, uint16 default_port, GLib.Cancellable? cancellable = null) throws GLib.Error
@@ -114,7 +121,7 @@ namespace Kademlia.DBus
           var flags1 = GLib.DBusConnectionFlags.AUTHENTICATION_CLIENT;
           var flags2 = GLib.DBusConnectionFlags.DELAY_MESSAGE_PROCESSING;
           var flags = flags1 | flags2;
-          var socket_connection = yield (new SocketClient ()).connect_to_host_async (host_and_port, default_port, cancellable);
+          var socket_connection = yield connect_to_host (host_and_port, default_port, cancellable);
           var krypt_stream = new Krypt.IOStream ("AES", "CBC", socket_connection);
           yield krypt_stream.handshake_client (GLib.Priority.LOW, cancellable);
           var dbus = yield new GLib.DBusConnection (krypt_stream, null, flags, null, cancellable);
@@ -125,6 +132,19 @@ namespace Kademlia.DBus
           dbus.start_message_processing ();
 
           return yield register_connection (dbus, cancellable);
+        }
+
+      static async GLib.SocketConnection connect_to_host (string host_and_port, uint16 default_port, GLib.Cancellable? cancellable = null) throws GLib.Error
+        {
+          var socket_client = new GLib.SocketClient ();
+
+          socket_client.enable_proxy = false;
+          socket_client.protocol = GLib.SocketProtocol.TCP;
+          socket_client.timeout = 3;
+          socket_client.tls = false;
+          socket_client.type = GLib.SocketType.STREAM;
+
+          return yield socket_client.connect_to_host_async (host_and_port, default_port, cancellable);
         }
 
       public async ValuePeer create_proxy_at (string host_and_port, uint16 default_port, string role, GLib.Cancellable? cancellable) throws GLib.Error
@@ -167,6 +187,8 @@ namespace Kademlia.DBus
 
             dbus.unregister_object (regid);
             dbus.unregister_object (regids.node_regid);
+
+          dbus.stream.close_async.begin ();
         }
 
       private bool on_incoming (GLib.SocketConnection socket_connection)
@@ -225,8 +247,13 @@ namespace Kademlia.DBus
 
           var regids = RegIds (node_regid, role_regids.steal ());
 
-          dbus.on_closed.connect ((c, a, b) => on_closed (c, regids));
-          return true;
+          dbus.on_closed.connect ((c, a, b) =>
+            {
+              on_closed (c, regids);
+              connections.remove (c);
+            });
+
+          return connections.add (dbus);
         }
 
       public void start () { socket_service.start (); }
@@ -246,53 +273,60 @@ namespace Kademlia.DBus
             }
           else try
             {
-              var done = null != yield connect_to (address.address, address.port, cancellable);
-              var role = done == false ? null : pick_contact_role (id);
-              var newid = new Key.verbatim (role.id.value);
+              var host_and_port = address.address;
+              var default_port = address.port;
 
-              if (unlikely (done == false && prevrole == null))
-
-                throw new PeerError.UNREACHABLE ("peer has no roles %s", id.to_string ());
-
-              else if (unlikely (done == false && prevrole != null))
+              if (unlikely (null == yield connect_to (host_and_port, default_port, cancellable)))
                 {
-                  debug ("peer registered as %s, vanished", id.to_string ());
-                  throw new NetworkError.RESETTED_PEER ("peer vanished %s:%s", prevrole, id.to_string ());
+                  if (unlikely (prevrole == null))
+                    {
+                      throw new PeerError.UNREACHABLE ("peer has no roles %s", id.to_string ());
+                    }
+                  else if (prevrole != pick_contact_role (id)?.role)
+                    {
+                      debug ("peer registered as %s, vanished", id.to_string ());
+                      throw new NetworkError.RESETTED_PEER ("peer vanished %s:%s", prevrole, id.to_string ());
+                    }
                 }
-
-              if (unlikely (Key.equal (id, newid) == false || (prevrole != null && prevrole != role.role)))
+              else
                 {
+                  var role = (Role?) pick_contact_role (id);
+                  var newid = new Key.verbatim (role.id.value);
 
-                  if (Key.equal (id, newid) == false)
+                  if (unlikely (Key.equal (id, newid) == false || (prevrole != null && prevrole != role.role)))
+                    {
 
-                    debug ("peer registered as %s, id changed to %s", id.to_string (), newid.to_string ());
+                      if (Key.equal (id, newid) == false)
 
-                  else if (prevrole != null && prevrole != role.role)
+                        debug ("peer registered as %s, id changed to %s", id.to_string (), newid.to_string ());
 
-                    debug ("peer registered role was %s, changed to %s:%s", prevrole, role.role, newid.to_string ());
+                      else if (prevrole != null && prevrole != role.role)
 
-                  throw new NetworkError.RESETTED_PEER ("peer role was resetted (maybe address collision?)");
-                }
+                        debug ("peer registered role was %s, changed to %s", prevrole, role.role);
 
-              return done;
-            }
-          catch (IOError e)
-            {
-              switch (e.code)
-                {
-                  case GLib.IOError.CONNECTION_REFUSED:
-                  case GLib.IOError.HOST_UNREACHABLE:
-                  case GLib.IOError.NETWORK_UNREACHABLE:
+                      throw new NetworkError.RESETTED_PEER ("peer role was resetted (maybe address collision?)");
+                    }
 
-                    drop_contact_address (id, address);  
-                    break;
-
-                  default: throw (owned) e;
+                  return true;
                 }
             }
           catch (GLib.Error e)
             {
-              throw (owned) e;
+              if (e.domain == GLib.IOError.quark ())
+
+                switch (e.code)
+                  {
+                    case GLib.IOError.CONNECTION_REFUSED:
+                    case GLib.IOError.HOST_UNREACHABLE:
+                    case GLib.IOError.NETWORK_UNREACHABLE:
+
+                      drop_contact_address (id, address);  
+                      break;
+
+                    default: throw (owned) e;
+                  }
+
+              else throw (owned) e;
             }
 
           return false;
@@ -310,7 +344,7 @@ namespace Kademlia.DBus
           foreach (unowned var keyref in keyrefs)
             {
               var id = new Key.verbatim (keyref.value);
-              var role = yield dbus.get_proxy<Role> (null, @"$object_path/$id", 0, cancellable);
+              var role = (Role) yield dbus.get_proxy<Role> (null, @"$object_path/$id", 0, cancellable);
 
               add_contact_addresses (id, addresses);
               add_contact_role (id, role);
