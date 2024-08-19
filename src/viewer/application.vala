@@ -348,7 +348,9 @@ namespace ScrapperD.Viewer
                     }
                 }
 
-              try { adv_hub.add_channel (new Advertise.Ipv4Channel (advertise_port)); } catch (GLib.Error e)
+              Advertise.Ipv4Channel channel = null;
+
+              try { (channel = new Advertise.Ipv4Channel ()).bind_any_port (advertise_port); } catch (GLib.Error e)
                 {
                   unowned var code = e.code;
                   unowned var domain = e.domain.to_string ();
@@ -357,6 +359,7 @@ namespace ScrapperD.Viewer
                   warning ("%s: %i: %s", domain, code, message);
                 }
 
+              adv_hub.add_channel (channel);
               activate ();
 
               foreach (unowned var address in addresses)

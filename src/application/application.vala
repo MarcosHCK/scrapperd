@@ -72,7 +72,7 @@ namespace ScrapperD
               string option_s;
               GLib.VariantIter iter;
 
-              Advertise.Channel? ipv4_channel = null;
+              Advertise.Ipv4Channel? ipv4_channel = null;
 
               var addresses = new GLib.SList<string> ();
               var advertise = true;
@@ -150,7 +150,7 @@ namespace ScrapperD
                   addresses.prepend ((owned) option_s);
                 }
 
-              try { yield hub.add_local_address ("localhost", port, cancellable); } catch (GLib.Error e)
+              try { hub.add_local_port (port, cancellable); } catch (GLib.Error e)
                 {
                   good = false;
                   cmdline.printerr ("can not listen on localhost: %s: %u: %s\n", e.domain.to_string (), e.code, e.message);
@@ -168,7 +168,7 @@ namespace ScrapperD
 
               if (unlikely (good == false)) break;
 
-              if (advertise) try { ipv4_channel = new Advertise.Ipv4Channel (advertise_port); } catch (GLib.Error e)
+              if (advertise) try { (ipv4_channel = new Advertise.Ipv4Channel ()).bind_any_port (advertise_port); } catch (GLib.Error e)
                 {
                   good = false;
                   cmdline.printerr ("can not create advertising channel: %s: %u: %s\n", e.domain.to_string (), e.code, e.message);

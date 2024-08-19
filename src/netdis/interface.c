@@ -15,6 +15,29 @@
  * along with ScrapperD. If not, see <http://www.gnu.org/licenses/>.
  */
 #include <config.h>
-#include <netifaces.h>
+#include <interface.h>
 
-#error Unimplemented
+#if defined(G_OS_WIN32)
+# include <interface-win32.c>
+#elif defined(G_OS_UNIX)
+# include <interface-unix.c>
+#endif
+
+void nd_interface_info_free (NdInterfaceInfo* info)
+{
+  g_clear_pointer (&info->address, g_object_unref);
+  g_clear_pointer (&info->name, g_free);
+  g_clear_pointer (&info->netmask, g_object_unref);
+  g_clear_pointer (&info->peer, g_object_unref);
+  g_slice_free (NdInterfaceInfo, info);
+}
+
+GSocketAddress* nd_interface_info_get_broadcast (NdInterfaceInfo* info)
+{
+  return (info->loopback || info->ppp) == TRUE ? NULL : info->broadcast;
+}
+
+GSocketAddress* nd_interface_info_get_peer (NdInterfaceInfo* info)
+{
+  return (info->loopback || info->ppp) == FALSE ? NULL : info->peer;
+}

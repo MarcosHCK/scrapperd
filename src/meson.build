@@ -30,6 +30,8 @@ subdir ('kademlia')
 
 subdir ('gvalr')
 subdir ('krypt')
+subdir ('netdis')
+
 subdir ('kademlia_dbus')
 
 subdir ('advertise')

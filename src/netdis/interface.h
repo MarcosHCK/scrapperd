@@ -14,21 +14,21 @@
  * You should have received a copy of the GNU General Public License
  * along with ScrapperD. If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef __ADV_NET_IFACES__
-#define __ADV_NET_IFACES__ 1
+#ifndef __NETDIS_INTERFACE_INFO__
+#define __NETDIS_INTERFACE_INFO__ 1
 #include <gio/gio.h>
 
-typedef struct _AdvNetIfacesInfo AdvNetIfacesInfo;
+typedef struct _NdInterfaceInfo NdInterfaceInfo;
 
 #if __cplusplus
 extern "C" {
 #endif // __cplusplus
 
-  struct _AdvNetIfacesInfo
+  struct _NdInterfaceInfo
     {
       GSocketAddress* address;
       gchar* name;
-      GSocketAddress *netmask;
+      GSocketAddress* netmask;
 
       guint loopback : 1;
       guint ppp : 1;
@@ -40,13 +40,13 @@ extern "C" {
         };
     };
 
-  G_GNUC_INTERNAL AdvNetIfacesInfo** adv_net_ifaces_enumerate (GSocketFamily family, GError** error);
-  G_GNUC_INTERNAL void adv_net_ifaces_info_free (AdvNetIfacesInfo* info);
-  G_GNUC_INTERNAL GSocketAddress* adv_net_ifaces_info_get_broadcast (AdvNetIfacesInfo* info);
-  G_GNUC_INTERNAL GSocketAddress* adv_net_ifaces_info_get_peer (AdvNetIfacesInfo* info);
+  NdInterfaceInfo** nd_interface_enumerate (GSocketFamily family, GError** error);
+  void nd_interface_info_free (NdInterfaceInfo* info);
+  GSocketAddress* nd_interface_info_get_broadcast (NdInterfaceInfo* info);
+  GSocketAddress* nd_interface_info_get_peer (NdInterfaceInfo* info);
 
 #if __cplusplus
 }
 #endif // __cplusplus
 
-#endif // __ADV_NET_IFACES__
+#endif // __NETDIS_INTERFACE_INFO__

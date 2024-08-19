@@ -14,25 +14,7 @@
  * You should have received a copy of the GNU General Public License
  * along with ScrapperD. If not, see <http://www.gnu.org/licenses/>.
  */
+#include <config.h>
+#include <interface.h>
 
-[CCode (cheader_filename = "netifaces.h", lower_case_cprefix = "adv_net_ifaces_")]
-
-namespace Advertise.NetIfaces
-{
-  [Compact (opaque = false)]
-
-  public class Info
-    {
-      private Info ();
-      public GLib.SocketAddress? address;
-      public bool loopback;
-      public string name;
-      public GLib.SocketAddress? netmask;
-      public bool ppp;
-      public GLib.SocketAddress? broadcast { get; }
-      public GLib.SocketAddress? peer { get; }
-    }
-
-  [CCode (array_length = false, array_null_terminated = true)]
-  public static Info[] enumerate (GLib.SocketFamily family) throws GLib.Error;
-}
+#error Unimplemented

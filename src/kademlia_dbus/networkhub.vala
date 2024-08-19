@@ -85,6 +85,30 @@ namespace Kademlia.DBus
             }
         }
 
+      public void add_local_port (uint16 port, GLib.Cancellable? cancellable = null) throws GLib.Error
+        {
+          GLib.SocketFamily families [] =
+            {
+              GLib.SocketFamily.IPV4,
+              GLib.SocketFamily.IPV6,
+            };
+
+          foreach (unowned var family in families)
+          foreach (unowned var info in Netdis.Interface.enumerate (family)) if (info.broadcast != null)
+            {
+              if ((info.address is GLib.InetSocketAddress) == false)
+
+                base.add_local_address (info.address.to_string (), port);
+              else
+                {
+                  var inet_address = ((GLib.InetSocketAddress) info.address).address;
+                  base.add_local_address (inet_address.to_string (), port);
+                }
+            }
+
+          socket_service.add_inet_port (port, null);
+        }
+
       private async Node? connect_to (string host_and_port, uint16 default_port, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
           var flags1 = GLib.DBusConnectionFlags.AUTHENTICATION_CLIENT;

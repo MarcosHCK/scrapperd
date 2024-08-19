@@ -23,14 +23,47 @@ namespace Advertise
     {
       public const uint16 DEFAULT_PORT = 33332;
 
-      public uint16 port { get; construct; }
       private GLib.List<GLib.SocketAddress> ifaces;
       private GLib.Socket socket;
 
-      public Ipv4Channel (uint16 port) throws GLib.Error
+      public Ipv4Channel () throws GLib.Error
         {
-          Object (port : port);
+          Object ();
           init ();
+        }
+
+      public bool bind (GLib.SocketAddress address) throws GLib.Error
+        {
+          return socket.bind (address, true);
+        }
+
+      private bool bind_x_port (bool pickany, uint16 port) throws GLib.Error
+        {
+          GLib.SocketAddress address;
+          var any = (int) 0;
+          var family = (SocketFamily) GLib.SocketFamily.IPV4;
+
+          foreach (unowned var info in Netdis.Interface.enumerate (family)) if (info.broadcast != null)
+            {
+              assert (info.broadcast is InetSocketAddress);
+              var socket_address = (SocketAddress) info.broadcast;
+              var inet_address = (InetAddress) ((GLib.InetSocketAddress) socket_address).address;
+
+              ifaces.append (address = new GLib.InetSocketAddress (inet_address, port));
+              any = (pickany == false ? bind (address) : try_bind (address)) ? 1 : 0;
+            }
+
+          return any > 0;
+        }
+
+      public void bind_all_port (uint16 port) throws GLib.Error
+        {
+          bind_x_port (false, port);
+        }
+
+      public bool bind_any_port (uint16 port) throws GLib.Error
+        {
+          return bind_x_port (true, port);
         }
 
       public ChannelSource create_source (GLib.Cancellable? cancellable)
@@ -54,19 +87,7 @@ namespace Advertise
 
           ifaces = new GLib.List<GLib.SocketAddress> ();
           socket = new GLib.Socket (family, type, protocol);
-
           socket.broadcast = true;
-
-          foreach (unowned var info in NetIfaces.enumerate (family)) if (info.broadcast != null)
-            {
-              assert (info.broadcast is InetSocketAddress);
-              var socket_address = (SocketAddress) info.broadcast;
-              var inet_address = (InetAddress) ((GLib.InetSocketAddress) socket_address).address;
-
-              ifaces.append (new GLib.InetSocketAddress (inet_address, port));
-            }
-
-          foreach (unowned var address in ifaces) socket.bind (address, true);
           return true;
         }
 
@@ -86,6 +107,26 @@ namespace Advertise
       public async bool send (GLib.Bytes contents, GLib.Cancellable? cancellable) throws GLib.Error
         {
           return yield send_to (socket, ifaces, contents, cancellable);
+        }
+
+      public bool try_bind (GLib.SocketAddress address) throws GLib.Error
+        {
+          try { socket.bind (address, true); } catch (GLib.Error e)
+            {
+              if (e.matches (GLib.IOError.quark (), GLib.IOError.INVALID_ARGUMENT) == false)
+
+                throw (owned) e;
+              else
+                {
+                  unowned var code = e.code;
+                  unowned var domain = e.domain.to_string ();
+                  unowned var message = e.message.to_string ();
+
+                  warning ("%s: %u: %s", domain, code, message);
+                }
+            }
+
+          return true;
         }
     }
 }
