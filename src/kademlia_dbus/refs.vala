@@ -105,7 +105,9 @@ namespace Kademlia.DBus
 
       public GLib.Value? get_value ()
         {
-          return GValr.net2nat (value);
+          GLib.Value value;
+          GValr.net2nat (out value, this.value);
+          return (owned) value;
         }
     }
 }

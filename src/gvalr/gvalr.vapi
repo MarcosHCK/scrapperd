@@ -19,12 +19,8 @@
 
 namespace GValr
 {
-  [CCode (cheader_filename = "glib-object.h", cname = "G_TYPE_FUNDAMENTAL")]
-
-  internal static extern GLib.Type _fundamental_type (GLib.Type g_type);
-
-  internal static bool is_a_or_equal (GLib.Type gtype, GLib.Type a_or_equal)
-    {
-      return gtype == a_or_equal || gtype.is_a (a_or_equal);
-    }
+	[CCode (cheader_filename = "gvalr.h")]
+	public static GLib.Variant nat2net (GLib.Value? value);
+	[CCode (cheader_filename = "gvalr.h")]
+	public static void net2nat (out GLib.Value value, GLib.Variant variant);
 }

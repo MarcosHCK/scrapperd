@@ -85,12 +85,15 @@ namespace Kademlia.DBus
             }
         }
 
-      public async bool store (PeerRef from_, KeyRef key, GLib.Variant value, GLib.Cancellable? cancellable = null) throws GLib.Error
+      public async bool store (PeerRef from_, KeyRef key, GLib.Variant variant, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
+          GLib.Value value;
+          GValr.net2nat (out value, variant);
+
           var from = (Key?) from_.know (hub);
           var id = (Key) new Key.verbatim (key.value);
-          var go = (bool) yield value_peer.store_value_complete (from, id, GValr.net2nat (value), cancellable);
-          return go;
+
+          return yield value_peer.store_value_complete (from, id, value, cancellable);
         }
 
       public async bool ping (PeerRef from_, GLib.Cancellable? cancellable = null) throws GLib.Error
