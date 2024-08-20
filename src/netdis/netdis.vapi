@@ -15,28 +15,28 @@
  * along with ScrapperD. If not, see <http://www.gnu.org/licenses/>.
  */
 
-[CCode (cprefix = "ScrapperdStorage", lower_case_cprefix = "scrapperd_storage_")]
+[CCode (cheader_filename = "netdis.h", cprefix = "Nd", lower_case_cprefix = "nd_")]
 
-namespace ScrapperD.Storage
+namespace Netdis
 {
-  const string APPID = "org.hck.ScrapperD.Storage";
-
-  public sealed class Application : ScrapperD.Application
+  namespace Interface
     {
+      [Compact (opaque = false)]
 
-      public Application ()
+      public class Info
         {
-          base (APPID, GLib.ApplicationFlags.NON_UNIQUE);
+          private Info ();
+          public GLib.SocketAddress? address;
+          public bool loopback;
+          public string name;
+          public GLib.SocketAddress? netmask;
+          public bool ppp;
+          public GLib.SocketAddress? broadcast { get; }
+          public GLib.SocketAddress? peer { get; }
         }
 
-      public static int main (string[] argv)
-        {
-          return (new Application ()).run (argv);
-        }
+      [CCode (array_length = false, array_null_terminated = true)]
 
-      protected override async void register_peers () throws GLib.Error
-        {
-          peer_hub.add_local_peer ("storage", new Kademlia.DBus.PeerImpl (new Store ()));
-        }
-    } 
+      public extern static Info[] enumerate (GLib.SocketFamily family) throws GLib.Error;
+    }
 }

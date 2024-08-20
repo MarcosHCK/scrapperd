@@ -42,7 +42,7 @@ extern "C" {
 
   static void _recv_callback (GTask* task, gpointer channel, RecvFromData* data, GCancellable* cancellable)
     {
-      guint i, tries, length = g_list_length (data->ifaces);
+      guint i, got, tries, length = g_list_length (data->ifaces);
       GError* tmperr = NULL;
       GInputMessage stat_messages [8], *dyn_messages = NULL, *messages;
       GInputVector stat_vectors [8], *dyn_vectors = NULL, *vectors;
@@ -82,7 +82,7 @@ extern "C" {
 
       for (tries = 0; TRUE; ++tries)
 
-        if ((i = g_datagram_based_receive_messages (G_DATAGRAM_BASED (data->socket), messages, length, 0, 0, cancellable, &tmperr)), G_UNLIKELY (tmperr != NULL))
+        if ((got = g_datagram_based_receive_messages (G_DATAGRAM_BASED (data->socket), messages, length, 0, 0, cancellable, &tmperr)), G_UNLIKELY (tmperr != NULL))
           {
             if (g_error_matches (tmperr, G_IO_ERROR, G_IO_ERROR_WOULD_BLOCK) && tries < TRIES)
 
@@ -93,14 +93,14 @@ extern "C" {
                 break;
               }
           }
-        else if (G_LIKELY (i > 0))
+        else if (G_LIKELY (got > 0))
           {
             GBytes* bytes;
             GPtrArray* ar = NULL;
 
-            for (i = 0; i < length; ++i) if (messages [i].bytes_received > 0)
+            for (i = 0; i < got; ++i) if (messages [i].bytes_received > 0)
               {
-                bytes = g_bytes_new (vectors [i].buffer, messages [i].bytes_received);
+                bytes = g_bytes_new (& buffer [i * BUFSZ], messages [i].bytes_received);
                 g_ptr_array_add ((ar = ar != NULL ? ar : g_ptr_array_new_with_free_func ((GDestroyNotify) g_bytes_unref)), bytes);
               }
 

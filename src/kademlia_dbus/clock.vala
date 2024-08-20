@@ -19,17 +19,16 @@
 
 namespace Kademlia.DBus
 {
-  internal class Clock : GLib.Object
+  public class Clock : GLib.Object
     {
       public const uint CLOCK_TICK_TIME = 300;
-      public GLib.Cancellable cancellable { get; construct; }
       public GLib.MainContext context { get; construct; }
-      public Hub hub { owned get { return (Hub) _hub.get (); } set { _hub.set (value); } }
+      public Hub hub { get; construct; }
       public GLib.Source source { get; construct; }
 
-      private Mutex peer_mutex = Mutex ();
-      private Mutex value_mutex = Mutex ();
-      private WeakRef _hub;
+      private GLib.Cancellable cancellable;
+      private GLib.Mutex peer_mutex = Mutex ();
+      private GLib.Mutex value_mutex = Mutex ();
 
       construct
         {
@@ -50,14 +49,7 @@ namespace Kademlia.DBus
           Object (context : MainContext.ref_thread_default (), hub : hub);
         }
 
-      public void destroy ()
-        {
-          cancellable.cancel ();
-          source.destroy ();
-          context.iteration (false);
-        }
-
-      private async void peer_step (Hub hub, Cancellable? cancellable = null) throws GLib.Error
+      private async void peer_step (Cancellable? cancellable = null) throws GLib.Error
         {
           var locals = new GLib.List<PeerImpl> ();
           hub.foreach_local ((a, b, peer) => locals.append (peer));
@@ -69,7 +61,14 @@ namespace Kademlia.DBus
             }
         }
 
-      private async void value_step (Hub hub, GLib.Cancellable? cancellable = null) throws GLib.Error
+      public void stop ()
+        {
+          cancellable.cancel ();
+          source.destroy ();
+          context.iteration (false);
+        }
+
+      private async void value_step (GLib.Cancellable? cancellable = null) throws GLib.Error
         {
           var locals = new GLib.List<PeerImpl> ();
           hub.foreach_local ((a, b, peer) => locals.append (peer));
@@ -86,42 +85,38 @@ namespace Kademlia.DBus
 
       private bool watch ()
         {
-          Hub hub;
+          if (peer_mutex.trylock ())
 
-          if ((hub = _hub.get () as Hub) != null)
-            {
-              if (peer_mutex.trylock ())
-
-                peer_step.begin (hub, cancellable, (o, res) =>
+            peer_step.begin (cancellable, (o, res) =>
+              {
+                try { ((Clock) o).peer_step.end (res); } catch (GLib.Error e)
                   {
-                    try { ((Clock) o).peer_step.end (res); } catch (GLib.Error e)
-                      {
-                        unowned var code = e.code;
-                        unowned var domain = e.domain.to_string ();
-                        unowned var message = e.message.to_string ();
+                    unowned var code = e.code;
+                    unowned var domain = e.domain.to_string ();
+                    unowned var message = e.message.to_string ();
 
-                        warning ("hub clock error: %s: %u: %s", domain, code, message);
-                      }
+                    warning ("hub clock error: %s: %u: %s", domain, code, message);
+                  }
 
-                    peer_mutex.unlock ();
-                  });
+                peer_mutex.unlock ();
+              });
 
-              if (value_mutex.trylock ())
+          if (value_mutex.trylock ())
 
-                value_step.begin (hub, cancellable, (o, res) =>
+            value_step.begin (cancellable, (o, res) =>
+              {
+                try { ((Clock) o).value_step.end (res); } catch (GLib.Error e)
                   {
-                    try { ((Clock) o).value_step.end (res); } catch (GLib.Error e)
-                      {
-                        unowned var code = e.code;
-                        unowned var domain = e.domain.to_string ();
-                        unowned var message = e.message.to_string ();
+                    unowned var code = e.code;
+                    unowned var domain = e.domain.to_string ();
+                    unowned var message = e.message.to_string ();
 
-                        warning ("hub clock error: %s: %u: %s", domain, code, message);
-                      }
+                    warning ("hub clock error: %s: %u: %s", domain, code, message);
+                  }
 
-                    value_mutex.unlock ();
-                  });
-            }
+                value_mutex.unlock ();
+              });
+
           return GLib.Source.CONTINUE;
         }
     }

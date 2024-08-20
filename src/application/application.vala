@@ -22,15 +22,17 @@ namespace ScrapperD
   public abstract class Application : GLib.Application
     {
       private Advertise.Clock? adv_clock = null;
-      private Advertise.Peeker? adv_peeker = null;
       private Advertise.Hub adv_hub;
-      public Kademlia.DBus.NetworkHub hub { get; private construct; }
+      private Advertise.Peeker? adv_peeker = null;
+      protected Kademlia.DBus.Clock peer_clock;
+      protected Kademlia.DBus.NetworkHub peer_hub;
 
       construct
         {
           adv_hub = new Advertise.Hub ();
           adv_peeker = new Advertise.Peeker (adv_hub);
-          hub = new Kademlia.DBus.NetworkHub ();
+          peer_hub = new Kademlia.DBus.NetworkHub ();
+          peer_clock = new Kademlia.DBus.Clock (peer_hub);
 
           adv_hub.ensure_protocol (typeof (Kademlia.Ad.Protocol));
 
@@ -72,7 +74,7 @@ namespace ScrapperD
               string option_s;
               GLib.VariantIter iter;
 
-              Advertise.Channel? ipv4_channel = null;
+              Advertise.Ipv4Channel? ipv4_channel = null;
 
               var addresses = new GLib.SList<string> ();
               var advertise = true;
@@ -150,7 +152,7 @@ namespace ScrapperD
                   addresses.prepend ((owned) option_s);
                 }
 
-              try { yield hub.add_local_address ("localhost", port, cancellable); } catch (GLib.Error e)
+              try { peer_hub.add_local_port (port, cancellable); } catch (GLib.Error e)
                 {
                   good = false;
                   cmdline.printerr ("can not listen on localhost: %s: %u: %s\n", e.domain.to_string (), e.code, e.message);
@@ -158,7 +160,7 @@ namespace ScrapperD
                   break;
                 }
 
-              foreach (unowned var address in addresses) try { yield hub.add_local_address (address, port, cancellable); } catch (GLib.Error e)
+              foreach (unowned var address in addresses) try { yield peer_hub.add_local_address (address, port, cancellable); } catch (GLib.Error e)
                 {
                   good = false;
                   cmdline.printerr ("can not listen on localhost: %s: %u: %s\n", e.domain.to_string (), e.code, e.message);
@@ -168,7 +170,7 @@ namespace ScrapperD
 
               if (unlikely (good == false)) break;
 
-              if (advertise) try { ipv4_channel = new Advertise.Ipv4Channel (advertise_port); } catch (GLib.Error e)
+              if (advertise) try { (ipv4_channel = new Advertise.Ipv4Channel ()).bind_any_port (advertise_port); } catch (GLib.Error e)
                 {
                   good = false;
                   cmdline.printerr ("can not create advertising channel: %s: %u: %s\n", e.domain.to_string (), e.code, e.message);
@@ -186,7 +188,7 @@ namespace ScrapperD
 
               var default_port = Kademlia.DBus.NetworkHub.DEFAULT_PORT;
 
-              foreach (unowned var host_and_port in entries) try { yield hub.join_at (host_and_port, default_port, null, cancellable); } catch (GLib.Error e)
+              foreach (unowned var host_and_port in entries) try { yield peer_hub.join_at (host_and_port, default_port, null, cancellable); } catch (GLib.Error e)
                 {
                   var address = host_and_port;
                   try { address = GLib.NetworkAddress.parse (host_and_port, default_port).to_string (); } catch (GLib.Error e) { }
@@ -201,10 +203,10 @@ namespace ScrapperD
 
               unowned Kademlia.Key? local_key;
               unowned Kademlia.DBus.Hub.Local? local_var;
-              var iter2 = HashTableIter<Kademlia.Key, Kademlia.DBus.Hub.Local?> (hub.locals);
+              var iter2 = HashTableIter<Kademlia.Key, Kademlia.DBus.Hub.Local?> (peer_hub.locals);
               var ar = new GenericArray<Kademlia.DBus.Address?> ();
 
-              foreach (unowned var address in hub.list_local_addresses ())
+              foreach (unowned var address in peer_hub.list_local_addresses ())
                 {
                   ar.add (address);
                 }
@@ -219,7 +221,7 @@ namespace ScrapperD
                 }
 
               hold ();
-              hub.start ();
+              peer_hub.start ();
 
               if (advertise)
                 {
@@ -247,7 +249,7 @@ namespace ScrapperD
           requires (proto.addresses != null)
           requires (proto.role != null)
         {
-          Kademlia.Ad.join.begin (hub, proto, null, (o, res) =>
+          Kademlia.Ad.join.begin (peer_hub, proto, null, (o, res) =>
             {
               try { Kademlia.Ad.join.end (res); } catch (GLib.Error e)
                 {
@@ -266,6 +268,7 @@ namespace ScrapperD
         {
           adv_clock?.stop ();
           adv_peeker?.stop ();
+          peer_clock?.stop ();
           base.shutdown ();
         }
 

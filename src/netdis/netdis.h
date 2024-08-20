@@ -14,29 +14,9 @@
  * You should have received a copy of the GNU General Public License
  * along with ScrapperD. If not, see <http://www.gnu.org/licenses/>.
  */
+#ifndef __NETDIS__
+#define __NETDIS__ 1
 
-[CCode (cprefix = "ScrapperdStorage", lower_case_cprefix = "scrapperd_storage_")]
+#include "interface.h"
 
-namespace ScrapperD.Storage
-{
-  const string APPID = "org.hck.ScrapperD.Storage";
-
-  public sealed class Application : ScrapperD.Application
-    {
-
-      public Application ()
-        {
-          base (APPID, GLib.ApplicationFlags.NON_UNIQUE);
-        }
-
-      public static int main (string[] argv)
-        {
-          return (new Application ()).run (argv);
-        }
-
-      protected override async void register_peers () throws GLib.Error
-        {
-          peer_hub.add_local_peer ("storage", new Kademlia.DBus.PeerImpl (new Store ()));
-        }
-    } 
-}
+#endif // __NETDIS__

@@ -15,8 +15,8 @@
  * along with ScrapperD. If not, see <http://www.gnu.org/licenses/>.
  */
 #include <config.h>
+#include <interface.h>
 #include <netconf.h>
-#include <netifaces.h>
 #include <glib-unix.h>
 
 #include <sys/types.h>
@@ -166,15 +166,15 @@ static void catch (GError** error, int e)
   g_set_error_literal (error, domain, code, message);
 }
 
-static AdvNetIfacesInfo** expand (GHashTable* set)
+static NdInterfaceInfo** expand (GHashTable* set)
 {
   GList* list = NULL;
   GList* link = NULL;
-  AdvNetIfacesInfo** array = NULL;
+  NdInterfaceInfo** array = NULL;
   guint i, length;
 
   length = g_hash_table_size (set);
-  array = g_new0 (AdvNetIfacesInfo*, 1 + length);
+  array = g_new0 (NdInterfaceInfo*, 1 + length);
 
   for (link = (list = g_hash_table_get_values (set)), i = 0; i < length; link = link->next, ++i)
 
@@ -247,9 +247,9 @@ static GSocketAddress* extract_addr (struct sockaddr* addr)
 
 #define APPEND_FIELD(var,expr) G_STMT_START { if ((var) == NULL) { var = (expr); } } G_STMT_END
 
-AdvNetIfacesInfo** adv_net_ifaces_enumerate (GSocketFamily family, GError** error)
+NdInterfaceInfo** nd_interface_enumerate (GSocketFamily family, GError** error)
 {
-  AdvNetIfacesInfo* info;
+  NdInterfaceInfo* info;
   gchar* name;
   GHashTable* set;
 #if defined(HAVE_GETIFADDRS)
@@ -257,7 +257,7 @@ AdvNetIfacesInfo** adv_net_ifaces_enumerate (GSocketFamily family, GError** erro
   struct ifaddrs* addrs = NULL;
   int e;
 
-  const GDestroyNotify dd = (GDestroyNotify) adv_net_ifaces_info_free;
+  const GDestroyNotify dd = (GDestroyNotify) nd_interface_info_free;
 
   if ((e = getifaddrs (&addrs)), G_UNLIKELY (e < 0))
 
@@ -275,7 +275,7 @@ AdvNetIfacesInfo** adv_net_ifaces_enumerate (GSocketFamily family, GError** erro
           if ((info = g_hash_table_lookup (set, addr->ifa_name)) == NULL)
             {
               name = g_strdup (addr->ifa_name);
-              info = g_slice_new0 (AdvNetIfacesInfo);
+              info = g_slice_new0 (NdInterfaceInfo);
 
               g_hash_table_insert (set, info->name = name, info);
             }
