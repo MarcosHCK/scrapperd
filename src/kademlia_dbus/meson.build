@@ -22,7 +22,7 @@ libkademlia_dbus = library \
     dependencies : libglib_vapis + \
       [
         libgio_dep, libglib_dep, libgobject_dep,
-        libgvalr_dep, netdis
+        libgvalr_dep, libnetdis_dep,
       ],
 
     include_directories : [ configdir ] + libdirs,
