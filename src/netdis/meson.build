@@ -128,9 +128,6 @@ libnetdis = library \
     include_directories : [ configdir ] + libdirs,
 
     install : true,
-    install_dir : private_libdir,
-    install_rpath : private_libdir,
-
     sources : [ 'interface.c', 'interface.h', netconf_h, 'netdis.h' ],
   )
 
