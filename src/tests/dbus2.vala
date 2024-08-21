@@ -31,8 +31,10 @@ namespace Testing
       return GLib.Test.run ();
     }
 
-  public class TestHub : Hub, PeerProvider
+  public class TestHub : GLib.Object, PeerProvider
     {
+      private AddressService address_service;
+      private RoleService role_service;
 
       class DummyRoleService : RoleService
         {
@@ -47,12 +49,15 @@ namespace Testing
             }
         }
 
+      ~TestHub ()
+        {
+          role_service.drop_all ();
+        }
+
       public TestHub (int min_nodes = 100, int max_nodes = 1000)
         {
-          var address_service = new AddressService ();
-          var role_service = new DummyRoleService (address_service);
-
-          Object (address_service : address_service, role_service : role_service);
+          address_service = new AddressService ();
+          role_service = new DummyRoleService (address_service);
 
           unowned AddressProvider address_provider = address_service;
           unowned AddressRegistry address_registry = address_service;
@@ -104,7 +109,7 @@ namespace Testing
 
       public async ValuePeer pick_any ()
         {
-          try { return yield create_proxy ("testing"); } catch (GLib.Error e)
+          try { return yield role_service.create_proxy ("testing"); } catch (GLib.Error e)
             {
               assert_no_error (e);
               assert_not_reached ();

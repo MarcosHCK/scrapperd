@@ -22,34 +22,40 @@ namespace Kademlia.DBus
   public class Hub : GLib.Object
     {
       public AddressService address_service { get; construct; }
-      public RoleService role_service { get; construct; }
+      public SocketRoleService role_service { get; construct; }
+
+      construct
+        {
+          address_service = new AddressService ();
+          role_service = new SocketRoleService (address_service);
+        }
 
       ~Hub ()
         {
           role_service.drop_all ();
         }
 
-      public async ValuePeer create_proxy (string role, GLib.Cancellable? cancellable = null) throws GLib.Error
+      public async void add_local_address (string host_and_port, uint16 default_port, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
-          unowned AddressProvider address_provider = address_service;
-          unowned AddressRegistry address_registry = address_service;
-          unowned RoleProvider role_provider = role_service;
-          unowned RoleRegistry role_registry = role_service;
-          var peers = (Key[]) role_service.remotes ();
-          var proxy = new PeerImplProxy (address_provider, null, address_registry, role_provider, role_registry);
-          foreach (unowned var to in peers) yield proxy.join (to, cancellable);
-          return proxy;
+          var network_address = GLib.NetworkAddress.parse (host_and_port, default_port);
+          var address_enumerator = network_address.enumerate ();
+          var address = (GLib.SocketAddress?) null;
+
+          while ((address = yield address_enumerator.next_async (cancellable)) != null)
+            {
+              var protocol = GLib.SocketProtocol.TCP;
+              var type = GLib.SocketType.STREAM;
+
+              role_service.listen_on_address (address, type, protocol);
+            }
         }
 
-      public async bool join (Key id, string role, GLib.Cancellable? cancellable = null) throws GLib.Error
+      public void add_local_port (uint16 port, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
-          var locals = new List<unowned Local?> ();
-          int any = 0;
-
-          role_service.foreach_local ((i, r, p) => locals.append (Local (r, p)));
-
-          foreach (unowned var local in locals) if (local.role == role) any += (yield local.peer.join (id, cancellable)) ? 1 : 0;
-          return any > 0;
+          role_service.listen_on_port (port, cancellable);
         }
+
+      public void start () { role_service.start (); }
+      public void stop () { role_service.stop (); }
     }
 }

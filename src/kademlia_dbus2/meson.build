@@ -45,7 +45,8 @@ libkademlia_dbus2 = library \
         'refs.vala',
         'roleprovider.vala',
         'roleregistry.vala',
-        'roleservice.vala'
+        'roleservice.vala',
+        'socketroleservice.vala',
       ]
   )
 

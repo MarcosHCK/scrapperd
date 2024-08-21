@@ -23,6 +23,5 @@ namespace Kademlia.DBus
     {
       public abstract Key[] locals ();
       public abstract async Role lookup (Key id, GLib.Cancellable? cancellable = null) throws GLib.Error;
-      public abstract Key[] remotes ();
     }
 }

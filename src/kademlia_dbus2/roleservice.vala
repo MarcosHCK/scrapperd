@@ -69,6 +69,31 @@ namespace Kademlia.DBus
           lock (roles) roles.insert (id.copy (), role);
         }
 
+      public async ValuePeer create_proxy (string role, GLib.Cancellable? cancellable = null) throws GLib.Error
+        {
+          Key[] peers;
+          PeerImplProxy proxy;
+          unowned AddressProvider address_provider = address_service;
+          unowned AddressRegistry address_registry = address_service;
+          unowned RoleProvider role_provider = this;
+          unowned RoleRegistry role_registry = this;
+
+          lock (roles)
+            {
+              var ar = new Array<Key> ();
+              var iter = HashTableIter<Key, Role> (roles);
+              unowned Key id;
+
+              while (iter.next (out id, null)) ar.append_val (id.copy ());
+              peers = ar.steal ();
+            }
+
+          proxy = new PeerImplProxy (address_provider, null, address_registry, role_provider, role_registry);
+
+          foreach (unowned var to in peers) yield proxy.join (to, cancellable);
+          return proxy;
+        }
+
       public void LocalRegistry.drop (Key id)
         {
           lock (locals) locals.remove (id);
@@ -99,6 +124,16 @@ namespace Kademlia.DBus
       public bool has_local (Key id)
         {
           lock (locals) return locals.contains (id);
+        }
+
+      public async bool join (Key id, string role, GLib.Cancellable? cancellable = null) throws GLib.Error
+        {
+          var locals_ = new List<Local?> ();
+          int any = 0;
+
+          lock (locals) foreach (unowned var local in locals.get_values ()) locals_.append (local);
+          foreach (unowned var local in locals_) if (local.role == role) any += (yield local.peer.join (id, cancellable)) ? 1 : 0;
+          return any > 0;
         }
 
       public Key[] RoleProvider.locals ()
@@ -224,19 +259,6 @@ namespace Kademlia.DBus
             }
 
           return false;
-        }
-
-      public Key[] remotes ()
-        {
-          lock (roles)
-            {
-              var ar = new Array<Key> ();
-              var iter = HashTableIter<Key, Role> (roles);
-              unowned Key id;
-
-              while (iter.next (out id, null)) ar.append_val (id.copy ());
-              return ar.steal ();
-            }
         }
     }
 }
