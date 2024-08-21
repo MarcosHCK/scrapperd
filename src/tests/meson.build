@@ -25,8 +25,6 @@ tests = \
     { 'description' : 'Krypt stream implementation', 'files' : [ 'krypt.vala' ], 'libs' : [ libkrypt ],
       'timeout' : 50 },
     { 'description' : 'Kademlia buckets tests', 'files' : [ 'buckets.vala' ], 'libs' : [ libkademlia ] },
-    { 'description' : 'Kademlia DBus hub tests', 'files' : [ 'hub.vala', 'baseintegration.vala' ], 'libs' : [ libkademlia, libkademlia_dbus ],
-      'timeout' : 70, 'deps' : [ libgvalr_dep ] },
     { 'description' : 'Kademlia DBus2 tests', 'files' : [ 'dbus2.vala', 'baseintegration.vala' ], 'libs' : [ libkademlia, libkademlia_dbus2 ],
       'timeout' : 70, 'deps' : [ libgvalr_dep ] },
     { 'description' : 'Kademlia integration tests', 'files' : [ 'integration.vala', 'baseintegration.vala' ], 'libs' : [ libkademlia ],
