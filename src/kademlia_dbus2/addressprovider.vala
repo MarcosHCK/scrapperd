@@ -44,6 +44,7 @@ namespace Kademlia.DBus
 
   public interface AddressProvider : GLib.Object
     {
+      public abstract bool has (Key id);
       public abstract Address[] locals ();
       public abstract Address[] lookup (Key id);
     }

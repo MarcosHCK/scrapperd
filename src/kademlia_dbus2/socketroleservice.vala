@@ -35,12 +35,10 @@ namespace Kademlia.DBus
 
   public class SocketRoleService : RoleService
     {
-      private GenericSet<GLib.DBusConnection> connections;
       private GLib.ThreadedSocketService socket_service;
 
       construct
         {
-          connections = new GenericSet<DBusConnection> (GLib.direct_hash, GLib.direct_equal);
           socket_service = new ThreadedSocketService ((int) GLib.get_num_processors ());
 
           socket_service.stop ();
@@ -73,12 +71,6 @@ namespace Kademlia.DBus
           return (owned) proxy;
         }
 
-      public new void drop_all ()
-        {
-          foreach (unowned var connection in connections.get_values ()) connection.close.begin ();
-          base.drop_all ();
-        }
-
       public async bool join_at (string host_and_port, uint16 default_port, string? role, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
           unowned RoleProvider role_provider = this;
@@ -97,16 +89,6 @@ namespace Kademlia.DBus
             }
 
           return any > 0;
-        }
-
-      static void on_closed (GLib.DBusConnection dbus, RegIds? regids)
-        {
-          foreach (unowned var regid in regids.role_regids)
-
-            dbus.unregister_object (regid);
-            dbus.unregister_object (regids.node_regid);
-
-          dbus.stream.close_async.begin ();
         }
 
       private bool on_incoming (GLib.SocketConnection socket_connection, GLib.Object? source_object)
@@ -170,43 +152,14 @@ namespace Kademlia.DBus
             
             if ((info.address is GLib.InetSocketAddress) == false)
 
-                address_service.add (null, new Address [] { Address (info.address.to_string (), port) });
-              else
-                {
-                  var inet_address = ((GLib.InetSocketAddress) info.address).address;
-                  address_service.add (null, new Address [] { Address (inet_address.to_string (), port) });
-                }
+              address_service.add (null, new Address [] { Address (info.address.to_string (), port) });
+            else
+              {
+                var inet_address = ((GLib.InetSocketAddress) info.address).address;
+                address_service.add (null, new Address [] { Address (inet_address.to_string (), port) });
+              }
 
           socket_service.add_inet_port (port, null);
-        }
-
-      private async bool prepare_connection (GLib.DBusConnection dbus, GLib.Cancellable? cancellable = null) throws GLib.Error
-        {
-          unowned AddressProvider address_provider = address_service;
-          unowned AddressRegistry address_registry = address_service;
-          unowned string object_path = Node.BASE_PATH;
-          unowned RoleProvider role_provider = this;
-
-          var node = new NodeSkeleton (address_provider, role_provider);
-          var node_regid = dbus.register_object<Node> (object_path, node);
-          var role_regids = new Array<uint> ();
-
-          foreach_local ((id, role, value_peer) =>
-            {
-              var rol = new RoleSkeleton (address_provider, address_registry, role, role_provider, value_peer);
-              var regid = dbus.register_object<Role> (@"$(Node.BASE_PATH)/$id", rol);
-              role_regids.append_val (regid);
-            });
-
-          var regids = RegIds (node_regid, role_regids.steal ());
-
-          dbus.on_closed.connect ((c, a, b) =>
-            {
-              connections.remove (c);
-              on_closed (c, regids);
-            });
-
-          return connections.add (dbus);
         }
 
       protected override async Node? reach (Address? address, GLib.Cancellable? cancellable = null) throws GLib.Error
@@ -240,30 +193,6 @@ namespace Kademlia.DBus
           socket_client.type = GLib.SocketType.STREAM;
 
           return yield socket_client.connect_to_host_async (host_and_port, default_port, cancellable);
-        }
-
-      private async Node? register_connection (GLib.DBusConnection dbus, GLib.Cancellable? cancellable = null) throws GLib.Error
-        {
-          unowned AddressRegistry address_registry = address_service;
-          unowned RoleRegistry role_registry = this;
-          unowned var object_path = Node.BASE_PATH;
-
-          var any = false;
-          var node = yield dbus.get_proxy<Node> (null, object_path, 0, cancellable);
-          var addresses = yield node.list_addresses (cancellable);
-          var keyrefs = yield node.list_ids (cancellable);
-
-          foreach (unowned var keyref in keyrefs)
-            {
-              var id = new Key.verbatim (keyref.value);
-              var role = (Role) yield dbus.get_proxy<Role> (null, @"$object_path/$id", 0, cancellable);
-
-              address_registry.add (id, addresses);
-              role_registry.add (id, role);
-              any = true;
-            }
-
-          return any == false ? null : (owned) node;
         }
 
       public void start () { socket_service.start (); }

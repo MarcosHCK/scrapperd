@@ -50,6 +50,19 @@ namespace Kademlia.DBus
             }
         }
 
+      public void add_local_peer (string role, Key? id, ValueStore value_store)
+        {
+          unowned AddressProvider address_provider = address_service;
+          unowned AddressRegistry address_registry = address_service;
+          unowned LocalRegistry local_registry = role_service;
+          unowned RoleProvider role_provider = role_service;
+          unowned RoleRegistry role_registry = role_service;
+          var peer = new PeerImpl (address_provider, id, address_registry, role_provider, role_registry, value_store);
+
+          debug ("exposing peer %s:%s", role, peer.id.to_string ());
+          local_registry.add (role, peer);
+        }
+
       public void add_local_port (uint16 port, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
           role_service.listen_on_port (port, cancellable);

@@ -35,7 +35,7 @@ scrapperd_viewer_support = library \
     install_dir : private_libdir,
     install_rpath : private_libdir,
 
-    link_with : [ libkademlia, libkademlia_dbus ],
+    link_with : [ libkademlia, libkademlia_dbus2 ],
 
     sources :
       [
@@ -65,7 +65,7 @@ executable \
     install_dir : private_bindir,
     install_rpath : private_libdir,
 
-    link_with : [ libadvertise, libkademlia, libkademlia_ad, libkademlia_dbus, scrapperd_viewer_support ],
+    link_with : [ libadvertise, libkademlia, libkademlia_ad, libkademlia_dbus2, scrapperd_viewer_support ],
 
     sources :
       [

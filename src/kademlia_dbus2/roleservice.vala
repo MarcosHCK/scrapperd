@@ -42,14 +42,16 @@ namespace Kademlia.DBus
       public extern static GLib.Quark quark ();
     }
 
-  public abstract class RoleService : GLib.Object, LocalRegistry, RoleProvider, RoleRegistry
+  public abstract class RoleService : GLib.Object, LocalProvider, LocalRegistry, RoleProvider, RoleRegistry
     {
       public AddressService address_service { get; construct; }
+      private GenericSet<GLib.DBusConnection> connections;
       private GLib.HashTable<Key, Local?> locals;
       private GLib.HashTable<Key, Role> roles;
 
       construct
         {
+          connections = new GenericSet<DBusConnection> (GLib.direct_hash, GLib.direct_equal);
           locals = new HashTable<Key, Local?> (Key.hash, Key.equal);
           roles = new HashTable<Key, Role> (Key.hash, Key.equal);
         }
@@ -106,6 +108,8 @@ namespace Kademlia.DBus
 
       public void drop_all ()
         {
+          lock (connections) foreach (unowned var connection in connections.get_values ()) connection.close.begin ();
+          lock (locals) locals.remove_all ();
           lock (roles) roles.remove_all ();
         }
 
@@ -121,7 +125,7 @@ namespace Kademlia.DBus
             }
         }
 
-      public bool has_local (Key id)
+      public bool LocalProvider.has (Key id)
         {
           lock (locals) return locals.contains (id);
         }
@@ -149,7 +153,12 @@ namespace Kademlia.DBus
             }
         }
 
-      public async Role lookup (Key id, GLib.Cancellable? cancellable = null) throws GLib.Error
+      public PeerImpl? LocalProvider.lookup (Key id)
+        {
+          lock (locals) return locals.lookup (id)?.peer;
+        }
+
+      public async Role RoleProvider.lookup (Key id, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
           Role? role;
           Local? local;
@@ -185,17 +194,58 @@ namespace Kademlia.DBus
           throw new PeerError.UNREACHABLE ("can not reach node %s", id.to_string ());
         }
 
+      static void on_closed (GLib.DBusConnection dbus, RegIds? regids)
+        {
+          foreach (unowned var regid in regids.role_regids)
+
+            dbus.unregister_object (regid);
+            dbus.unregister_object (regids.node_regid);
+
+          dbus.stream.close_async.begin ();
+        }
+
       public Role? pick (Key id)
         {
           lock (roles) return roles.lookup (id);
         }
 
+      protected async bool prepare_connection (GLib.DBusConnection dbus, GLib.Cancellable? cancellable = null) throws GLib.Error
+        {
+          unowned AddressProvider address_provider = address_service;
+          unowned AddressRegistry address_registry = address_service;
+          unowned string object_path = Node.BASE_PATH;
+          unowned RoleProvider role_provider = this;
+
+          var node = new NodeSkeleton (address_provider, role_provider);
+          var node_regid = dbus.register_object<Node> (object_path, node);
+          var role_regids = new Array<uint> ();
+
+          foreach_local ((id, role, value_peer) =>
+            {
+              var rol = new RoleSkeleton (address_provider, address_registry, role, role_provider, value_peer);
+              var regid = dbus.register_object<Role> (@"$(Node.BASE_PATH)/$id", rol);
+              role_regids.append_val (regid);
+            });
+
+          var regids = RegIds (node_regid, role_regids.steal ());
+
+          lock (connections) connections.add (dbus);
+
+          dbus.on_closed.connect ((c, a, b) =>
+            {
+              lock (connections) connections.remove (c);
+              on_closed (c, regids);
+            });
+
+          return true;
+        }
+
       public abstract async Node? reach (Address? address, GLib.Cancellable? cancellable = null) throws GLib.Error;
 
-      protected virtual async bool reconnect (Key id, GLib.Cancellable? cancellable = null) throws GLib.Error
+      protected virtual async bool reconnect (Key id_, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
-          var address = address_service.pick (id);
-          var prevrole = pick (id)?.role;
+          var address = address_service.pick (id_);
+          var id = id_.copy ();
 
           if (unlikely (address == null))
             {
@@ -206,38 +256,12 @@ namespace Kademlia.DBus
           else try
             {
               if (unlikely (null == yield reach (address, cancellable)))
-                {
-                  if (unlikely (prevrole == null))
-                    {
-                      throw new PeerError.UNREACHABLE ("peer has no roles %s", id.to_string ());
-                    }
-                  else if (prevrole != pick (id)?.role)
-                    {
-                      debug ("peer registered as %s, vanished", id.to_string ());
-                      throw new NetworkError.RESETTED ("peer vanished %s:%s", prevrole, id.to_string ());
-                    }
-                }
-              else
-                {
-                  var role = (Role?) pick (id);
-                  var newid = new Key.verbatim (role.id.value);
 
-                  if (unlikely (Key.equal (id, newid) == false || (prevrole != null && prevrole != role.role)))
-                    {
+                throw new PeerError.UNREACHABLE ("peer could not be reached %s", id.to_string ());
+              else if (unlikely (pick (id) == null))
 
-                      if (Key.equal (id, newid) == false)
-
-                        debug ("peer registered as %s, id changed to %s", id.to_string (), newid.to_string ());
-
-                      else if (prevrole != null && prevrole != role.role)
-
-                        debug ("peer registered role was %s, changed to %s", prevrole, role.role);
-
-                      throw new NetworkError.RESETTED ("peer role was resetted (maybe address collision?)");
-                    }
-
-                  return true;
-                }
+                throw new NetworkError.RESETTED ("peer vanished %s", id.to_string ());
+              return true;
             }
           catch (GLib.Error e)
             {
@@ -249,6 +273,7 @@ namespace Kademlia.DBus
                     case GLib.IOError.HOST_UNREACHABLE:
                     case GLib.IOError.NETWORK_UNREACHABLE:
 
+                      debug ("could not reach using %s:%u %s", address.address, (uint) address.port, id.to_string ());
                       address_service.drop (id, new Address [] { address });
                       break;
 
@@ -259,6 +284,28 @@ namespace Kademlia.DBus
             }
 
           return false;
+        }
+
+      protected async Node? register_connection (GLib.DBusConnection dbus, GLib.Cancellable? cancellable = null) throws GLib.Error
+        {
+          unowned AddressRegistry address_registry = address_service;
+          unowned RoleRegistry role_registry = this;
+          unowned var object_path = Node.BASE_PATH;
+
+          var node = yield dbus.get_proxy<Node> (null, object_path, 0, cancellable);
+          var addresses = yield node.list_addresses (cancellable);
+          var keyrefs = yield node.list_ids (cancellable);
+
+          foreach (unowned var keyref in keyrefs)
+            {
+              var id = new Key.verbatim (keyref.value);
+              var role = (Role) yield dbus.get_proxy<Role> (null, @"$object_path/$id", 0, cancellable);
+
+              address_registry.add (id, addresses);
+              role_registry.add (id, role);
+            }
+
+          return keyrefs.length == 0 ? null : (owned) node;
         }
     }
 }

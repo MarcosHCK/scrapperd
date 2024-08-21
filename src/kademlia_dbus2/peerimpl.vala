@@ -32,6 +32,13 @@ namespace Kademlia.DBus
       public RoleProvider role_provider { get; construct; }
       public RoleRegistry role_registry { get; construct; }
 
+      construct
+        {
+          added_contact.connect ((k) => debug ("added contact %s:(%s)", k.to_string (), id.to_string ()));
+          dropped_contact.connect ((k) => debug ("dropped contact %s:(%s)", k.to_string (), id.to_string ()));
+          staled_contact.connect ((k) => debug ("staled contact %s:(%s)", k.to_string (), id.to_string ()));
+        }
+
       public PeerImpl (AddressProvider address_provider, Key? id, AddressRegistry address_registry, RoleProvider role_provider, RoleRegistry role_registry, ValueStore value_store)
         {
           Object (address_provider : address_provider, address_registry : address_registry, id : id, role_provider : role_provider, role_registry : role_registry, value_store : value_store);
@@ -49,6 +56,19 @@ namespace Kademlia.DBus
 
                   debug ("contact lost %s (I/O layer error)", peer.to_string ());
                   role_registry.drop (peer);
+                  return;
+              }
+
+          else if (e.domain == NetworkError.quark ())
+
+            switch (e.code)
+              {
+                case NetworkError.RESETTED:
+
+                  debug ("contact lost %s (network layer error)", peer.to_string ());
+
+                  address_registry.drop (id, address_provider.lookup (id));
+                  role_registry.drop (id);
                   return;
               }
 

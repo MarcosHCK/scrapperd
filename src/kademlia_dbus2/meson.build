@@ -37,6 +37,7 @@ libkademlia_dbus2 = library \
         'addressservice.vala',
         'clock.vala',
         'hub.vala',
+        'localprovider.vala',
         'localregistry.vala',
         'node.vala',
         'nodeskeleton.vala',

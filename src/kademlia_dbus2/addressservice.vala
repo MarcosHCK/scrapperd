@@ -21,29 +21,29 @@ namespace Kademlia.DBus
 {
   public class AddressService : GLib.Object, AddressProvider, AddressRegistry
     {
-      private GenericSet<Address?> addresses;
-      private GLib.HashTable<Key, GenericSet<Address?>> contacts;
+      private GenericSet<Address?> locals;
+      private GLib.HashTable<Key, GenericSet<Address?>> roles;
 
       construct
         {
-          addresses = new GenericSet<Address?> (Address.hash, Address.equal);
-          contacts = new HashTable<Key, GenericSet<Address?>> (Key.hash, Key.equal);
+          locals = new GenericSet<Address?> (Address.hash, Address.equal);
+          roles = new HashTable<Key, GenericSet<Address?>> (Key.hash, Key.equal);
         }
 
-      public void AddressRegistry.add (Key? id, Address[] addresses_)
+      public void AddressRegistry.add (Key? id, Address[] addresses)
         {
-          if (id == null) lock (addresses)
+          if (id == null) lock (locals)
             {
-              foreach (unowned var addr in addresses_) addresses.add (addr);
+              foreach (unowned var addr in addresses) locals.add (addr);
             }
-          else lock (contacts)
+          else lock (roles)
             {
               unowned GLib.EqualFunc<Address?> equal_func = Address.equal;
               unowned GLib.HashFunc<Address?> hash_func = Address.hash;
               GenericSet<Address?> older;
               Key oldkey;
 
-              if (contacts.steal_extended (id, out oldkey, out older) == false)
+              if (roles.steal_extended (id, out oldkey, out older) == false)
                 {
                   oldkey = id.copy ();
                   older = new GenericSet<Address?> (hash_func, equal_func);
@@ -53,46 +53,46 @@ namespace Kademlia.DBus
 
                 older.add (address);
 
-              contacts.insert ((owned) oldkey, (owned) older);
+              roles.insert ((owned) oldkey, (owned) older);
             }
         }
 
-      public void AddressRegistry.drop (Key? id, Address[] addresses_)
+      public void AddressRegistry.drop (Key? id, Address[] addresses)
         {
-          if (id == null) lock (addresses)
-            {
-              foreach (unowned var addr in addresses_) addresses.remove (addr);
-            }
-          else lock (contacts)
-            {
-              GenericSet<Address?> addresses;
+          if (id == null)
 
-              if ((addresses = contacts.lookup (id)) != null)
-                {
-                  foreach (unowned var addr in addresses_) addresses.remove (addr);
-                  if (addresses.length == 0) contacts.remove (id);
-                }
-            }
+            lock (locals)
+
+              foreach (unowned var addr in addresses) locals.remove (addr);
+
+          else
+
+            lock (roles)
+              {
+                GenericSet<Address?> old;
+
+                if ((old = roles.lookup (id)) != null)
+                  {
+                    foreach (unowned var addr in addresses) old.remove (addr);
+                    if (old.length == 0) roles.remove (id);
+                  }
+              }
         }
 
-      public bool has_contact (Key id)
+      public bool has (Key id)
         {
-          lock (contacts) return contacts.contains (id);
+          lock (roles) return roles.contains (id);
         }
 
       public Address[] AddressProvider.locals ()
         {
-          lock (addresses)
+          lock (locals)
             {
               var addr = (Address?) null;
-              var ar = (Address[]) new Address [addresses.length];
-              var iter = (GenericSetIter<Address?>) addresses.iterator ();
-              int i = 0;
+              var ar = (Address[]) new Address [locals.length];
+              var iter = (GenericSetIter<Address?>) locals.iterator ();
 
-              while ((addr = iter.next_value ()) != null)
-
-                ar [i++] = addr;
-
+              for (int i = 0; (addr = iter.next_value ()) != null; ++i) ar [i] = addr;
               return (owned) ar;
             }
         }
@@ -101,28 +101,30 @@ namespace Kademlia.DBus
         {
           GenericSet<Address?> addresses;
 
-          lock (contacts) if ((addresses = contacts.lookup (id)) != null)
-            {
-              var addr = (Address?) null;
-              var ar = (Address[]) new Address [addresses.length];
-              var iter = (GenericSetIter<Address?>) addresses.iterator ();
-              int i = 0;
+          lock (roles)
 
-              while ((addr = iter.next_value ()) != null)
+            if ((addresses = roles.lookup (id)) != null)
+              {
+                var addr = (Address?) null;
+                var ar = (Address[]) new Address [addresses.length];
+                var iter = (GenericSetIter<Address?>) addresses.iterator ();
+                int i = 0;
 
-                ar [i++] = addr;
+                while ((addr = iter.next_value ()) != null)
 
-              return (owned) ar;
-            }
+                  ar [i++] = addr;
+
+                return (owned) ar;
+              }
 
           return new Address [0];
         }
 
       public Address? pick (Key id)
         {
-          lock (contacts)
+          lock (roles)
             {
-              var addresses = contacts.lookup (id);
+              var addresses = roles.lookup (id);
               var iter = addresses == null ? (GenericSetIter<Address?>?) null : addresses.iterator ();
               return iter == null ? null : iter.next_value ();
             }
