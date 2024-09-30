@@ -19,29 +19,6 @@
 
 namespace Kademlia.DBus
 {
-  public struct Address
-    {
-      public string address;
-      public uint16 port;
-
-      public Address (owned string address, uint16 port)
-        {
-          this.address = (owned) address;
-          this.port = port;
-        }
-
-      public static bool equal (Address? a, Address? b)
-        {
-          return a.port == b.port && GLib.str_equal (a.address, b.address);
-        }
-
-      public static uint hash (Address? a)
-        {
-          int a_ = a.port;
-          return GLib.int_hash (a_) ^ GLib.str_hash (a.address);
-        }
-    }
-
   public struct KeyRef
     {
       public uint8[] value;
@@ -70,18 +47,6 @@ namespace Kademlia.DBus
           this.id = KeyRef ((owned) id);
           this.knowable = false;
         }
-
-      internal Key? know (Hub hub)
-        {
-          Key? id = null;
-
-          if (knowable)
-            {
-              id = new Key.verbatim (this.id.value);
-              hub.add_contact_addresses (id, addresses);
-            }
-          return (owned) id;
-        }
     }
 
   public struct ValueRef
@@ -105,7 +70,9 @@ namespace Kademlia.DBus
 
       public GLib.Value? get_value ()
         {
-          return GValr.net2nat (value);
+          GLib.Value value;
+          GValr.net2nat (out value, this.value);
+          return (owned) value;
         }
     }
 }

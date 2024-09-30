@@ -60,7 +60,7 @@ executable \
     install_dir : private_bindir,
     install_rpath : private_libdir,
 
-    link_with : [ libkademlia, libkademlia_dbus, libscrapperd, libscrapping ],
+    link_with : [ libkademlia, libkademlia_dbus2, libscrapperd, libscrapping ],
 
     sources :
       [

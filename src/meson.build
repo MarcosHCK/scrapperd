@@ -32,7 +32,7 @@ subdir ('gvalr')
 subdir ('krypt')
 subdir ('netdis')
 
-subdir ('kademlia_dbus')
+subdir ('kademlia_dbus2')
 
 subdir ('advertise')
 subdir ('kademlia_ad')

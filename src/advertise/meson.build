@@ -25,7 +25,7 @@ libadvertise = library \
     dependencies : libglib_vapis + \
       [
         libgio_dep, libglib_dep, libgobject_dep, libjson_glib_dep,
-        libjson_glib_vapi, netdis,
+        libjson_glib_vapi, libnetdis_dep,
       ],
 
     include_directories : [ configdir ] + libdirs,

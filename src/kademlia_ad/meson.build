@@ -31,7 +31,7 @@ libkademlia_ad = library \
     install_dir : private_libdir,
     install_rpath : private_libdir,
 
-    link_with : [ libadvertise, libkademlia, libkademlia_dbus ],
+    link_with : [ libadvertise, libkademlia, libkademlia_dbus2 ],
 
     sources :
       [

@@ -26,16 +26,19 @@ namespace Kademlia.Ad
       requires (proto.role != null)
     {
       unowned var id = proto.id;
+      unowned AddressProvider address_provider = hub.address_service;
+      unowned AddressRegistry address_registry = hub.address_service;
+      unowned LocalProvider local_provider = hub.role_service;
 
-      if (hub.has_contact (id) == false && hub.has_local (id) == false)
+      if (address_provider.has (id) == false && local_provider.has (id) == false)
         {
           var addresses = new Address [proto.addresses.length];
           int i = 0;
 
           foreach (unowned var address in proto.addresses) addresses [i++] = address;
-          hub.add_contact_addresses (proto.id, addresses);
+          address_registry.add (proto.id, addresses);
 
-          yield hub.join (id, proto.role, cancellable);
+          yield hub.role_service.join (id, proto.role, cancellable);
         }
       return true;
     }

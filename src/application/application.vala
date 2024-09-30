@@ -25,13 +25,13 @@ namespace ScrapperD
       private Advertise.Hub adv_hub;
       private Advertise.Peeker? adv_peeker = null;
       protected Kademlia.DBus.Clock peer_clock;
-      protected Kademlia.DBus.NetworkHub peer_hub;
+      protected Kademlia.DBus.Hub peer_hub;
 
       construct
         {
           adv_hub = new Advertise.Hub ();
           adv_peeker = new Advertise.Peeker (adv_hub);
-          peer_hub = new Kademlia.DBus.NetworkHub ();
+          peer_hub = new Kademlia.DBus.Hub ();
           peer_clock = new Kademlia.DBus.Clock (peer_hub);
 
           adv_hub.ensure_protocol (typeof (Kademlia.Ad.Protocol));
@@ -81,7 +81,7 @@ namespace ScrapperD
               var advertise_interval = (int) 5000 /* 5 seconds */;
               var advertise_port = (uint16) Advertise.Ipv4Channel.DEFAULT_PORT;
               var entries = new GLib.SList<string> ();
-              var port = (uint16) Kademlia.DBus.NetworkHub.DEFAULT_PORT;
+              var port = (uint16) Kademlia.DBus.DEFAULT_PORT;
 
               if (options.lookup ("address", "as", out iter)) while (iter.next ("s", out option_s))
                 {
@@ -186,9 +186,9 @@ namespace ScrapperD
                   break;
                 }
 
-              var default_port = Kademlia.DBus.NetworkHub.DEFAULT_PORT;
+              var default_port = Kademlia.DBus.DEFAULT_PORT;
 
-              foreach (unowned var host_and_port in entries) try { yield peer_hub.join_at (host_and_port, default_port, null, cancellable); } catch (GLib.Error e)
+              foreach (unowned var host_and_port in entries) try { yield peer_hub.role_service.join_at (host_and_port, default_port, null, cancellable); } catch (GLib.Error e)
                 {
                   var address = host_and_port;
                   try { address = GLib.NetworkAddress.parse (host_and_port, default_port).to_string (); } catch (GLib.Error e) { }
@@ -201,23 +201,29 @@ namespace ScrapperD
 
               if (unlikely (good == false)) break;
 
-              unowned Kademlia.Key? local_key;
-              unowned Kademlia.DBus.Hub.Local? local_var;
-              var iter2 = HashTableIter<Kademlia.Key, Kademlia.DBus.Hub.Local?> (peer_hub.locals);
-              var ar = new GenericArray<Kademlia.DBus.Address?> ();
-
-              foreach (unowned var address in peer_hub.list_local_addresses ())
+              if (true) try
                 {
-                  ar.add (address);
+                  var ar = new GenericArray<Kademlia.DBus.Address?> ();
+
+                  foreach (unowned var address in peer_hub.address_service.locals ())
+                    {
+                      ar.add (address);
+                    }
+
+                  foreach (unowned var id in peer_hub.role_service.locals ())
+                    {
+                      var role = yield ((Kademlia.DBus.RoleProvider) peer_hub.role_service).lookup (id);
+
+                      debug ("advertising node %s:%s", role.role, id.to_string ());
+                      adv_hub.add_protocol (new Kademlia.Ad.Protocol (id, role.role, ar));
+                    }
                 }
-
-              while (iter2.next (out local_key, out local_var))
+              catch (GLib.Error e)
                 {
-                  unowned var id = local_key;
-                  unowned var role = local_var.role;
-
-                  debug ("advertising node %s:%s", role, id.to_string ());
-                  adv_hub.add_protocol (new Kademlia.Ad.Protocol (id, role, ar));
+                  good = false;
+                  cmdline.printerr ("internal error: %s: %u: %s\n", e.domain.to_string (), e.code, e.message);
+                  cmdline.set_exit_status (1);
+                  break;
                 }
 
               hold ();

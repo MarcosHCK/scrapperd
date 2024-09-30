@@ -52,7 +52,7 @@ namespace Kademlia.DBus
       private async void peer_step (Cancellable? cancellable = null) throws GLib.Error
         {
           var locals = new GLib.List<PeerImpl> ();
-          hub.foreach_local ((a, b, peer) => locals.append (peer));
+          hub.role_service.foreach_local ((a, b, peer) => locals.append (peer));
 
           foreach (unowned var peer in locals)
             {
@@ -71,7 +71,7 @@ namespace Kademlia.DBus
       private async void value_step (GLib.Cancellable? cancellable = null) throws GLib.Error
         {
           var locals = new GLib.List<PeerImpl> ();
-          hub.foreach_local ((a, b, peer) => locals.append (peer));
+          hub.role_service.foreach_local ((a, b, peer) => locals.append (peer));
 
           foreach (unowned var peer in locals) foreach (unowned var key in yield peer.value_store.enumerate_staled_values (cancellable))
             {

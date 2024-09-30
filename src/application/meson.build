@@ -31,7 +31,7 @@ libscrapperd = library \
     install_dir : private_libdir,
     install_rpath : private_libdir,
 
-    link_with : [ libadvertise, libkademlia, libkademlia_ad, libkademlia_dbus ],
+    link_with : [ libadvertise, libkademlia, libkademlia_ad, libkademlia_dbus2 ],
 
     sources :
       [

@@ -254,9 +254,16 @@ namespace Testing
               assert_no_error (e);
             }
 
-          for (unowned int i = 0; i < ids.length; ++i) try { assert_cmpvariant (GValr.nat2net (values [i]), GValr.nat2net (yield peer.lookup (ids [i]))); } catch (GLib.Error e)
+          for (unowned int i = 0; i < ids.length; ++i) 
             {
-              assert_no_error (e);
+              GLib.Value? got;
+              try { got = yield peer.lookup (ids [i]); } catch (GLib.Error e)
+                {
+                  assert_no_error (e);
+                  assert_not_reached ();
+                }
+
+              assert_cmpvariant (GValr.nat2net (values [i]), GValr.nat2net (got));
             }
         }
     }

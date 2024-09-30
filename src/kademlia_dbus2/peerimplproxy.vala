@@ -34,11 +34,9 @@ namespace Kademlia.DBus
 
   internal class PeerImplProxy : PeerImpl
     {
-
-      public PeerImplProxy (Hub hub, string role, Key? id = null)
+      public PeerImplProxy (AddressProvider address_provider, Key? id, AddressRegistry address_registry, RoleProvider role_provider, RoleRegistry role_registry)
         {
-          base (new DummyValueStore (), id);
-          this.hub = hub;
+          Object (address_provider : address_provider, address_registry : address_registry, id : id, role_provider : role_provider, role_registry : role_registry, value_store : new DummyValueStore ());
         }
 
       protected override PeerRef get_self ()

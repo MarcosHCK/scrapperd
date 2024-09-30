@@ -19,10 +19,18 @@
 
 namespace Kademlia.DBus
 {
+  public errordomain PeerImplError
+    {
+      FAILED;
+      public extern static GLib.Quark quark ();
+    }
+
   public class PeerImpl : ValuePeer
     {
-      private WeakRef _hub;
-      public Hub hub { owned get { return (Hub) _hub.get (); } internal set { _hub.set (value); } }
+      public AddressProvider address_provider { get; construct; }
+      public AddressRegistry address_registry { get; construct; }
+      public RoleProvider role_provider { get; construct; }
+      public RoleRegistry role_registry { get; construct; }
 
       construct
         {
@@ -31,9 +39,9 @@ namespace Kademlia.DBus
           staled_contact.connect ((k) => debug ("staled contact %s:(%s)", k.to_string (), id.to_string ()));
         }
 
-      public PeerImpl (ValueStore value_store, Key? id = null)
+      public PeerImpl (AddressProvider address_provider, Key? id, AddressRegistry address_registry, RoleProvider role_provider, RoleRegistry role_registry, ValueStore value_store)
         {
-          base (value_store, id);
+          Object (address_provider : address_provider, address_registry : address_registry, id : id, role_provider : role_provider, role_registry : role_registry, value_store : value_store);
         }
 
       private void @catch (Key peer, owned GLib.Error? e) throws GLib.Error
@@ -47,7 +55,7 @@ namespace Kademlia.DBus
                 case GLib.IOError.TIMED_OUT:
 
                   debug ("contact lost %s (I/O layer error)", peer.to_string ());
-                  hub.drop_role (peer);
+                  role_registry.drop (peer);
                   return;
               }
 
@@ -55,54 +63,47 @@ namespace Kademlia.DBus
 
             switch (e.code)
               {
-                case NetworkError.RESETTED_PEER:
+                case NetworkError.RESETTED:
 
                   debug ("contact lost %s (network layer error)", peer.to_string ());
-                  hub.drop_role (peer);
+
+                  address_registry.drop (id, address_provider.lookup (id));
+                  role_registry.drop (id);
                   return;
               }
 
           throw (owned) e;
         }
 
-      private void know (Hub hub, Key peer, PeerRef? @ref)
-        {
-          if (Key.equal (id, peer) == false)
-            {
-              hub.add_contact_addresses (peer, @ref.addresses);
-              this.add_contact (peer);
-            }
-        }
-
       protected virtual PeerRef get_self ()
         {
-          return PeerRef (id.bytes, hub.list_local_addresses ());
+          return PeerRef (id.bytes, address_provider.locals ());
         }
 
-      protected override async Key[] find_peer (Key peer, Key id, GLib.Cancellable? cancellable = null) throws GLib.Error requires (_hub.get () != null)
+      protected override async Key[] find_peer (Key peer, Key id, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
-          while (true) try
+          for (int tries = 0; tries < 3; ++tries) try
             {
-              var hub = this.hub;
-              var role = yield hub.lookup_role (peer, cancellable);
+              var role = yield role_provider.lookup (peer, cancellable);
               var refs = yield role.find_node (get_self (), KeyRef (id.bytes), cancellable);
               var ar = new Key [refs.length];
               for (int i = 0; i < ar.length; ++i) ar [i] = new Key.verbatim (refs [i].id.value);
-              for (int i = 0; i < ar.length; ++i) if (refs [i].knowable) know (hub, ar [i], refs [i]);
+              for (int i = 0; i < ar.length; ++i) if (refs [i].knowable) know (ar [i], refs [i]);
               return (owned) ar;
             }
           catch (GLib.Error e)
             {
               @catch (peer, (owned) e);
             }
+
+          throw new PeerImplError.FAILED ("internal error");
         }
 
-      protected override async Value find_value (Key peer, Key id, GLib.Cancellable? cancellable = null) throws GLib.Error requires (_hub.get () != null)
+      protected override async Value find_value (Key peer, Key id, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
-          while (true) try
+          for (int tries = 0; tries < 3; ++tries) try
             {
-              var hub = this.hub;
-              var role = yield hub.lookup_role (peer, cancellable);
+              var role = yield role_provider.lookup (peer, cancellable);
               var value = yield role.find_value (get_self (), KeyRef (id.bytes), cancellable);
 
               if (value.found)
@@ -112,7 +113,7 @@ namespace Kademlia.DBus
                 {
                   var ar = new Key [value.others.length];
                   for (int i = 0; i < ar.length; ++i) ar [i] = new Key.verbatim (value.others [i].id.value);
-                  for (int i = 0; i < ar.length; ++i) if (value.others [i].knowable) know (hub, ar [i], value.others [i]);
+                  for (int i = 0; i < ar.length; ++i) if (value.others [i].knowable) know (ar [i], value.others [i]);
                   return new Kademlia.Value.delegated ((owned) ar);
                 }
             }
@@ -120,13 +121,24 @@ namespace Kademlia.DBus
             {
               @catch (peer, (owned) e);
             }
+
+          throw new PeerImplError.FAILED ("internal error");
         }
 
-      protected override async bool store_value (Key peer, Key key, GLib.Value? value = null, GLib.Cancellable? cancellable = null) throws GLib.Error requires (_hub.get () != null)
+      private void know (Key peer, PeerRef? @ref)
         {
-          while (true) try
+          if (Key.equal (id, peer) == false)
             {
-              var role = yield hub.lookup_role (peer, cancellable);
+              address_registry.add (peer, @ref.addresses);
+              this.add_contact (peer);
+            }
+        }
+
+      protected override async bool store_value (Key peer, Key key, GLib.Value? value = null, GLib.Cancellable? cancellable = null) throws GLib.Error
+        {
+          for (int tries = 0; tries < 3; ++tries) try
+            {
+              var role = yield role_provider.lookup (peer, cancellable);
               var result = yield role.store (get_self (), KeyRef (key.bytes), GValr.nat2net (value), cancellable);
               return result;
             }
@@ -134,13 +146,15 @@ namespace Kademlia.DBus
             {
               @catch (peer, (owned) e);
             }
+
+          throw new PeerImplError.FAILED ("internal error");
         }
 
-      protected override async bool ping_peer (Key peer, GLib.Cancellable? cancellable = null) throws GLib.Error requires (_hub.get () != null)
+      protected override async bool ping_peer (Key peer, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
-          while (true) try
+          for (int tries = 0; tries < 3; ++tries) try
             {
-              var role = yield hub.lookup_role (peer, cancellable);
+              var role = yield role_provider.lookup (peer, cancellable);
               var result = yield role.ping (get_self (), cancellable);
               return result;
             }
@@ -148,6 +162,8 @@ namespace Kademlia.DBus
             {
               @catch (peer, (owned) e);
             }
+
+          throw new PeerImplError.FAILED ("internal error");
         }
     }
 }

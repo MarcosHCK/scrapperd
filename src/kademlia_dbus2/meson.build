@@ -15,32 +15,40 @@
 # along with ScrapperD. If not, see <http://www.gnu.org/licenses/>.
 #
 
-libkademlia_dbus = library \
+libkademlia_dbus2 = library \
   (
-    'kademlia_dbus',
+    'kademlia_dbus2',
 
-    dependencies : libglib_vapis + \
+    dependencies : libglib_vapis +
       [
-        libgio_dep, libglib_dep, libgobject_dep,
-        netdis
+        libgio_dep, libglib_dep,
+        libgvalr_dep, libnetdis_dep
       ],
 
-    include_directories : [ configdir ] + libdirs,
+    include_directories : libdirs + [ configdir ],
     install : true,
 
-    link_with : [ libgvalr, libkademlia, libkrypt ],
+    link_with : [ libkademlia, libkrypt ],
 
     sources :
       [
+        'addressprovider.vala',
+        'addressregistry.vala',
+        'addressservice.vala',
         'clock.vala',
         'hub.vala',
-        'networkhub.vala',
+        'localprovider.vala',
+        'localregistry.vala',
         'node.vala',
         'nodeskeleton.vala',
         'peerimpl.vala',
         'peerimplproxy.vala',
         'refs.vala',
-      ],
+        'roleprovider.vala',
+        'roleregistry.vala',
+        'roleservice.vala',
+        'socketroleservice.vala',
+      ]
   )
 
 libdirs += include_directories ('.')

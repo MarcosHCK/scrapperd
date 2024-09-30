@@ -14,29 +14,19 @@
  * You should have received a copy of the GNU General Public License
  * along with ScrapperD. If not, see <http://www.gnu.org/licenses/>.
  */
+#ifndef __GVALR__
+#define __GVALR__ 1
+#include <glib-object.h>
 
-[CCode (cprefix = "ScrapperdStorage", lower_case_cprefix = "scrapperd_storage_")]
+#if __cplusplus
+extern "C" {
+#endif // __cplusplus
 
-namespace ScrapperD.Storage
-{
-  const string APPID = "org.hck.ScrapperD.Storage";
+  GVariant* g_valr_nat2net (GValue* value);
+  void g_valr_net2nat (GValue* value, GVariant* variant);
 
-  public sealed class Application : ScrapperD.Application
-    {
-
-      public Application ()
-        {
-          base (APPID, GLib.ApplicationFlags.NON_UNIQUE);
-        }
-
-      public static int main (string[] argv)
-        {
-          return (new Application ()).run (argv);
-        }
-
-      protected override async void register_peers () throws GLib.Error
-        {
-          peer_hub.add_local_peer ("storage", null, new Store ());
-        }
-    } 
+#if __cplusplus
 }
+#endif // __cplusplus
+
+#endif // __GVALR__

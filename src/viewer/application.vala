@@ -30,7 +30,8 @@ namespace ScrapperD.Viewer
       private Advertise.Hub adv_hub;
       private Advertise.Peeker adv_peeker;
       private GenericSet<unowned Kademlia.Key> adv_peers;
-      private Kademlia.DBus.NetworkHub hub;
+      private Kademlia.DBus.Clock peer_clock;
+      private Kademlia.DBus.Hub peer_hub;
 
       struct JoinToProxy
         {
@@ -60,7 +61,8 @@ namespace ScrapperD.Viewer
           adv_hub = new Advertise.Hub ();
           adv_peeker = new Advertise.Peeker (adv_hub);
           adv_peers = new GenericSet<unowned Kademlia.Key> (Kademlia.Key.hash, Kademlia.Key.equal);
-          hub = new Kademlia.DBus.NetworkHub ();
+          peer_hub = new Kademlia.DBus.Hub ();
+          peer_clock = new Kademlia.DBus.Clock (peer_hub);
 
           adv_hub.ensure_protocol (typeof (Kademlia.Ad.Protocol));
           adv_peeker.got_ad.connect (on_got_ad);
@@ -419,7 +421,7 @@ namespace ScrapperD.Viewer
       private async GLib.List<JoinToProxy?> jointo_async (string address, GLib.Cancellable? cancellable = null) throws GLib.Error
         {
           string[] elements;
-          var default_port = Kademlia.DBus.NetworkHub.DEFAULT_PORT;
+          var default_port = Kademlia.DBus.DEFAULT_PORT;
           var proxies = new GLib.List<JoinToProxy?> ();
 
           if ((elements = address.split ("#", -1)).length == 0)
@@ -432,7 +434,7 @@ namespace ScrapperD.Viewer
               for (unowned var i = 1; i < elements.length; ++i)
                 {
                   var role = elements [i];
-                  var proxy = yield hub.create_proxy_at (host_and_port, default_port, role, cancellable);
+                  var proxy = yield peer_hub.role_service.create_proxy_at (host_and_port, default_port, role, cancellable);
 
                   proxies.append (JoinToProxy ((owned) role, (owned) proxy));
                 }
@@ -609,8 +611,8 @@ namespace ScrapperD.Viewer
               unowned var proto = (Kademlia.Ad.Protocol) proto_;
               unowned bool added;
                 added = adv_peers.contains (proto.id);
-                added = added || hub.has_contact (proto.id);
-                added = added || hub.has_local (proto.id);
+                added = added || ((Kademlia.DBus.AddressProvider) peer_hub.address_service).has (proto.id);
+                added = added || ((Kademlia.DBus.LocalProvider) peer_hub.role_service).has (proto.id);
               if (added == false) added_ad (proto);
             }
         }
@@ -632,6 +634,13 @@ namespace ScrapperD.Viewer
       [CCode (cname = "gtk_style_context_add_provider_for_display")]
 
       static extern void _gtk_style_context_add_provider_for_display (Gdk.Display display, Gtk.StyleProvider provider, uint priority);
+
+      public override void shutdown ()
+        {
+          adv_peeker.stop ();
+          peer_clock.stop ();
+          base.shutdown ();
+        }
 
       public override void startup ()
         {

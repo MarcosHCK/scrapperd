@@ -15,28 +15,13 @@
  * along with ScrapperD. If not, see <http://www.gnu.org/licenses/>.
  */
 
-[CCode (cprefix = "ScrapperdStorage", lower_case_cprefix = "scrapperd_storage_")]
+[CCode (cprefix = "KDBus", lower_case_cprefix = "k_dbus_")]
 
-namespace ScrapperD.Storage
+namespace Kademlia.DBus
 {
-  const string APPID = "org.hck.ScrapperD.Storage";
-
-  public sealed class Application : ScrapperD.Application
+  public interface AddressRegistry : GLib.Object
     {
-
-      public Application ()
-        {
-          base (APPID, GLib.ApplicationFlags.NON_UNIQUE);
-        }
-
-      public static int main (string[] argv)
-        {
-          return (new Application ()).run (argv);
-        }
-
-      protected override async void register_peers () throws GLib.Error
-        {
-          peer_hub.add_local_peer ("storage", null, new Store ());
-        }
-    } 
+      public abstract void add (Key? id, Address[] addresses);
+      public abstract void drop (Key? id, Address[] addresses);
+    }
 }

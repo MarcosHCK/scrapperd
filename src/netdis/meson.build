@@ -131,11 +131,9 @@ libnetdis = library \
     sources : [ 'interface.c', 'interface.h', netconf_h, 'netdis.h' ],
   )
 
-netdis = declare_dependency \
+libnetdis_dep = declare_dependency \
   (
     include_directories : [ include_directories ('.') ],
     link_with : [ libnetdis ],
     sources : [ 'netdis.h', 'netdis.vapi' ],
   )
-
-libdirs += include_directories ('.')

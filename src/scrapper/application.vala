@@ -51,7 +51,7 @@ namespace ScrapperD.Scrapper
               assert (store != null);
               bool first = true;
 
-              try { store_proxy = yield peer_hub.create_proxy ("storage", cancellable); } catch (GLib.Error e)
+              try { store_proxy = yield peer_hub.role_service.create_proxy ("storage", cancellable); } catch (GLib.Error e)
                 {
                   good = false;
                   cmdline.printerr ("can not connect to network: %s: %u: %s", e.domain.to_string (), e.code, e.message);
@@ -89,11 +89,9 @@ namespace ScrapperD.Scrapper
 
       protected override async void register_peers () throws GLib.Error
         {
-          var value_store = new Store (scrapper);
-          var scrapper_peer = new Kademlia.DBus.PeerImpl (value_store);
-
-          peer_hub.add_local_peer ("scrapper", scrapper_peer);
-          (store = value_store).scrapper_peer = scrapper_peer;
+          var id = new Kademlia.Key.random ();
+          peer_hub.add_local_peer ("scrapper", id, store = new Store (scrapper));
+          store.scrapper_peer = ((Kademlia.DBus.LocalProvider) peer_hub.role_service).lookup (id);
         }
     } 
 }
