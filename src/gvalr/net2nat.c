@@ -42,8 +42,7 @@ void g_valr_net2nat (GValue* value, GVariant* variant)
 
   const gchar* ntype;
   const GType gtype = g_type_from_name (ntype = g_variant_get_string (g_variant_get_child_value (variant, 0), NULL));
-  const GVariant* packed;
-  const GVariantType* vtype = g_variant_get_type (packed = g_variant_get_variant (g_variant_get_child_value (variant, 1)));
+  GVariant* packed = g_variant_get_variant (g_variant_get_child_value (variant, 1));
 
   if (G_UNLIKELY (gtype == G_TYPE_NONE)) g_error ("unknown type %s", ntype);
 
