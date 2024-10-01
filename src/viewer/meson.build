@@ -27,6 +27,7 @@ scrapperd_viewer_support = library \
     dependencies : libglib_vapis + \
       [
         libgio_dep, libglib_dep, libgobject_dep,
+        libgvalr_dep,
       ],
 
     include_directories : [ configdir ] + libdirs,

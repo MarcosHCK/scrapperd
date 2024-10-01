@@ -22,6 +22,7 @@ namespace ScrapperD.Viewer
   public errordomain RoleTransportError
     {
       FAILED,
+      EMPTY_KEY,
       INVALID,
       UNKNOWN_TYPE;
 

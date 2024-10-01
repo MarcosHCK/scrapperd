@@ -44,15 +44,23 @@ namespace ScrapperD.Viewer
         {
           switch (target_type)
             {
+
               case RoleTargetType.CONSOLE:
                 {
-                  print ("%s\n", Kademlia.DBus.ValueRef.inmediate (value).value.print (false));
+                  if (value == null)
+                    print ("<'void'>\n");
+                  else
+                    print ("%s\n", GValr.nat2net (value).print (false));
                   break;
                 }
 
               case RoleTargetType.DATA:
                 {
                   string data;
+
+                  if (value == null)
+
+                    throw new RoleTransportError.EMPTY_KEY ("empty key response");
 
                   if (unlikely (value.holds (typeof (string)) == false))
 
@@ -68,6 +76,14 @@ namespace ScrapperD.Viewer
 
               case RoleTargetType.FILE:
                 {
+                  if (value == null)
+
+                    throw new RoleTransportError.EMPTY_KEY ("empty key response");
+
+                  if (unlikely (value.holds (typeof (GLib.Bytes)) == false))
+
+                    throw new RoleTransportError.INVALID ("key didn't hold a valid value, use another target");
+
                   var bytes = (GLib.Bytes) value.dup_boxed ();
                   var file = GLib.File.new_for_commandline_arg (target);
                   var file_stream = yield file.replace_async (null, false, 0, GLib.Priority.LOW, cancellable);

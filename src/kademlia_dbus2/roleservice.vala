@@ -85,8 +85,9 @@ namespace Kademlia.DBus
               var ar = new Array<Key> ();
               var iter = HashTableIter<Key, Role> (roles);
               unowned Key id;
+              unowned Role value;
 
-              while (iter.next (out id, null)) ar.append_val (id.copy ());
+              while (iter.next (out id, out value)) if (value.role == role) ar.append_val (id.copy ());
               peers = ar.steal ();
             }
 
