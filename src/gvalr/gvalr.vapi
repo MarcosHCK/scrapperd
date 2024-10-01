@@ -19,7 +19,7 @@
 
 namespace GValr
 {
-	[CCode (cheader_filename = "gvalr.h")]
+	[CCode (cheader_filename = "gvalr.h", returns_floating_reference = true)]
 	public static GLib.Variant nat2net (GLib.Value? value);
 	[CCode (cheader_filename = "gvalr.h")]
 	public static void net2nat (out GLib.Value value, GLib.Variant variant);
