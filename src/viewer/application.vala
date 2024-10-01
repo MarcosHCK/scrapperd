@@ -436,6 +436,7 @@ namespace ScrapperD.Viewer
                   var role = elements [i];
                   var proxy = yield peer_hub.role_service.create_proxy_at (host_and_port, default_port, role, cancellable);
 
+                  peer_clock.watch_proxy (proxy);
                   proxies.append (JoinToProxy ((owned) role, (owned) proxy));
                 }
             }

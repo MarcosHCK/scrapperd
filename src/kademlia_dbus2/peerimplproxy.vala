@@ -34,6 +34,11 @@ namespace Kademlia.DBus
 
   internal class PeerImplProxy : PeerImpl
     {
+      private int64 age = 0;
+      [CCode (cheader_filename = "glib.h", cname = "G_USEC_PER_SEC")]
+      public extern const int64 USEC_PER_SEC;
+      public const int64 FRESHTIME = 3 * USEC_PER_SEC;
+
       public PeerImplProxy (AddressProvider address_provider, Key? id, AddressRegistry address_registry, RoleProvider role_provider, RoleRegistry role_registry)
         {
           Object (address_provider : address_provider, address_registry : address_registry, id : id, role_provider : role_provider, role_registry : role_registry, value_store : new DummyValueStore ());
@@ -44,11 +49,31 @@ namespace Kademlia.DBus
           return PeerRef.anonymous (id.bytes);
         }
 
+      public new async bool join (Key to, GLib.Cancellable? cancellable = null) throws GLib.Error
+        {
+          var done = yield ((PeerImpl) this).join (to, cancellable);
+          age = GLib.get_monotonic_time ();
+          return done;
+        }
+
       public override GLib.SList<Key> nearest (Key id)
         {
           var list = base.nearest (id);
           list.foreach (a => { if (Key.equal (a, this.id)) list.remove (a); });
           return (owned) list;
+        }
+
+      public async bool refresh (GLib.Cancellable? cancellable = null) throws GLib.Error
+        {
+          if ((GLib.get_monotonic_time () - age) > FRESHTIME)
+            {
+              debug ("refreshing proxy %s", id.to_string ());
+
+              yield lookup_node (id, cancellable);
+              age = GLib.get_monotonic_time ();
+            }
+
+          return true;
         }
     }
 }

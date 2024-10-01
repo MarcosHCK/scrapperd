@@ -25,9 +25,10 @@ namespace Kademlia.DBus
       public GLib.MainContext context { get; construct; }
       public Hub hub { get; construct; }
       public GLib.Source source { get; construct; }
-
+      
       private GLib.Cancellable cancellable;
       private GLib.Mutex peer_mutex = Mutex ();
+      private GLib.List<PeerImplProxy> proxies;
       private GLib.Mutex value_mutex = Mutex ();
 
       construct
@@ -58,6 +59,13 @@ namespace Kademlia.DBus
             {
               yield peer.check_dormat_ranges (cancellable);
               yield peer.check_stale_contacts (cancellable);
+            }
+
+          foreach (unowned var proxy in proxies)
+            {
+              yield proxy.check_dormat_ranges (cancellable);
+              yield proxy.check_stale_contacts (cancellable);
+              yield proxy.refresh (cancellable);
             }
         }
 
@@ -118,6 +126,11 @@ namespace Kademlia.DBus
               });
 
           return GLib.Source.CONTINUE;
+        }
+
+      public void watch_proxy (ValuePeer peer) requires (peer.get_type ().is_a (typeof (PeerImplProxy)))
+        {
+          proxies.append ((PeerImplProxy) peer);
         }
     }
 }
