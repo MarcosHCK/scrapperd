@@ -18,10 +18,10 @@
 # Create build image
 #
 
-FROM glib-ubuntu-devel:latest AS builder
+FROM gtk-ubuntu-base:latest AS builder
 
 # Install dependencies
-RUN apt-get install -y libgcrypt-dev libglib2.0-dev libjson-glib-dev meson tar valac
+RUN apt-get install -y libgcrypt-dev libglib2.0-dev libgtk-4-dev libjson-glib-dev libsoup-3.0-dev meson tar valac
 
 # Install maybe needed dependencies
 RUN apt-get install -y ca-certificates
@@ -35,17 +35,17 @@ RUN cat *.tar.xz | tar -xJ
 
 # Build
 WORKDIR /build/
-RUN meson setup -Dprefix=/app/ -Dscrapper=disabled -Dviewer=disabled $(ls -d /dist/*/ | head -n 1)
+RUN meson setup -Dprefix=/app/ $(ls -d /dist/*/ | head -n 1)
 RUN meson compile
 RUN meson install
 
 # Create production image
 #
 
-FROM glib-ubuntu-release:latest
+FROM gtk-ubuntu-base:latest
 
 # Install dependencies
-RUN apt-get install -y libgcrypt20 libglib2.0-0 libjson-glib-1.0-0
+RUN apt-get install -y libgcrypt20 libglib2.0-0 libsoup-3.0-0 libjson-glib-1.0-0
 
 COPY --from=builder /app/ /
 

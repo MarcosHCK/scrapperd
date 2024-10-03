@@ -4,7 +4,7 @@
 
 - Compilador de C/C++ (preferiblemente Clang)
 - Compilador de Vala
-- gcrypt, glib, gobject, gio, soup3
+- gcrypt, glib, gobject, gio, json-glib, soup3
 - Gtk 4
 - meson
 
@@ -12,12 +12,13 @@
 
 ```sh
 apt install clang
-apt install vala
-api install libgcrypt20-dev
+apt install libgcrypt20-dev
 apt install libglib2.0-dev
 apt install libgtk-4-dev
+apt install libjson-glib-dev
 apt install libsoup-3.0-dev
 apt install meson
+apt install vala
 ```
 
 # Ejecutando la aplicación
@@ -35,23 +36,23 @@ meson compile
 ### Ejecutando nodo de almacenamiento
 
 ```sh
-src/storage/scrapperd-storage -p [<port>] -a [<entry node>]
+src/storage/storage -p [<port>] -a [<entry node>]
 ```
 
 ### Ejecutando nodo de scrapper
 
 ```sh
-src/scrapper/scrapperd-scrapper -p [<port>] -a [<entry node>]
+src/scrapper/scrapper -p [<port>] -a [<entry node>]
 ```
 
 ### Ejecutando aplicación gráfica
 
 ```sh
-src/viewer/scrapperd-viewer
+src/viewer/viewer
 ```
 
 o
 
 ```sh
-src/viewer/scrapperd-viewer -a [<entry node>]
+src/viewer/viewer -a [<entry node>]
 ```

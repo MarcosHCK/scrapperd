@@ -32,7 +32,7 @@ network_kill ()
 case $1 in
 
   build-*)
-      if [[ ! -e $BUILDDIR/meson-dist/*.tar.xz ]]
+      if [[ "" = "$(find "$BUILDDIR/meson-dist/" -maxdepth 1 -name "*.tar.xz")" ]]
       then
         echo "Must generate dist source package"
         exit 1
@@ -53,12 +53,26 @@ case $1 in
       meson dist -C $BUILDDIR/
     ;;
 
-  network-add)
-      docker run -dit -e G_MESSAGES_DEBUG=ScrapperD --network=$NETNAME --rm scrapperd
+  network-add-*)
+      instance=`echo "$1" | sed s/network-add-//`
+      docker run -dit -e G_MESSAGES_DEBUG=ScrapperD --entrypoint "/libexec/scrapperd/$instance" --network=$NETNAME --rm scrapperd
     ;;
 
-  network-add-expose)
-      docker run -it -e G_MESSAGES_DEBUG=ScrapperD --network=$NETNAME -p 33334:33334 --rm scrapperd
+  network-run-*)
+
+      instance=`echo "$1" | sed s/network-run-//`
+
+      case $instance in
+
+        viewer)
+          xhost +local:root
+          docker run -it -e DISPLAY=$DISPLAY -e G_MESSAGES_DEBUG=ScrapperD -v /tmp/.X11-unix:/tmp/.X11-unix --entrypoint "/libexec/scrapperd/$instance" --network=$NETNAME --rm scrapperd
+          xhost -local:root
+          ;;
+        *)
+          docker run -it -e G_MESSAGES_DEBUG=ScrapperD --entrypoint "/libexec/scrapperd/$instance" --network=$NETNAME --rm scrapperd
+          ;;
+      esac
     ;;
 
   network-down)
